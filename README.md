@@ -11,6 +11,9 @@ A containerized FastAPI application for managing projects and associated images/
 - Docker Compose for local development
 
 ## Project Structure
+
+![Project Structure](1readme_imgs/image.png)
+
 ```
 .
 ├── app/
@@ -23,13 +26,33 @@ A containerized FastAPI application for managing projects and associated images/
 │   ├── crud.py         # Database interaction functions
 │   ├── dependencies.py # Auth and authorization dependencies
 │   ├── minio_client.py # MinIO connection and functions
-│   └── routers/
-│       ├── __init__.py
-│       ├── projects.py   # Project related routes
-│       └── images.py     # Image related routes
+│   ├── test_upload.py  # Upload testing utility
+│   ├── routers/
+│   │   ├── __init__.py
+│   │   ├── projects.py # Project related routes
+│   │   ├── images.py   # Image related routes
+│   │   └── ui.py       # UI related routes
+│   └── ui/
+│       ├── index.html  # Main UI page
+│       ├── project.html # Project details page
+│       ├── view.html   # Image/file view page
+│       └── static/
+│           ├── css/
+│           │   └── styles.css # UI styling
+│           └── js/
+│               ├── index.js   # Main page scripts
+│               ├── project.js # Project page scripts
+│               └── view.js    # View page scripts
+├── 1readme_imgs/      # README images
+│   └── image.png      # Project structure image
 ├── .env              # Environment variables
+├── .env.example      # Example environment variables
+├── .gitignore        # Git ignore patterns
 ├── Dockerfile        # Docker build instructions for the app
 ├── docker-compose.yml # Docker Compose configuration
+├── docker-compose.override.yml # Docker Compose override for development
+├── k8s.yaml          # Kubernetes deployment manifest
+├── README.md         # This documentation
 └── requirements.txt  # Python dependencies
 ```
 
