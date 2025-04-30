@@ -1,0 +1,20 @@
+{
+  "name": "Python FastAPI Development",
+  "dockerComposeFile": "docker-compose.yml",
+  "service": "app-dev",
+  "workspaceFolder": "/app",
+  "forwardPorts": [8000],
+  "postCreateCommand": "pip install --no-cache-dir --upgrade -r requirements.txt",
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "ms-python.python",
+        "ms-python.vscode-pylance",
+        "saoudrizwan.claude-dev"
+      ],
+      "settings": {
+        "python.defaultInterpreterPath": "/usr/local/bin/python"
+      }
+    }
+  }
+}

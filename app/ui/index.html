@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Image Manager</title>
+  <link rel="stylesheet" href="/ui/static/css/styles.css">
+</head>
+<body>
+  <header>
+    <h1>Image Manager</h1>
+    <button id="new-project-btn" class="btn">New Project</button>
+  </header>
+
+  <div class="container">
+    <div id="alerts-container"></div>
+    
+    <div class="card">
+      <div class="card-header">
+        <h2>Projects</h2>
+      </div>
+      <div id="projects-container" class="card-content">
+        <!-- Projects will be loaded here -->
+        <p>Loading projects...</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- Create Project Modal -->
+  <div id="create-project-modal" class="modal hidden" style="display: none;">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h3>Create New Project</h3>
+        <span id="close-modal" class="close">&times;</span>
+      </div>
+      <div id="modal-body" class="modal-body">
+        <form id="create-project-form">
+          <div class="form-group">
+            <label for="project-name">Project Name</label>
+            <input type="text" id="project-name" required>
+          </div>
+          <div class="form-group">
+            <label for="project-description">Description (Optional)</label>
+            <textarea id="project-description" rows="3"></textarea>
+          </div>
+          <div class="form-group">
+            <label for="project-group">Group ID</label>
+            <input type="text" id="project-group" required>
+          </div>
+          <div class="modal-footer">
+            <button type="button" id="cancel-create" class="btn btn-secondary">Cancel</button>
+            <button type="submit" class="btn btn-success">Create Project</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <script src="/ui/static/js/index.js"></script>
+  <script>
+    // Additional initialization if needed
+    document.getElementById('cancel-create').addEventListener('click', function() {
+      document.getElementById('create-project-modal').classList.add('hidden');
+    });
+    
+    // Debug: Check if modal is hidden on page load
+    console.log('Modal hidden on load:', document.getElementById('create-project-modal').classList.contains('hidden'));
+    console.log('Modal display style:', document.getElementById('create-project-modal').style.display);
+  </script>
+</body>
+</html>

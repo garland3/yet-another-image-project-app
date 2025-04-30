@@ -1,0 +1,12 @@
+tfastapi[all]
+uvicorn[standard]
+sqlalchemy[asyncio]>=2.0
+asyncpg
+psycopg2-binary
+alembic
+python-dotenv
+pydantic-settings
+minio
+python-multipart
+uuid
+httpx

@@ -1,0 +1,20 @@
+version: '3.8'
+
+services:
+  app-dev:
+    build:
+      context: ..
+      dockerfile: Dockerfile
+      target: base
+    volumes:
+      - ..:/app:cached
+    command: sleep infinity
+    networks:
+      - data_mgmt_net
+    env_file:
+      - ../.env
+
+networks:
+  data_mgmt_net:
+    external: true
+    name: data_mgmt_net

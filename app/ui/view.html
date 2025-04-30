@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Image View - Image Manager</title>
+  <link rel="stylesheet" href="/ui/static/css/styles.css">
+</head>
+<body>
+  <header>
+    <div id="view-header">
+      <button id="back-button" class="btn btn-secondary">← Back to Project</button>
+      <h1 id="image-title">Loading image...</h1>
+    </div>
+  </header>
+
+  <div class="container">
+    <div id="alerts-container"></div>
+    
+    <div class="image-view-container">
+      <div class="image-navigation">
+        <button id="prev-button" class="btn btn-secondary navigation-btn">&lt; Previous</button>
+        <button id="next-button" class="btn btn-secondary navigation-btn">Next &gt;</button>
+      </div>
+      
+      <div id="image-display">
+        <!-- Image will be loaded here -->
+        <div class="loading-container">
+          <div class="loading"></div>
+          <p>Loading image...</p>
+        </div>
+      </div>
+      
+      <div class="image-controls">
+        <button id="zoom-in-button" class="btn btn-secondary control-btn">Zoom In</button>
+        <button id="zoom-out-button" class="btn btn-secondary control-btn">Zoom Out</button>
+        <button id="reset-zoom-button" class="btn btn-secondary control-btn">Reset</button>
+        <button id="download-button" class="btn btn-success control-btn">Download</button>
+      </div>
+      
+      <div class="card" id="metadata-container">
+        <div class="card-header">
+          <h2>Image Metadata</h2>
+        </div>
+        <div class="card-content" id="metadata-content">
+          <!-- Metadata will be loaded here -->
+          <p>Loading metadata...</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="/ui/static/js/view.js"></script>
+</body>
+</html>

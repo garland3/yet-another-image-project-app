@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Project - Image Manager</title>
+  <link rel="stylesheet" href="/ui/static/css/styles.css">
+</head>
+<body>
+  <header>
+    <div id="project-header">
+      <button id="back-button" class="btn btn-secondary">← Back to Projects</button>
+      <h1 id="project-title">Loading project...</h1>
+      <p id="project-description"></p>
+    </div>
+  </header>
+
+  <div class="container">
+    <div id="alerts-container"></div>
+    
+    <div class="card">
+      <div class="card-header">
+        <h2>Upload Images</h2>
+      </div>
+      <div class="card-content">
+        <form id="upload-form">
+          <div id="upload-area" class="upload-area">
+            <p>Drag and drop images here, or click to select files</p>
+            <p id="file-name">No file selected</p>
+            <input type="file" id="file-input" accept="image/*" multiple style="display: none;">
+          </div>
+          
+          <div class="form-group">
+            <label for="metadata-input">Metadata (Optional JSON)</label>
+            <textarea id="metadata-input" rows="3" placeholder='{"key": "value"}'></textarea>
+          </div>
+          
+          <div class="form-group">
+            <button type="submit" class="btn btn-success">Upload Images</button>
+          </div>
+        </form>
+      </div>
+    </div>
+    
+    <div class="card">
+      <div class="card-header">
+        <h2>Images</h2>
+      </div>
+      <div id="images-container" class="card-content">
+        <!-- Images will be loaded here -->
+        <p>Loading images...</p>
+      </div>
+    </div>
+  </div>
+
+  <script src="/ui/static/js/project.js"></script>
+</body>
+</html>
