@@ -131,6 +131,19 @@ To run this project on Kubernetes, use the provided `k8s.yaml` manifest. It sets
 - Project and image access is controlled by group membership (mocked via `.env`).
 - All code is in the `app/` directory, with routers for projects and images.
 
+### Test User Setup
+
+The application uses a mock user for development purposes. This user is defined in the `.env` file with the `MOCK_USER_EMAIL` variable. When `SKIP_HEADER_CHECK=True`, the application will use this mock user for authentication.
+
+The application will automatically create the test user in the database during startup. If you need to manually create the test user (for example, if you're running the application for the first time or if you've reset the database), you can run:
+
+```sh
+# From the project root
+./create_test_user.py
+```
+
+This will create the test user in the database with the email specified in the `.env` file.
+
 ### Dev Container & Docker Compose Override Workflow
 
 For local development with VS Code Dev Containers, this project uses a Docker Compose override and a dedicated dev container setup:

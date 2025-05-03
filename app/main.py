@@ -10,6 +10,7 @@ from app.database import create_db_and_tables
 from app.minio_client import minio_client, ensure_bucket_exists
 from app.routers import projects, images
 from app.routers import ui
+from app.create_test_user import create_test_user
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -17,6 +18,11 @@ async def lifespan(app: FastAPI):
     print("Creating database tables if they don't exist...")
     await create_db_and_tables()
     print("Database tables checked/created.")
+    
+    # Create test user if it doesn't exist
+    if settings.SKIP_HEADER_CHECK:
+        print("Creating test user if it doesn't exist...")
+        await create_test_user()
     print(f"Checking/Creating MinIO bucket: {settings.MINIO_BUCKET_NAME}")
     if minio_client:
          bucket_exists = ensure_bucket_exists(minio_client, settings.MINIO_BUCKET_NAME)

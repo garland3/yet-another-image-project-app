@@ -5,6 +5,10 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Image View - Image Manager</title>
   <link rel="stylesheet" href="/ui/static/css/styles.css">
+  <!-- Alpine.js -->
+  <script defer src="https://unpkg.com/alpinejs@3.12.3/dist/cdn.min.js"></script>
+  <!-- Alpine.js Plugins -->
+  <script defer src="https://unpkg.com/@alpinejs/focus@3.12.3/dist/cdn.min.js"></script>
 </head>
 <body>
   <header>
@@ -17,39 +21,427 @@
   <div class="container">
     <div id="alerts-container"></div>
     
-    <div class="image-view-container">
-      <div class="image-navigation">
-        <button id="prev-button" class="btn btn-secondary navigation-btn">&lt; Previous</button>
-        <button id="next-button" class="btn btn-secondary navigation-btn">Next &gt;</button>
-      </div>
-      
-      <div id="image-display">
-        <!-- Image will be loaded here -->
-        <div class="loading-container">
-          <div class="loading"></div>
-          <p>Loading image...</p>
+    <!-- Main content container with sidebar -->
+    <div class="main-content-container" x-data="{ activeTab: 'metadata' }">
+      <!-- Left Column: Main content area -->
+      <div class="image-pane">
+        <div class="image-view-container">
+          <div class="image-navigation">
+            <button id="prev-button" class="btn btn-secondary navigation-btn">&lt; Previous</button>
+            <button id="next-button" class="btn btn-secondary navigation-btn">Next &gt;</button>
+          </div>
+          
+          <div id="image-display">
+            <!-- Image will be loaded here -->
+            <div class="loading-container">
+              <div class="loading"></div>
+              <p>Loading image...</p>
+            </div>
+          </div>
+          
+          <div class="image-controls">
+            <button id="zoom-in-button" class="btn btn-secondary control-btn">Zoom In</button>
+            <button id="zoom-out-button" class="btn btn-secondary control-btn">Zoom Out</button>
+            <button id="reset-zoom-button" class="btn btn-secondary control-btn">Reset</button>
+            <button id="download-button" class="btn btn-success control-btn">Download</button>
+          </div>
         </div>
       </div>
       
-      <div class="image-controls">
-        <button id="zoom-in-button" class="btn btn-secondary control-btn">Zoom In</button>
-        <button id="zoom-out-button" class="btn btn-secondary control-btn">Zoom Out</button>
-        <button id="reset-zoom-button" class="btn btn-secondary control-btn">Reset</button>
-        <button id="download-button" class="btn btn-success control-btn">Download</button>
-      </div>
+      <!-- Sidebar content moved below image pane -->
+      <div class="sidebar">
+        <div class="sidebar-content">
+          <!-- Sidebar tabs -->
+          <div class="tabs">
+            <button class="tab-btn" :class="{ 'active': activeTab === 'metadata' }" @click="activeTab = 'metadata'">Metadata</button>
+            <button class="tab-btn" :class="{ 'active': activeTab === 'comments' }" @click="activeTab = 'comments'">Comments</button>
+            <button class="tab-btn" :class="{ 'active': activeTab === 'boxes' }" @click="activeTab = 'boxes'">Bounding Boxes</button>
+            <button class="tab-btn" :class="{ 'active': activeTab === 'categories' }" @click="activeTab = 'categories'">Categories</button>
+          </div>
       
-      <div class="card" id="metadata-container">
-        <div class="card-header">
-          <h2>Image Metadata</h2>
+          <!-- Metadata Tab -->
+          <div class="tab-content" x-show="activeTab === 'metadata'" x-data="imageMetadataManager()">
+        <div class="card">
+          <div class="card-header">
+            <h2>Image Metadata</h2>
+            <button class="btn" @click="showAddMetadataForm = true">Add Metadata</button>
+          </div>
+          <div class="card-content">
+            <div x-show="showAddMetadataForm" class="metadata-form">
+              <h3>Add New Metadata</h3>
+              <form @submit.prevent="addMetadata">
+                <div class="form-group">
+                  <label for="metadata-key">Key</label>
+                  <input type="text" id="metadata-key" x-model="newMetadata.key" required>
+                </div>
+                <div class="form-group">
+                  <label for="metadata-value">Value</label>
+                  <textarea id="metadata-value" x-model="newMetadata.value" rows="3"></textarea>
+                </div>
+                <div class="form-actions">
+                  <button type="button" class="btn btn-secondary" @click="showAddMetadataForm = false">Cancel</button>
+                  <button type="submit" class="btn btn-success">Add</button>
+                </div>
+              </form>
+            </div>
+            
+            <div x-show="editingMetadata !== null" class="metadata-form">
+              <h3>Edit Metadata</h3>
+              <form @submit.prevent="updateMetadata">
+                <div class="form-group">
+                  <label>Key</label>
+                  <input type="text" :value="editingMetadata ? editingMetadata.key : ''" disabled>
+                </div>
+                <div class="form-group">
+                  <label for="edit-metadata-value">Value</label>
+                  <textarea id="edit-metadata-value" 
+                            :value="editingMetadata ? editingMetadata.value : ''" 
+                            @input="if (editingMetadata) editingMetadata.value = $event.target.value" 
+                            rows="3"></textarea>
+                </div>
+                <div class="form-actions">
+                  <button type="button" class="btn btn-secondary" @click="cancelEdit">Cancel</button>
+                  <button type="submit" class="btn btn-success">Update</button>
+                </div>
+              </form>
+            </div>
+            
+            <div x-show="!showAddMetadataForm && !editingMetadata">
+              <table class="metadata-table" x-show="metadata.length > 0">
+                <thead>
+                  <tr>
+                    <th>Key</th>
+                    <th>Value</th>
+                    <th>Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <template x-for="item in metadata" :key="item.id">
+                    <tr>
+                      <td x-text="item.key"></td>
+                      <td x-text="item.value || '-'"></td>
+                      <td class="actions-cell">
+                        <button class="btn-icon" @click="editMetadata(item)">
+                          <span class="icon">✏️</span>
+                        </button>
+                        <button class="btn-icon" @click="deleteMetadata(item.id)">
+                          <span class="icon">🗑️</span>
+                        </button>
+                      </td>
+                    </tr>
+                  </template>
+                </tbody>
+              </table>
+              <p x-show="metadata.length === 0" class="empty-state">No metadata found. Add some metadata to get started.</p>
+            </div>
+          </div>
         </div>
-        <div class="card-content" id="metadata-content">
-          <!-- Metadata will be loaded here -->
-          <p>Loading metadata...</p>
+          </div>
+          
+          <!-- Comments Tab -->
+          <div class="tab-content" x-show="activeTab === 'comments'" x-data="commentsManager()">
+        <div class="card">
+          <div class="card-header">
+            <h2>Comments</h2>
+          </div>
+          <div class="card-content">
+            <div class="comments-section">
+              <div class="comments-list" x-show="comments.length > 0">
+                <template x-for="comment in comments" :key="comment.id">
+                  <div class="comment-card">
+                    <div class="comment-header">
+                      <span class="comment-author" x-text="comment.user_id"></span>
+                      <span class="comment-date" x-text="formatDate(comment.created_at)"></span>
+                      <div class="comment-actions" x-show="canEditComment(comment)">
+                        <button class="btn-icon" @click="editComment(comment)">
+                          <span class="icon">✏️</span>
+                        </button>
+                        <button class="btn-icon" @click="deleteComment(comment.id)">
+                          <span class="icon">🗑️</span>
+                        </button>
+                      </div>
+                    </div>
+                    <div class="comment-body" x-text="comment.text"></div>
+                  </div>
+                </template>
+              </div>
+              <p x-show="comments.length === 0" class="empty-state">No comments yet. Be the first to comment!</p>
+              
+              <div x-show="editingComment !== null" class="comment-form">
+                <h3>Edit Comment</h3>
+                <form @submit.prevent="updateComment">
+                  <div class="form-group">
+                    <label for="edit-comment-text">Comment</label>
+                    <textarea id="edit-comment-text" 
+                              :value="editingComment ? editingComment.text : ''" 
+                              @input="if (editingComment) editingComment.text = $event.target.value" 
+                              rows="3" required></textarea>
+                  </div>
+                  <div class="form-actions">
+                    <button type="button" class="btn btn-secondary" @click="cancelEdit">Cancel</button>
+                    <button type="submit" class="btn btn-success">Update</button>
+                  </div>
+                </form>
+              </div>
+              
+              <div x-show="!editingComment" class="comment-form">
+                <h3>Add Comment</h3>
+                <form @submit.prevent="addComment">
+                  <div class="form-group">
+                    <label for="comment-text">Comment</label>
+                    <textarea id="comment-text" x-model="newComment.text" rows="3" required></textarea>
+                  </div>
+                  <div class="form-actions">
+                    <button type="submit" class="btn btn-success">Post Comment</button>
+                  </div>
+                </form>
+              </div>
+            </div>
+          </div>
+        </div>
+          </div>
+          
+          <!-- Bounding Boxes Tab -->
+          <div class="tab-content" x-show="activeTab === 'boxes'" x-data="boundingBoxManager()">
+        <div class="card">
+          <div class="card-header">
+            <h2>Bounding Boxes</h2>
+          </div>
+          <div class="card-content">
+            <div class="bounding-box-container">
+              <div class="bounding-box-controls">
+                <button class="btn" @click="startDrawing" x-show="!isDrawing">Draw Box</button>
+                <button class="btn btn-secondary" @click="cancelDrawing" x-show="isDrawing">Cancel</button>
+                <select x-model="selectedClassId" x-show="isDrawing || editingBox">
+                  <option value="">Select a class</option>
+                  <template x-for="cls in classes" :key="cls.id">
+                    <option :value="cls.id" x-text="cls.name"></option>
+                  </template>
+                </select>
+              </div>
+              
+              <div id="bounding-box-canvas-container" class="bounding-box-canvas-container">
+                <!-- Canvas will be loaded here -->
+                <div class="loading-container" x-show="typeof loading !== 'undefined' && loading">
+                  <div class="loading"></div>
+                  <p>Loading image...</p>
+                </div>
+              </div>
+              
+              <div x-show="editingBox !== null" class="bounding-box-form">
+                <h3>Edit Bounding Box</h3>
+                <form @submit.prevent="updateBox">
+                  <div class="form-group">
+                    <label for="box-class">Class</label>
+                    <select id="box-class" 
+                            :value="editingBox ? editingBox.image_class_id : ''" 
+                            @input="if (editingBox) editingBox.image_class_id = $event.target.value ? parseInt($event.target.value) : null" 
+                            required>
+                      <option value="">Select a class</option>
+                      <template x-for="cls in classes" :key="cls.id">
+                        <option :value="cls.id" x-text="cls.name"></option>
+                      </template>
+                    </select>
+                  </div>
+                  <div class="form-group">
+                    <label for="box-comment">Comment (Optional)</label>
+                    <textarea id="box-comment" 
+                              :value="editingBox ? editingBox.comment : ''" 
+                              @input="if (editingBox) editingBox.comment = $event.target.value" 
+                              rows="3"></textarea>
+                  </div>
+                  <div class="form-actions">
+                    <button type="button" class="btn btn-secondary" @click="cancelEdit">Cancel</button>
+                    <button type="submit" class="btn btn-success">Update</button>
+                    <button type="button" class="btn btn-error" @click="editingBox && deleteBox(editingBox.id)">Delete</button>
+                  </div>
+                </form>
+              </div>
+              
+              <div x-show="drawingComplete && !editingBox" class="bounding-box-form">
+                <h3>Add Bounding Box</h3>
+                <form @submit.prevent="saveBox">
+                  <div class="form-group">
+                    <label for="new-box-class">Class</label>
+                    <select id="new-box-class" x-model="selectedClassId" required>
+                      <option value="">Select a class</option>
+                      <template x-for="cls in classes" :key="cls.id">
+                        <option :value="cls.id" x-text="cls.name"></option>
+                      </template>
+                    </select>
+                  </div>
+                  <div class="form-group">
+                    <label for="new-box-comment">Comment (Optional)</label>
+                    <textarea id="new-box-comment" x-model="newBoxComment" rows="3"></textarea>
+                  </div>
+                  <div class="form-actions">
+                    <button type="button" class="btn btn-secondary" @click="cancelDrawing">Cancel</button>
+                    <button type="submit" class="btn btn-success">Save</button>
+                  </div>
+                </form>
+              </div>
+              
+              <div class="bounding-box-list" x-show="boxes.length > 0 && !isDrawing && !drawingComplete && !editingBox">
+                <h3>Existing Boxes</h3>
+                <table class="metadata-table">
+                  <thead>
+                    <tr>
+                      <th>Class</th>
+                      <th>Comment</th>
+                      <th>Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <template x-for="box in boxes" :key="box.id">
+                      <tr>
+                        <td x-text="getClassName(box.image_class_id)"></td>
+                        <td x-text="box.comment || '-'"></td>
+                        <td class="actions-cell">
+                          <button class="btn-icon" @click="editBox(box)">
+                            <span class="icon">✏️</span>
+                          </button>
+                          <button class="btn-icon" @click="deleteBox(box.id)">
+                            <span class="icon">🗑️</span>
+                          </button>
+                        </td>
+                      </tr>
+                    </template>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        </div>
+          </div>
+          
+          <!-- Categories Tab -->
+          <div class="tab-content" x-show="activeTab === 'categories'" x-data="categoriesManager()">
+        <div class="card">
+          <div class="card-header">
+            <h2>Categories</h2>
+          </div>
+          <div class="card-content">
+            <div class="categories-section">
+              <div class="categories-list">
+                <h3>Assign Categories</h3>
+                <div class="category-selection">
+                  <div class="form-group">
+                    <label for="category-select">Add Category</label>
+                    <div class="category-select-container">
+                      <select id="category-select" x-model="selectedCategoryId">
+                        <option value="">Select a category</option>
+                        <template x-for="category in availableCategories" :key="category.id">
+                          <option :value="category.id" x-text="category.name"></option>
+                        </template>
+                      </select>
+                      <button class="btn" @click="addCategory" :disabled="!selectedCategoryId">Add</button>
+                    </div>
+                  </div>
+                </div>
+                
+                <div class="assigned-categories" x-show="assignedCategories.length > 0">
+                  <h3>Assigned Categories</h3>
+                  <div class="category-tags">
+                    <template x-for="category in assignedCategories" :key="category.id">
+                      <div class="category-tag">
+                        <span x-text="category.name"></span>
+                        <button class="tag-remove" @click="removeCategory(category.id)">×</button>
+                      </div>
+                    </template>
+                  </div>
+                </div>
+                
+                <p x-show="assignedCategories.length === 0" class="empty-state">No categories assigned to this image.</p>
+              </div>
+              
+              <div class="category-management" x-show="canManageCategories">
+                <h3>Manage Categories</h3>
+                <div x-show="showAddCategoryForm" class="category-form">
+                  <h4>Add New Category</h4>
+                  <form @submit.prevent="createCategory">
+                    <div class="form-group">
+                      <label for="category-name">Name</label>
+                      <input type="text" id="category-name" x-model="newCategory.name" required>
+                    </div>
+                    <div class="form-group">
+                      <label for="category-description">Description</label>
+                      <textarea id="category-description" x-model="newCategory.description" rows="3"></textarea>
+                    </div>
+                    <div class="form-actions">
+                      <button type="button" class="btn btn-secondary" @click="showAddCategoryForm = false">Cancel</button>
+                      <button type="submit" class="btn btn-success">Create</button>
+                    </div>
+                  </form>
+                </div>
+                
+                <button class="btn" @click="showAddCategoryForm = true" x-show="!showAddCategoryForm">Create New Category</button>
+                
+                <div class="all-categories" x-show="!showAddCategoryForm">
+                  <table class="metadata-table">
+                    <thead>
+                      <tr>
+                        <th>Name</th>
+                        <th>Description</th>
+                        <th>Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      <template x-for="category in allCategories" :key="category.id">
+                        <tr>
+                          <td x-text="category.name"></td>
+                          <td x-text="category.description || '-'"></td>
+                          <td class="actions-cell">
+                            <button class="btn-icon" @click="editCategory(category)">
+                              <span class="icon">✏️</span>
+                            </button>
+                            <button class="btn-icon" @click="deleteCategory(category.id)">
+                              <span class="icon">🗑️</span>
+                            </button>
+                          </td>
+                        </tr>
+                      </template>
+                    </tbody>
+                  </table>
+                </div>
+                
+                <div x-show="editingCategory !== null" class="category-form">
+                  <h4>Edit Category</h4>
+                  <form @submit.prevent="updateCategory">
+                    <div class="form-group">
+                      <label for="edit-category-name">Name</label>
+                      <input type="text" id="edit-category-name" 
+                             :value="editingCategory ? editingCategory.name : ''" 
+                             @input="if (editingCategory) editingCategory.name = $event.target.value" 
+                             required>
+                    </div>
+                    <div class="form-group">
+                      <label for="edit-category-description">Description</label>
+                      <textarea id="edit-category-description" 
+                                :value="editingCategory ? editingCategory.description : ''" 
+                                @input="if (editingCategory) editingCategory.description = $event.target.value" 
+                                rows="3"></textarea>
+                    </div>
+                    <div class="form-actions">
+                      <button type="button" class="btn btn-secondary" @click="cancelEdit">Cancel</button>
+                      <button type="submit" class="btn btn-success">Update</button>
+                    </div>
+                  </form>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+          </div>
         </div>
       </div>
     </div>
   </div>
 
   <script src="/ui/static/js/view.js"></script>
+  <script src="/ui/static/js/sidebar.js"></script>
+  <script src="/ui/static/js/image-metadata.js"></script>
+  <script src="/ui/static/js/comments.js"></script>
+  <script src="/ui/static/js/bounding-boxes.js"></script>
+  <script src="/ui/static/js/categories.js"></script>
 </body>
 </html>

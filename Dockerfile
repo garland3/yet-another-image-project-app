@@ -32,7 +32,11 @@ RUN pip install --no-cache-dir --upgrade pip && \
     pip install --no-cache-dir -r requirements.txt
 
 COPY ./app /app/app
+COPY create_test_user.py /app/create_test_user.py
 COPY .env /app/.env
+
+# Make the test user creation script executable
+RUN chmod +x /app/create_test_user.py
 
 EXPOSE 8000
 
