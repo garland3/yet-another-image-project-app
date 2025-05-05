@@ -18,9 +18,10 @@ function initSidebar() {
     }
   });
   
-  // Make sure the image display adjusts when the sidebar is toggled
+  // REMOVED MutationObserver related to old sidebar collapsing adjustments
+  /*
   const sidebar = document.querySelector('.sidebar');
-  const mainContent = document.querySelector('.image-pane'); // Updated selector
+  const mainContent = document.querySelector('.main-content'); // Use left column selector
   
   if (sidebar && mainContent) {
     // Create a mutation observer to watch for changes to the sidebar's class
@@ -40,6 +41,7 @@ function initSidebar() {
     // REMOVED Initial adjustment call
     // adjustMainContent();
   }
+  */
 }
 
 // REMOVED adjustMainContent function
