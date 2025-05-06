@@ -206,7 +206,14 @@ async def create_comment(db: AsyncSession, comment: schemas.ImageCommentCreate) 
     db.add(db_comment)
     await db.commit()
     await db.refresh(db_comment)
-    return db_comment
+    
+    # Explicitly load the comment without the relationship
+    # to avoid the MissingGreenlet error
+    result = await db.execute(
+        select(models.ImageComment)
+        .where(models.ImageComment.id == db_comment.id)
+    )
+    return result.scalars().first()
 
 async def update_comment(db: AsyncSession, comment_id: uuid.UUID, comment_data: Dict[str, Any]) -> Optional[models.ImageComment]:
     # First check if the comment exists

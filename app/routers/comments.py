@@ -36,6 +36,7 @@ async def create_comment(
     print(f"Created comment object: {comment_create}")
     
     # Set the author_id based on the current user
+    # We need to ensure we have a valid user ID from a real user in the database
     if current_user.id:
         comment_create.author_id = current_user.id
     else:
