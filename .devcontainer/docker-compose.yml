@@ -8,6 +8,8 @@ services:
       target: base
     volumes:
       - ..:/app:delegate
+      - node_modules_volume:/app/frontend/node_modules
+      - npm_cache:/root/.npm
     command: sleep infinity
     networks:
       - data_mgmt_net

@@ -15,8 +15,10 @@
     "web-vitals": "^2.1.4"
   },
   "scripts": {
-    "start": "cross-env NODE_ENV=development NODE_OPTIONS=--max_old_space_size=4096 FAST_REFRESH=true CHOKIDAR_USEPOLLING=true WDS_SOCKET_HOST=127.0.0.1 react-app-rewired start",
-    "build": "react-app-rewired build",
+    "blah_start": "cross-env NODE_ENV=development NODE_OPTIONS=--max_old_space_size=4096 FAST_REFRESH=true CHOKIDAR_USEPOLLING=true WDS_SOCKET_HOST=127.0.0.1 react-app-rewired start",
+   "start": " react-app-rewired start",
+   
+   "build": "react-app-rewired build",
     "test": "react-app-rewired test",
     "eject": "react-scripts eject"
   },
