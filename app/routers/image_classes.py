@@ -138,14 +138,21 @@ async def classify_image(
     db: AsyncSession = Depends(get_db),
     current_user: schemas.User = Depends(get_current_user),
 ):
+    print(f"Classification request received for image_id: {image_id}")
+    print(f"Request body: {classification}")
+    
     # Check if the user has access to the image
     db_image = await check_image_access(image_id, db, current_user)
     
     # Ensure the image_id in the path matches the one in the request body
-    if image_id != classification.image_id:
+    # Convert both to strings for comparison to handle different UUID object types
+    if str(image_id) != str(classification.image_id):
+        print(f"Image ID mismatch: path={image_id}, body={classification.image_id}")
+        print(f"Types: path={type(image_id)}, body={type(classification.image_id)}")
+        print(f"String comparison: {str(image_id)} vs {str(classification.image_id)}")
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Image ID in the path must match the image_id in the request body",
+            detail=f"Image ID in the path must match the image_id in the request body. Path: {image_id}, Body: {classification.image_id}",
         )
     
     # Get the image class to ensure it exists and belongs to the same project
@@ -160,6 +167,9 @@ async def classify_image(
         )
     
     # Set the created_by_id to the current user's ID
+    # We need to ensure we have a valid user ID from a real user in the database
+    
+    # Check if the current user has an ID
     if current_user.id:
         classification.created_by_id = current_user.id
     else:
@@ -175,6 +185,9 @@ async def classify_image(
             db_user = await crud.create_user(db=db, user=user_create)
         
         classification.created_by_id = db_user.id
+    
+    # Log the final classification object before saving
+    print(f"Final classification object to save: {classification}")
     
     # Create the classification
     return await crud.create_image_classification(db=db, classification=classification)

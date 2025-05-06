@@ -1,4 +1,4 @@
-from fastapi import FastAPI, Request
+from fastapi import FastAPI, Request, status
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import JSONResponse
 from contextlib import asynccontextmanager
@@ -10,7 +10,7 @@ from app.database import create_db_and_tables
 from app.minio_client import minio_client, ensure_bucket_exists
 from app.migrations import run_migrations
 from app.routers import projects, images, users, image_classes, comments, project_metadata
-from app.routers import ui
+
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -70,36 +70,47 @@ class CustomJSONResponse(JSONResponse):
             cls=CustomJSONEncoder,
         ).encode("utf-8")
 
-@app.middleware("http")
-async def log_request(request, call_next):
-    print(f"Request: {request.method} {request.url}")
-    try:
-        response = await call_next(request)
-        return response
-    except ValidationError as e:
-        # Log the detailed error
-        print(f"Pydantic ValidationError: {str(e)}")
-        print(f"Error details: {e.errors()}")
-        print(f"Traceback: {traceback.format_exc()}")
+# @app.middleware("http")
+# async def log_request(request, call_next):
+#     print(f"Request: {request.method} {request.url}")
+#     try:
+#         response = await call_next(request)
+#         return response
+#     except ValidationError as e:
+#         # Log the detailed error
+#         print(f"Pydantic ValidationError: {str(e)}")
+#         print(f"Error details: {e.errors()}")
+#         print(f"Traceback: {traceback.format_exc()}")
         
-        # Return a more informative error response
-        return CustomJSONResponse(
-            status_code=422,
-            content={
-                "detail": "Validation Error",
-                "errors": e.errors(),
-                "message": str(e)
-            }
-        )
-    except Exception as e:
-        # Log other exceptions
-        print(f"Unhandled exception: {str(e)}")
-        print(f"Traceback: {traceback.format_exc()}")
-        raise
+#         # Return a more informative error response
+#         return CustomJSONResponse(
+#             status_code=422,
+#             content={
+#                 "detail": "Validation Error",
+#                 "errors": e.errors(),
+#                 "message": str(e)
+#             }
+#         )
+#     except Exception as e:
+#         # Log other exceptions
+#         print(f"Unhandled exception: {str(e)}")
+#         print(f"Traceback: {traceback.format_exc()}")
+        # raise
+
+# Global exception handler for Pydantic ValidationError
+@app.exception_handler(ValidationError)
+async def validation_exception_handler(request: Request, exc: ValidationError):
+    # print he trace back to and as much informaion tot he console. 
+    print(f"ValidationError: {str(exc)}")
+    print(f"Error details: {exc.errors()}")
+    print(f"Traceback: {traceback.format_exc()}")
+    return JSONResponse(
+        status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+        content={"detail": exc.errors()},
+    )
 
 
-# Mount static files for UI
-app.mount("/ui/static", StaticFiles(directory="app/ui/static"), name="ui-static")
+
 
 app.include_router(projects.router)
 app.include_router(images.router)
@@ -107,7 +118,7 @@ app.include_router(users.router)
 app.include_router(image_classes.router)
 app.include_router(comments.router)
 app.include_router(project_metadata.router)
-app.include_router(ui.router)
+# app.include_router(ui.router)
 
 from fastapi.responses import RedirectResponse
 

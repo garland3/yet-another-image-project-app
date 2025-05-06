@@ -19,6 +19,10 @@ async def create_comment(
     db: AsyncSession = Depends(get_db),
     current_user: schemas.User = Depends(get_current_user),
 ):
+    print(f"Comment request received for image_id: {image_id}")
+    print(f"Comment text: {comment.text}")
+    print(f"Current user: {current_user}")
+    
     # Check if the user has access to the image
     await check_image_access(image_id, db, current_user)
     
@@ -26,12 +30,15 @@ async def create_comment(
     comment_create = schemas.ImageCommentCreate(
         image_id=image_id,
         text=comment.text,
-        author_id=current_user.id,
+        # author_id is now optional in the schema
     )
     
-    # If the current user doesn't have an ID (e.g., it's a mock user),
-    # we need to find or create a user record for them
-    if not comment_create.author_id:
+    print(f"Created comment object: {comment_create}")
+    
+    # Set the author_id based on the current user
+    if current_user.id:
+        comment_create.author_id = current_user.id
+    else:
         db_user = await crud.get_user_by_email(db=db, email=current_user.email)
         if not db_user:
             # Create a new user

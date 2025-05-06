@@ -125,9 +125,19 @@ class ImageClass(ImageClassBase):
 class ImageClassificationBase(BaseModel):
     image_id: uuid.UUID
     class_id: uuid.UUID
+    
+    @field_validator('image_id', 'class_id', mode='before')
+    @classmethod
+    def validate_uuid(cls, v):
+        if isinstance(v, str):
+            try:
+                return uuid.UUID(v)
+            except ValueError:
+                raise ValueError(f"Invalid UUID format: {v}")
+        return v
 
 class ImageClassificationCreate(ImageClassificationBase):
-    created_by_id: uuid.UUID
+    created_by_id: Optional[uuid.UUID] = None
 
 class ImageClassification(ImageClassificationBase):
     id: uuid.UUID
@@ -135,8 +145,8 @@ class ImageClassification(ImageClassificationBase):
     created_at: datetime
     updated_at: Optional[datetime] = None
     
-    # Include related data
-    image_class: Optional[ImageClass] = None
+    # Remove the related data that's causing issues
+    # image_class: Optional[ImageClass] = None
 
     model_config = {
         "from_attributes": True,
@@ -149,7 +159,19 @@ class ImageCommentBase(BaseModel):
 
 class ImageCommentCreate(ImageCommentBase):
     image_id: uuid.UUID
-    author_id: uuid.UUID
+    author_id: Optional[uuid.UUID] = None
+    
+    @field_validator('image_id', 'author_id', mode='before')
+    @classmethod
+    def validate_uuid(cls, v):
+        if v is None:
+            return None
+        if isinstance(v, str):
+            try:
+                return uuid.UUID(v)
+            except ValueError:
+                raise ValueError(f"Invalid UUID format: {v}")
+        return v
 
 class ImageComment(ImageCommentBase):
     id: uuid.UUID

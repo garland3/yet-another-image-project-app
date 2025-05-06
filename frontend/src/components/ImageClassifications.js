@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { v4 as uuidv4 } from 'uuid'; // Add UUID library
 
 function ImageClassifications({ imageId, classes, loading, setLoading, setError }) {
   const [imageClassifications, setImageClassifications] = useState([]);
@@ -36,6 +37,9 @@ function ImageClassifications({ imageId, classes, loading, setLoading, setError 
       
       // Check if the image is already classified with this class
       const classIdStr = String(classId);
+      console.log("Class ID (string):", classIdStr);
+      console.log("Class ID (original):", classId);
+      
       const existingClassification = imageClassifications.find(
         classification => String(classification.class_id) === classIdStr
       );
@@ -48,21 +52,34 @@ function ImageClassifications({ imageId, classes, loading, setLoading, setError 
       
       // Ensure imageId is a string to match the format expected by the backend
       const imageIdStr = String(imageId);
+      console.log("Image ID (string):", imageIdStr);
+      console.log("Image ID (original):", imageId);
       // classIdStr is already declared above
+      
+      // Create the request payload
+      // The backend will handle UUID conversion and setting created_by_id
+      const payload = {
+        image_id: imageIdStr,
+        class_id: classIdStr
+        // No created_by_id - backend will handle this
+      };
+      
+      console.log("Request payload:", JSON.stringify(payload, null, 2));
       
       const response = await fetch(`/images/${imageIdStr}/classifications`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({
-          image_id: imageIdStr,
-          class_id: classIdStr,
-        }),
+        body: JSON.stringify(payload),
       });
       
+      console.log("Response status:", response.status);
+      
       if (!response.ok) {
-        throw new Error(`HTTP error! Status: ${response.status}`);
+        const errorText = await response.text();
+        console.error("Error response:", errorText);
+        throw new Error(`HTTP error! Status: ${response.status}, Details: ${errorText}`);
       }
       
       const newClassification = await response.json();

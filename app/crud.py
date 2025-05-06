@@ -163,7 +163,14 @@ async def create_image_classification(db: AsyncSession, classification: schemas.
     db.add(db_classification)
     await db.commit()
     await db.refresh(db_classification)
-    return db_classification
+    
+    # Explicitly load the classification without the relationship
+    # to avoid the MissingGreenlet error
+    result = await db.execute(
+        select(models.ImageClassification)
+        .where(models.ImageClassification.id == db_classification.id)
+    )
+    return result.scalars().first()
 
 async def delete_image_classification(db: AsyncSession, classification_id: uuid.UUID) -> bool:
     # First check if the classification exists
