@@ -1,5 +1,5 @@
 # Use an official Python runtime as a parent image
-# use multi-stage build to enable the dev enviroment to only use the base image
+# use multi-stage build to enable the dev environment to only use the base image
 FROM python:3.11-slim AS base
 
 # Install system dependencies and tools for development
@@ -37,16 +37,25 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 FROM base AS builder
 
+# Install Python dependencies
 COPY requirements.txt .
 RUN pip install --no-cache-dir --upgrade pip && \
     pip install --no-cache-dir -r requirements.txt
 
+# Copy backend code
 COPY ./app /app/app
 COPY .env /app/.env
 
+# Add frontend setup steps
+WORKDIR /app/frontend
+COPY ./frontend/package.json ./frontend/package-lock.json ./
+RUN npm install
+RUN npm run build
+
+# Expose backend port
+WORKDIR /app
 EXPOSE 8000
 
 CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]
-# uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
 # For production, use:
 # CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
