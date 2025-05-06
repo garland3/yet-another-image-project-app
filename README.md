@@ -1,154 +1,146 @@
-# Data Management API
+# Image Management System
 
-A containerized FastAPI application for managing projects and associated images/files, using PostgreSQL for metadata and MinIO for object storage. Includes mock authentication and group-based access control for development.
+A web-based system for managing images, projects, and annotations.
 
 ## Features
-- Project CRUD (create, list, retrieve)
-- Image/file upload, listing, metadata, and presigned download URLs
-- PostgreSQL for metadata storage
-- MinIO (S3-compatible) for file storage
-- Mock authentication and group membership (configurable)
-- Docker Compose for local development
 
-## Project Structure
+### Core Features
+- Project management
+- Image upload and storage
+- Image viewing and navigation
+- Image metadata
 
-![Project Structure](1readme_imgs/image.png)
+### New Features
+1. **Image Classification**
+   - Define custom classes per project (e.g., 'defect', 'ok', 'unsure')
+   - Classify images with one or more classes
+   - View and manage classifications
 
-```
-.
-├── app/
-│   ├── __init__.py
-│   ├── main.py         # FastAPI app setup and root endpoint
-│   ├── config.py       # Pydantic settings management
-│   ├── database.py     # Database connection and session
-│   ├── models.py       # SQLAlchemy ORM models
-│   ├── schemas.py      # Pydantic schemas for API validation
-│   ├── crud.py         # Database interaction functions
-│   ├── dependencies.py # Auth and authorization dependencies
-│   ├── minio_client.py # MinIO connection and functions
-│   ├── test_upload.py  # Upload testing utility
-│   ├── routers/
-│   │   ├── __init__.py
-│   │   ├── projects.py # Project related routes
-│   │   ├── images.py   # Image related routes
-│   │   └── ui.py       # UI related routes
-│   └── ui/
-│       ├── index.html  # Main UI page
-│       ├── project.html # Project details page
-│       ├── view.html   # Image/file view page
-│       └── static/
-│           ├── css/
-│           │   └── styles.css # UI styling
-│           └── js/
-│               ├── index.js   # Main page scripts
-│               ├── project.js # Project page scripts
-│               └── view.js    # View page scripts
-├── 1readme_imgs/      # README images
-│   └── image.png      # Project structure image
-├── .env              # Environment variables
-├── .env.example      # Example environment variables
-├── .gitignore        # Git ignore patterns
-├── Dockerfile        # Docker build instructions for the app
-├── docker-compose.yml # Docker Compose configuration
-├── docker-compose.override.yml # Docker Compose override for development
-├── k8s.yaml          # Kubernetes deployment manifest
-├── README.md         # This documentation
-└── requirements.txt  # Python dependencies
-```
+2. **Image Comments**
+   - Add comments to images
+   - View, edit, and delete comments
+   - Comments are associated with users
 
-## Quickstart
+3. **Project Metadata**
+   - Add key-value metadata to projects
+   - Support for simple values and complex JSON objects
+   - Bulk update project metadata
 
-1. **Clone the repository**
-   ```sh
-   git clone <repo-url>
-   cd project_management_ui
-   ```
-2. **Create a `.env` file** (see below for example)
-3. **Build and run with Docker Compose**
-   ```sh
-   docker-compose up --build
-   ```
-4. **Access the app:**
-   - API docs: [http://localhost:8000/docs](http://localhost:8000/docs)
-   - MinIO Console: [http://localhost:9090](http://localhost:9090)
-   - PostgreSQL: `localhost:5433` (use credentials from `.env`)
+4. **User Management**
+   - User accounts with email and groups
+   - User authentication and authorization
+   - User-based permissions for comments and classifications
 
-## Example `.env`
-```
-APP_NAME="Data Management API"
-SKIP_HEADER_CHECK=True
-MOCK_USER_EMAIL="test@example.com"
-MOCK_USER_GROUPS='["admin-group", "data-scientists", "project-alpha-group"]'
-POSTGRES_USER=admin
-POSTGRES_PASSWORD=supersecretpassword
-POSTGRES_DB=datamgmt
-POSTGRES_SERVER=db
-POSTGRES_PORT=5432
-DATABASE_URL=postgresql+asyncpg://admin:supersecretpassword@db:5432/datamgmt
-MINIO_ENDPOINT=minio:9000
-MINIO_ACCESS_KEY=minioadmin
-MINIO_SECRET_KEY=minioadminpassword
-MINIO_BUCKET_NAME=data-storage
-MINIO_USE_SSL=False
-```
+## Architecture
 
-## Usage
-- **API documentation:** [http://localhost:8000/docs](http://localhost:8000/docs)
-- **MinIO Console:** [http://localhost:9090](http://localhost:9090) (login with `MINIO_ACCESS_KEY`/`MINIO_SECRET_KEY`)
-- **Database:** Connect to PostgreSQL on `localhost:5433` using credentials from `.env`
+### Backend
+- FastAPI for the REST API
+- SQLAlchemy for database ORM
+- PostgreSQL for data storage
+- MinIO for object storage (images)
 
-## Kubernetes Deployment
+### Frontend
+- Vanilla JavaScript
+- HTML/CSS
+- Responsive design
 
-To run this project on Kubernetes, use the provided `k8s.yaml` manifest. It sets up:
-- A dedicated namespace (`data-mgmt`)
-- Secrets for environment variables
-- Persistent storage for PostgreSQL and MinIO
-- Deployments and Services for PostgreSQL, MinIO, and the FastAPI app
-- NodePort services for external access to the API and MinIO Console
+## Database Schema
 
-### Steps to Deploy
+### Core Tables
+- `projects`: Stores project information
+- `data_instances`: Stores image information and metadata
 
-1. **Build and push your FastAPI Docker image:**
-   Replace `<your-dockerhub-username>` in `k8s.yaml` with your Docker Hub username, then build and push your image:
-   ```sh
-   docker build -t <your-dockerhub-username>/project-management-ui:latest .
-   docker push <your-dockerhub-username>/project-management-ui:latest
-   ```
-2. **Apply the Kubernetes manifest:**
-   ```sh
-   kubectl apply -f k8s.yaml
-   ```
-3. **Access the services:**
-   - FastAPI app: `http://<node-ip>:30080`
-   - MinIO Console: `http://<node-ip>:30909`
+### New Tables
+- `users`: Stores user information
+- `image_classes`: Stores class definitions for projects
+- `image_classifications`: Stores image classifications
+- `image_comments`: Stores comments on images
+- `project_metadata`: Stores project metadata
 
-> **Note:**
-> - You may need to configure your Kubernetes cluster to support NodePort access.
-> - For production, consider using Ingress and secure your secrets appropriately.
+## API Endpoints
 
-## Development Notes
-- The app uses mock authentication by default (`SKIP_HEADER_CHECK=True`). Set to `False` to require real authentication (not implemented).
-- Project and image access is controlled by group membership (mocked via `.env`).
-- All code is in the `app/` directory, with routers for projects and images.
+### Project Endpoints
+- `GET /projects`: List all projects
+- `POST /projects`: Create a new project
+- `GET /projects/{project_id}`: Get project details
 
-### Dev Container & Docker Compose Override Workflow
+### Image Endpoints
+- `POST /projects/{project_id}/images`: Upload an image to a project
+- `GET /projects/{project_id}/images`: List all images in a project
+- `GET /images/{image_id}`: Get image metadata
+- `GET /images/{image_id}/download`: Get image download URL
+- `GET /images/{image_id}/content`: Get image content
 
-For local development with VS Code Dev Containers, this project uses a Docker Compose override and a dedicated dev container setup:
+### User Endpoints
+- `POST /users`: Create a new user
+- `GET /users/me`: Get current user information
+- `GET /users/{user_id}`: Get user information
+- `PATCH /users/{user_id}`: Update user information
 
-- The main `docker-compose.yml` defines all services (app, db, minio).
-- The `docker-compose.override.yml` disables the app service for development, so only db and minio run when you use `docker-compose up -d`.
-- The `.devcontainer/docker-compose.yml` defines the dev container, which connects to the same Docker network and mounts your workspace for live code editing.
-- The `.devcontainer/devcontainer.json` configures VS Code to use the dev container and install dependencies automatically.
+### Image Class Endpoints
+- `POST /projects/{project_id}/classes`: Create a new image class
+- `GET /projects/{project_id}/classes`: List all image classes for a project
+- `GET /classes/{class_id}`: Get image class details
+- `PATCH /classes/{class_id}`: Update image class
+- `DELETE /classes/{class_id}`: Delete image class
 
-**Development workflow:**
-1. Start db and minio with `docker-compose up -d` in the project root.
-2. Open the project in VS Code using Dev Containers, which starts the dev container.
-3. Run your FastAPI app inside the dev container with:
-   ```
-   uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
-   ```
+### Image Classification Endpoints
+- `POST /images/{image_id}/classifications`: Classify an image
+- `GET /images/{image_id}/classifications`: List all classifications for an image
+- `DELETE /classifications/{classification_id}`: Delete classification
 
-This setup avoids duplication, keeps service definitions in sync, and provides a robust development workflow.
+### Comment Endpoints
+- `POST /images/{image_id}/comments`: Add a comment to an image
+- `GET /images/{image_id}/comments`: List all comments for an image
+- `GET /comments/{comment_id}`: Get comment details
+- `PATCH /comments/{comment_id}`: Update comment
+- `DELETE /comments/{comment_id}`: Delete comment
+
+### Project Metadata Endpoints
+- `POST /projects/{project_id}/metadata`: Add metadata to a project
+- `GET /projects/{project_id}/metadata`: List all metadata for a project
+- `GET /projects/{project_id}/metadata/{key}`: Get metadata value
+- `PUT /projects/{project_id}/metadata/{key}`: Update metadata value
+- `DELETE /projects/{project_id}/metadata/{key}`: Delete metadata
+- `GET /projects/{project_id}/metadata-dict`: Get all metadata as a dictionary
+- `PUT /projects/{project_id}/metadata-dict`: Update all metadata from a dictionary
+
+## UI Pages
+
+### Project List Page
+- List all projects
+- Create new projects
+
+### Project Page
+- View project details
+- Upload images
+- Manage project metadata
+- Define image classes
+- View all images in the project
+
+### Image View Page
+- View image details
+- Navigate between images
+- View and add classifications
+- View and add comments
+- View image metadata
+
+## Getting Started
+
+### Prerequisites
+- Docker and Docker Compose
+- Python 3.9+
+
+### Installation
+1. Clone the repository
+2. Copy `.env.example` to `.env` and update the values
+3. Run `docker-compose up -d`
+4. Access the application at `http://localhost:8000`
+
+### Development
+1. Install dependencies: `pip install -r requirements.txt`
+2. Run the application: `uvicorn app.main:app --reload`
+3. Access the application at `http://localhost:8000`
 
 ## License
-Specify your license here.
+This project is licensed under the MIT License - see the LICENSE file for details.

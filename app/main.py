@@ -8,7 +8,8 @@ import json
 from app.config import settings
 from app.database import create_db_and_tables
 from app.minio_client import minio_client, ensure_bucket_exists
-from app.routers import projects, images
+from app.migrations import run_migrations
+from app.routers import projects, images, users, image_classes, comments, project_metadata
 from app.routers import ui
 
 @asynccontextmanager
@@ -17,6 +18,9 @@ async def lifespan(app: FastAPI):
     print("Creating database tables if they don't exist...")
     await create_db_and_tables()
     print("Database tables checked/created.")
+    
+    # Run migrations to set up new tables and migrate existing data
+    await run_migrations()
     print(f"Checking/Creating MinIO bucket: {settings.MINIO_BUCKET_NAME}")
     if minio_client:
          bucket_exists = ensure_bucket_exists(minio_client, settings.MINIO_BUCKET_NAME)
@@ -34,6 +38,16 @@ async def lifespan(app: FastAPI):
 app = FastAPI(
     title=settings.APP_NAME,
     lifespan=lifespan
+)
+
+from fastapi.middleware.cors import CORSMiddleware
+# Add CORS middleware
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["http://localhost:3000"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
 )
 
 # Add middleware that prints the request type and path to the console
@@ -89,6 +103,10 @@ app.mount("/ui/static", StaticFiles(directory="app/ui/static"), name="ui-static"
 
 app.include_router(projects.router)
 app.include_router(images.router)
+app.include_router(users.router)
+app.include_router(image_classes.router)
+app.include_router(comments.router)
+app.include_router(project_metadata.router)
 app.include_router(ui.router)
 
 from fastapi.responses import RedirectResponse

@@ -1,4 +1,4 @@
-tfastapi[all]
+fastapi[all]
 uvicorn[standard]
 sqlalchemy[asyncio]>=2.0
 asyncpg

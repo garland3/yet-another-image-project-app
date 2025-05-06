@@ -3,10 +3,27 @@ from pydantic import BaseModel, EmailStr, Field, field_validator
 from typing import Optional, List, Dict, Any, Union
 from datetime import datetime
 
-class User(BaseModel):
+# User schemas
+class UserBase(BaseModel):
     email: EmailStr
+    username: Optional[str] = None
     groups: List[str] = []
+    is_active: bool = True
 
+class UserCreate(UserBase):
+    pass
+
+class User(UserBase):
+    id: Optional[uuid.UUID] = None
+    created_at: Optional[datetime] = None
+    updated_at: Optional[datetime] = None
+
+    model_config = {
+        "from_attributes": True,
+        "populate_by_name": True
+    }
+
+# Project schemas
 class ProjectBase(BaseModel):
     name: str = Field(..., min_length=1, max_length=255)
     description: Optional[str] = None
@@ -25,6 +42,7 @@ class Project(ProjectBase):
         "populate_by_name": True
     }
 
+# DataInstance schemas
 class DataInstanceBase(BaseModel):
     filename: str
     content_type: Optional[str] = None
@@ -35,12 +53,14 @@ class DataInstanceCreate(DataInstanceBase):
     project_id: uuid.UUID
     object_storage_key: str
     uploaded_by_user_id: str
+    uploader_id: Optional[uuid.UUID] = None
 
 class DataInstance(DataInstanceBase):
     id: uuid.UUID
     project_id: uuid.UUID
     object_storage_key: str
     uploaded_by_user_id: str
+    uploader_id: Optional[uuid.UUID] = None
     created_at: datetime
     updated_at: Optional[datetime] = None
 
@@ -76,6 +96,89 @@ class DataInstance(DataInstanceBase):
             
         # If all else fails, return an empty dict
         return {}
+
+    model_config = {
+        "from_attributes": True,
+        "populate_by_name": True
+    }
+
+# ImageClass schemas
+class ImageClassBase(BaseModel):
+    name: str = Field(..., min_length=1, max_length=255)
+    description: Optional[str] = None
+
+class ImageClassCreate(ImageClassBase):
+    project_id: uuid.UUID
+
+class ImageClass(ImageClassBase):
+    id: uuid.UUID
+    project_id: uuid.UUID
+    created_at: datetime
+    updated_at: Optional[datetime] = None
+
+    model_config = {
+        "from_attributes": True,
+        "populate_by_name": True
+    }
+
+# ImageClassification schemas
+class ImageClassificationBase(BaseModel):
+    image_id: uuid.UUID
+    class_id: uuid.UUID
+
+class ImageClassificationCreate(ImageClassificationBase):
+    created_by_id: uuid.UUID
+
+class ImageClassification(ImageClassificationBase):
+    id: uuid.UUID
+    created_by_id: uuid.UUID
+    created_at: datetime
+    updated_at: Optional[datetime] = None
+    
+    # Include related data
+    image_class: Optional[ImageClass] = None
+
+    model_config = {
+        "from_attributes": True,
+        "populate_by_name": True
+    }
+
+# ImageComment schemas
+class ImageCommentBase(BaseModel):
+    text: str = Field(..., min_length=1)
+
+class ImageCommentCreate(ImageCommentBase):
+    image_id: uuid.UUID
+    author_id: uuid.UUID
+
+class ImageComment(ImageCommentBase):
+    id: uuid.UUID
+    image_id: uuid.UUID
+    author_id: uuid.UUID
+    created_at: datetime
+    updated_at: Optional[datetime] = None
+    
+    # Include author information
+    author: Optional[User] = None
+
+    model_config = {
+        "from_attributes": True,
+        "populate_by_name": True
+    }
+
+# ProjectMetadata schemas
+class ProjectMetadataBase(BaseModel):
+    key: str = Field(..., min_length=1, max_length=255)
+    value: Any = None
+
+class ProjectMetadataCreate(ProjectMetadataBase):
+    project_id: uuid.UUID
+
+class ProjectMetadata(ProjectMetadataBase):
+    id: uuid.UUID
+    project_id: uuid.UUID
+    created_at: datetime
+    updated_at: Optional[datetime] = None
 
     model_config = {
         "from_attributes": True,

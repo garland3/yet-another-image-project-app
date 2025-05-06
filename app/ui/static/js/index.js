@@ -3,6 +3,9 @@ let projects = [];
 
 // DOM Elements
 document.addEventListener('DOMContentLoaded', () => {
+  // Initialize common variables
+  common.initCommonVariables();
+  
   // Initialize the UI
   initUI();
   
@@ -61,13 +64,7 @@ async function loadProjects() {
   try {
     showLoader('projects-container');
     
-    const response = await fetch('/projects/');
-    
-    if (!response.ok) {
-      throw new Error(`HTTP error! Status: ${response.status}`);
-    }
-    
-    projects = await response.json();
+    projects = await common.fetchWithErrorHandling('/projects/');
     
     // Display projects
     displayProjects(projects);
@@ -171,7 +168,7 @@ async function createProject() {
   try {
     showLoader('modal-body');
     
-    const response = await fetch('/projects/', {
+    const newProject = await common.fetchWithErrorHandling('/projects/', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json'
@@ -182,13 +179,6 @@ async function createProject() {
         meta_group_id
       })
     });
-    
-    if (!response.ok) {
-      const errorData = await response.json();
-      throw new Error(errorData.detail || `HTTP error! Status: ${response.status}`);
-    }
-    
-    const newProject = await response.json();
     
     // Add new project to the list and refresh display
     projects.push(newProject);
@@ -211,55 +201,8 @@ async function createProject() {
   }
 }
 
-function showLoader(containerId) {
-  const container = document.getElementById(containerId);
-  if (!container) return;
-  
-  const loader = document.createElement('div');
-  loader.className = 'loader';
-  loader.innerHTML = '<div class="loading"></div>';
-  
-  container.appendChild(loader);
-}
-
-function hideLoader(containerId) {
-  const container = document.getElementById(containerId);
-  if (!container) return;
-  
-  const loader = container.querySelector('.loader');
-  if (loader) {
-    container.removeChild(loader);
-  }
-}
-
-function showError(message) {
-  const alertsContainer = document.getElementById('alerts-container');
-  if (!alertsContainer) return;
-  
-  const alert = document.createElement('div');
-  alert.className = 'alert alert-error';
-  alert.textContent = message;
-  
-  alertsContainer.appendChild(alert);
-  
-  // Remove after 5 seconds
-  setTimeout(() => {
-    alertsContainer.removeChild(alert);
-  }, 5000);
-}
-
-function showSuccess(message) {
-  const alertsContainer = document.getElementById('alerts-container');
-  if (!alertsContainer) return;
-  
-  const alert = document.createElement('div');
-  alert.className = 'alert alert-success';
-  alert.textContent = message;
-  
-  alertsContainer.appendChild(alert);
-  
-  // Remove after 5 seconds
-  setTimeout(() => {
-    alertsContainer.removeChild(alert);
-  }, 5000);
-}
+// Use common utility functions
+const showLoader = common.showLoader;
+const hideLoader = common.hideLoader;
+const showError = common.showError;
+const showSuccess = common.showSuccess;

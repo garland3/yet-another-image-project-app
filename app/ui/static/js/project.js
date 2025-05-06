@@ -1,16 +1,17 @@
 // Global variables
-let projectId = null;
 let projectData = null;
 let images = [];
 
 // DOM Elements
 document.addEventListener('DOMContentLoaded', () => {
-  // Get project ID from URL
-  const urlParams = new URLSearchParams(window.location.search);
-  projectId = urlParams.get('id');
+  // Initialize common variables
+  const { projectId: urlProjectId } = common.initCommonVariables();
+  
+  // Set global projectId from common
+  projectId = window.common.projectId;
   
   if (!projectId) {
-    showError('Project ID is missing. Redirecting to projects page...');
+    common.showError('Project ID is missing. Redirecting to projects page...');
     setTimeout(() => {
       window.location.href = '/ui';
     }, 3000);
@@ -104,13 +105,7 @@ async function loadProject() {
   try {
     showLoader('project-header');
     
-    const response = await fetch(`/projects/${projectId}/`);
-    
-    if (!response.ok) {
-      throw new Error(`HTTP error! Status: ${response.status}`);
-    }
-    
-    projectData = await response.json();
+    projectData = await common.fetchWithErrorHandling(`/projects/${projectId}/`);
     
     // Update project header
     updateProjectHeader(projectData);
@@ -144,34 +139,17 @@ async function loadImages() {
     showLoader('images-container');
     
     console.log('Fetching images for project:', projectId);
-    const response = await fetch(`/projects/${projectId}/images/`);
     
-    if (!response.ok) {
-      throw new Error(`HTTP error! Status: ${response.status}`);
+    images = await common.fetchWithErrorHandling(`/projects/${projectId}/images/`);
+    console.log('Parsed images:', images);
+    
+    if (!Array.isArray(images)) {
+      console.error('Server response is not an array:', images);
+      throw new Error('Invalid server response: expected an array of images');
     }
     
-    // Clone the response to log it without consuming it
-    const responseClone = response.clone();
-    const responseText = await responseClone.text();
-    console.log('Raw response from server:', responseText);
-    
-    try {
-      // Parse the original response
-      images = await response.json();
-      console.log('Parsed images:', images);
-      
-      if (!Array.isArray(images)) {
-        console.error('Server response is not an array:', images);
-        throw new Error('Invalid server response: expected an array of images');
-      }
-      
-      // Display images - await since displayImages is now async
-      await displayImages(images);
-    } catch (parseError) {
-      console.error('Error parsing JSON response:', parseError);
-      console.error('Response text was:', responseText);
-      throw new Error(`Failed to parse server response: ${parseError.message}`);
-    }
+    // Display images - await since displayImages is now async
+    await displayImages(images);
     
   } catch (error) {
     console.error('Error loading images:', error);
@@ -263,13 +241,7 @@ async function createImageCard(image) {
     console.log('Creating card for image:', image.id);
     
     // Get download URL
-    const urlResponse = await fetch(`/images/${image.id}/download/`);
-    
-    if (!urlResponse.ok) {
-      throw new Error(`HTTP error! Status: ${urlResponse.status}`);
-    }
-    
-    const urlData = await urlResponse.json();
+    const urlData = await common.fetchWithErrorHandling(`/images/${image.id}/download/`);
     console.log('URL data received:', urlData);
     
     if (!urlData || !urlData.url) {
@@ -443,70 +415,9 @@ async function uploadImage() {
   }
 }
 
-function formatFileSize(bytes) {
-  if (!bytes) return 'Unknown size';
-  
-  const units = ['B', 'KB', 'MB', 'GB'];
-  let size = bytes;
-  let unitIndex = 0;
-  
-  while (size >= 1024 && unitIndex < units.length - 1) {
-    size /= 1024;
-    unitIndex++;
-  }
-  
-  return `${size.toFixed(1)} ${units[unitIndex]}`;
-}
-
-function showLoader(containerId) {
-  const container = document.getElementById(containerId);
-  if (!container) return;
-  
-  const loader = document.createElement('div');
-  loader.className = 'loader';
-  loader.innerHTML = '<div class="loading"></div>';
-  
-  container.appendChild(loader);
-}
-
-function hideLoader(containerId) {
-  const container = document.getElementById(containerId);
-  if (!container) return;
-  
-  const loader = container.querySelector('.loader');
-  if (loader) {
-    container.removeChild(loader);
-  }
-}
-
-function showError(message) {
-  const alertsContainer = document.getElementById('alerts-container');
-  if (!alertsContainer) return;
-  
-  const alert = document.createElement('div');
-  alert.className = 'alert alert-error';
-  alert.textContent = message;
-  
-  alertsContainer.appendChild(alert);
-  
-  // Remove after 5 seconds
-  setTimeout(() => {
-    alertsContainer.removeChild(alert);
-  }, 5000);
-}
-
-function showSuccess(message) {
-  const alertsContainer = document.getElementById('alerts-container');
-  if (!alertsContainer) return;
-  
-  const alert = document.createElement('div');
-  alert.className = 'alert alert-success';
-  alert.textContent = message;
-  
-  alertsContainer.appendChild(alert);
-  
-  // Remove after 5 seconds
-  setTimeout(() => {
-    alertsContainer.removeChild(alert);
-  }, 5000);
-}
+// Use common utility functions
+const formatFileSize = common.formatFileSize;
+const showLoader = common.showLoader;
+const hideLoader = common.hideLoader;
+const showError = common.showError;
+const showSuccess = common.showSuccess;
