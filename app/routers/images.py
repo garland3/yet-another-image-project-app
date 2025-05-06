@@ -1,8 +1,10 @@
 import uuid
 import io
-from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, File, Form, Query
+from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, File, Form, Query, Body
+from sqlalchemy import update
 from sqlalchemy.ext.asyncio import AsyncSession
 from typing import List, Optional, Dict, Any
+from pydantic import BaseModel
 from app import crud, schemas, models
 from app.database import get_db
 from app.dependencies import get_current_user, check_mock_user_in_group
@@ -437,3 +439,180 @@ async def get_image_thumbnail(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
                 detail=f"Error fetching image from storage: {str(e)}"
             )
+
+class MetadataUpdate(BaseModel):
+    key: str
+    value: Any
+
+@router.put("/images/{image_id}/metadata", status_code=status.HTTP_200_OK)
+async def update_image_metadata(
+    image_id: uuid.UUID,
+    metadata: MetadataUpdate = Body(...),
+    db: AsyncSession = Depends(get_db),
+    current_user: schemas.User = Depends(get_current_user),
+):
+    """Update metadata for a specific image"""
+    db_image = await crud.get_data_instance(db=db, image_id=image_id)
+    if db_image is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Image not found")
+    
+    # Check access permissions
+    is_member = False
+    if settings.SKIP_HEADER_CHECK:
+        is_member = check_mock_user_in_group(current_user, db_image.project.meta_group_id)
+    else:
+        is_member = db_image.project.meta_group_id in current_user.groups
+    if not is_member:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=f"User '{current_user.email}' does not have access to image '{image_id}'",
+        )
+    
+    # Update the metadata
+    current_metadata = db_image.metadata_ or {}
+    current_metadata[metadata.key] = metadata.value
+    
+    # Update the database
+    await db.execute(
+        update(models.DataInstance)
+        .where(models.DataInstance.id == image_id)
+        .values(metadata_=current_metadata)
+    )
+    await db.commit()
+    
+    # Return the updated image
+    await db.refresh(db_image)
+    
+    # Create a dictionary from the SQLAlchemy model
+    db_dict = {}
+    for c in db_image.__table__.columns:
+        if c.name == "metadata_":
+            # Special handling for metadata
+            if db_image.metadata_ is not None:
+                try:
+                    # Try to get the raw value from the SQLAlchemy JSON type
+                    if hasattr(db_image.metadata_, "_asdict"):
+                        db_dict["metadata_"] = db_image.metadata_._asdict()
+                    elif hasattr(db_image.metadata_, "items"):
+                        db_dict["metadata_"] = dict(db_image.metadata_.items())
+                    elif hasattr(db_image.metadata_, "__class__") and db_image.metadata_.__class__.__name__ == "MetaData":
+                        # Handle MetaData object by converting it to an empty dict
+                        db_dict["metadata_"] = {}
+                    # Check if it's a string that can be parsed as JSON
+                    elif isinstance(db_image.metadata_, str):
+                        try:
+                            import json
+                            db_dict["metadata_"] = json.loads(db_image.metadata_)
+                        except json.JSONDecodeError:
+                            db_dict["metadata_"] = {"value": db_image.metadata_}
+                    else:
+                        # If it's already a dict or can be converted to one
+                        try:
+                            db_dict["metadata_"] = dict(db_image.metadata_) if db_image.metadata_ else None
+                        except (TypeError, ValueError):
+                            # If conversion to dict fails, use an empty dict
+                            db_dict["metadata_"] = {}
+                except (TypeError, ValueError, AttributeError) as e:
+                    print(f"Error converting metadata to dict: {e}")
+                    db_dict["metadata_"] = {}
+            else:
+                db_dict["metadata_"] = None
+        else:
+            # Normal column handling
+            db_dict[c.name] = getattr(db_image, c.name)
+    
+    try:
+        # Validate with Pydantic
+        response_data = schemas.DataInstance.model_validate(db_dict)
+    except Exception as e:
+        print(f"Error validating DataInstance: {e}")
+        print(f"Input data: {db_dict}")
+        raise
+    return response_data
+
+@router.delete("/images/{image_id}/metadata/{key}", status_code=status.HTTP_200_OK)
+async def delete_image_metadata(
+    image_id: uuid.UUID,
+    key: str,
+    db: AsyncSession = Depends(get_db),
+    current_user: schemas.User = Depends(get_current_user),
+):
+    """Delete metadata for a specific image"""
+    db_image = await crud.get_data_instance(db=db, image_id=image_id)
+    if db_image is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Image not found")
+    
+    # Check access permissions
+    is_member = False
+    if settings.SKIP_HEADER_CHECK:
+        is_member = check_mock_user_in_group(current_user, db_image.project.meta_group_id)
+    else:
+        is_member = db_image.project.meta_group_id in current_user.groups
+    if not is_member:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=f"User '{current_user.email}' does not have access to image '{image_id}'",
+        )
+    
+    # Update the metadata
+    current_metadata = db_image.metadata_ or {}
+    if key in current_metadata:
+        del current_metadata[key]
+    
+    # Update the database
+    await db.execute(
+        update(models.DataInstance)
+        .where(models.DataInstance.id == image_id)
+        .values(metadata_=current_metadata)
+    )
+    await db.commit()
+    
+    # Return the updated image
+    await db.refresh(db_image)
+    
+    # Create a dictionary from the SQLAlchemy model
+    db_dict = {}
+    for c in db_image.__table__.columns:
+        if c.name == "metadata_":
+            # Special handling for metadata
+            if db_image.metadata_ is not None:
+                try:
+                    # Try to get the raw value from the SQLAlchemy JSON type
+                    if hasattr(db_image.metadata_, "_asdict"):
+                        db_dict["metadata_"] = db_image.metadata_._asdict()
+                    elif hasattr(db_image.metadata_, "items"):
+                        db_dict["metadata_"] = dict(db_image.metadata_.items())
+                    elif hasattr(db_image.metadata_, "__class__") and db_image.metadata_.__class__.__name__ == "MetaData":
+                        # Handle MetaData object by converting it to an empty dict
+                        db_dict["metadata_"] = {}
+                    # Check if it's a string that can be parsed as JSON
+                    elif isinstance(db_image.metadata_, str):
+                        try:
+                            import json
+                            db_dict["metadata_"] = json.loads(db_image.metadata_)
+                        except json.JSONDecodeError:
+                            db_dict["metadata_"] = {"value": db_image.metadata_}
+                    else:
+                        # If it's already a dict or can be converted to one
+                        try:
+                            db_dict["metadata_"] = dict(db_image.metadata_) if db_image.metadata_ else None
+                        except (TypeError, ValueError):
+                            # If conversion to dict fails, use an empty dict
+                            db_dict["metadata_"] = {}
+                except (TypeError, ValueError, AttributeError) as e:
+                    print(f"Error converting metadata to dict: {e}")
+                    db_dict["metadata_"] = {}
+            else:
+                db_dict["metadata_"] = None
+        else:
+            # Normal column handling
+            db_dict[c.name] = getattr(db_image, c.name)
+    
+    try:
+        # Validate with Pydantic
+        response_data = schemas.DataInstance.model_validate(db_dict)
+    except Exception as e:
+        print(f"Error validating DataInstance: {e}")
+        print(f"Input data: {db_dict}")
+        raise
+    return response_data
