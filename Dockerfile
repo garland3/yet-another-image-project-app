@@ -47,10 +47,11 @@ COPY ./app /app/app
 # COPY .env /app/.env
 
 # Add frontend setup steps
-WORKDIR /app/frontend
-COPY ./frontend/package.json ./frontend/package-lock.json ./
-# Copy the rest of the code. 
 COPY ./frontend ./app/frontend
+WORKDIR /app/frontend
+# COPY ./frontend/package.json ./frontend/package-lock.json ./
+# Copy the rest of the code. 
+# COPY ./frontend ./app/frontend
 RUN npm install
 RUN npm run build
 
