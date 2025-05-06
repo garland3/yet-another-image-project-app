@@ -6,6 +6,8 @@ from app import crud, schemas, models
 from app.database import get_db
 from app.dependencies import get_current_user, requires_group_membership, check_mock_user_in_group
 from app.config import settings
+from aiocache import cached
+from aiocache.serializers import JsonSerializer
 
 router = APIRouter(
     prefix="/projects",
@@ -32,6 +34,7 @@ async def create_new_project(
     return db_project
 
 @router.get("/", response_model=List[schemas.Project])
+@cached(ttl=3600, key_builder=lambda *args, **kwargs: f"projects:groups:{kwargs['current_user'].groups}:skip:{kwargs.get('skip', 0)}:limit:{kwargs.get('limit', 100)}")
 async def read_projects(
     skip: int = 0,
     limit: int = 100,
@@ -42,6 +45,7 @@ async def read_projects(
     return projects
 
 @router.get("/{project_id}", response_model=schemas.Project)
+@cached(ttl=3600, key_builder=lambda *args, **kwargs: f"project:{kwargs['project_id']}:user:{kwargs['current_user'].email}")
 async def read_project(
     project_id: uuid.UUID,
     db: AsyncSession = Depends(get_db),

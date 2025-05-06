@@ -10,3 +10,5 @@ minio
 python-multipart
 uuid
 httpx
+aiocache
+Pillow

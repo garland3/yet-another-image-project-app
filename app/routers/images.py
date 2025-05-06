@@ -1,6 +1,6 @@
 import uuid
 import io
-from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, File, Form
+from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, File, Form, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 from typing import List, Optional, Dict, Any
 from app import crud, schemas, models
@@ -9,6 +9,9 @@ from app.dependencies import get_current_user, check_mock_user_in_group
 from app.minio_client import upload_file_to_minio, get_presigned_download_url
 from app.config import settings
 import json
+from aiocache import cached
+from aiocache.serializers import JsonSerializer
+from PIL import Image
 
 router = APIRouter(
     tags=["Images"],
@@ -118,6 +121,7 @@ async def upload_image_to_project(
     return response_data
 
 @router.get("/projects/{project_id}/images", response_model=List[schemas.DataInstance])
+@cached(ttl=3600, key_builder=lambda *args, **kwargs: f"project_images:{kwargs['project_id']}:skip:{kwargs.get('skip', 0)}:limit:{kwargs.get('limit', 100)}")
 async def list_images_in_project(
     project_id: uuid.UUID,
     skip: int = 0,
@@ -196,6 +200,7 @@ async def list_images_in_project(
     return response_images
 
 @router.get("/images/{image_id}", response_model=schemas.DataInstance)
+@cached(ttl=3600, key_builder=lambda *args, **kwargs: f"image:{kwargs['image_id']}")
 async def get_image_metadata(
     image_id: uuid.UUID,
     db: AsyncSession = Depends(get_db),
@@ -265,6 +270,7 @@ import httpx
 from fastapi.responses import StreamingResponse
 
 @router.get("/images/{image_id}/download", response_model=schemas.PresignedUrlResponse)
+@cached(ttl=3600, key_builder=lambda *args, **kwargs: f"image_download:{kwargs['image_id']}")
 async def get_image_download_url(
     image_id: uuid.UUID,
     db: AsyncSession = Depends(get_db),
@@ -342,6 +348,90 @@ async def get_image_content(
                     "Content-Disposition": f'inline; filename="{db_image.filename}"'
                 }
             )
+        except httpx.HTTPError as e:
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail=f"Error fetching image from storage: {str(e)}"
+            )
+
+@router.get("/images/{image_id}/thumbnail", response_class=StreamingResponse)
+async def get_image_thumbnail(
+    image_id: uuid.UUID,
+    width: int = Query(200, description="Thumbnail width in pixels"),
+    height: int = Query(200, description="Thumbnail height in pixels"),
+    db: AsyncSession = Depends(get_db),
+    current_user: schemas.User = Depends(get_current_user),
+):
+    """Generate and return a thumbnail of the image"""
+    db_image = await crud.get_data_instance(db=db, image_id=image_id)
+    if db_image is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Image not found")
+    
+    # Check access permissions
+    is_member = False
+    if settings.SKIP_HEADER_CHECK:
+        is_member = check_mock_user_in_group(current_user, db_image.project.meta_group_id)
+    else:
+        is_member = db_image.project.meta_group_id in current_user.groups
+    if not is_member:
+         raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=f"User '{current_user.email}' does not have access to image '{image_id}'",
+        )
+    
+    # Get the presigned URL for internal use
+    internal_url = get_presigned_download_url(
+        bucket_name=settings.MINIO_BUCKET_NAME,
+        object_name=db_image.object_storage_key
+    )
+    if not internal_url:
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Could not generate download URL")
+    
+    # Use httpx to fetch the image from Minio
+    async with httpx.AsyncClient() as client:
+        try:
+            response = await client.get(internal_url)
+            response.raise_for_status()
+            
+            # Get the image data
+            image_data = await response.aread()
+            
+            # Use PIL to resize the image
+            try:
+                img = Image.open(io.BytesIO(image_data))
+                
+                # Resize the image while maintaining aspect ratio
+                img.thumbnail((width, height))
+                
+                # Save the resized image to a bytes buffer
+                output_buffer = io.BytesIO()
+                img_format = img.format or 'JPEG'  # Default to JPEG if format is unknown
+                img.save(output_buffer, format=img_format)
+                output_buffer.seek(0)
+                
+                # Determine the content type based on the image format
+                content_type_map = {
+                    'JPEG': 'image/jpeg',
+                    'PNG': 'image/png',
+                    'GIF': 'image/gif',
+                    'WEBP': 'image/webp'
+                }
+                content_type = content_type_map.get(img_format, 'image/jpeg')
+                
+                # Return the thumbnail
+                return StreamingResponse(
+                    content=output_buffer,
+                    media_type=content_type,
+                    headers={
+                        "Content-Disposition": f'inline; filename="thumbnail_{db_image.filename}"'
+                    }
+                )
+            except Exception as e:
+                raise HTTPException(
+                    status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                    detail=f"Error generating thumbnail: {str(e)}"
+                )
+                
         except httpx.HTTPError as e:
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,

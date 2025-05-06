@@ -35,7 +35,7 @@ function App() {
 
   useEffect(() => {
     // Fetch projects from the API
-    fetch('/projects/')
+    fetch('/projects')
       .then(response => {
         if (!response.ok) {
           throw new Error(`HTTP error! status: ${response.status}`);
@@ -65,7 +65,7 @@ function App() {
     e.preventDefault();
     setLoading(true);
     
-    fetch('/projects/', {
+    fetch('/projects', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
