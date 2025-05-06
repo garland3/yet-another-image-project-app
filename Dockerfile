@@ -44,7 +44,7 @@ RUN pip install --no-cache-dir --upgrade pip && \
 
 # Copy backend code
 COPY ./app /app/app
-COPY .env /app/.env
+# COPY .env /app/.env
 
 # Add frontend setup steps
 WORKDIR /app/frontend
