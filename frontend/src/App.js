@@ -2,8 +2,9 @@ import React, { useState, useEffect, lazy, Suspense, memo } from 'react';
 import { Routes, Route, useNavigate, Link } from 'react-router-dom';
 import './App.css';
 
-// Lazy load the Project component
+// Lazy load components
 const Project = lazy(() => import('./Project'));
+const ImageView = lazy(() => import('./ImageView'));
 
 // Memoized ProjectItem component to prevent unnecessary re-renders
 const ProjectItem = memo(function ProjectItem({ project }) {
@@ -194,6 +195,14 @@ function App() {
         element={
           <Suspense fallback={<div className="loading-container">Loading project...</div>}>
             <Project />
+          </Suspense>
+        } 
+      />
+      <Route 
+        path="/view/:imageId" 
+        element={
+          <Suspense fallback={<div className="loading-container">Loading image...</div>}>
+            <ImageView />
           </Suspense>
         } 
       />

@@ -468,6 +468,130 @@ hr {
   margin: 20px 0;
 }
 
+/* Image View styles */
+.image-view-container {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.image-navigation {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 10px;
+}
+
+.navigation-btn {
+  min-width: 100px;
+}
+
+#image-display {
+  position: relative;
+  background-color: #f0f0f0;
+  border-radius: var(--border-radius);
+  overflow: hidden;
+  height: 80vh; /* Increased height to 80% of viewport height */
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  transition: opacity 0.3s ease;
+  width: 100%; /* Ensure full width */
+}
+
+#image-display.transitioning {
+  opacity: 0.5;
+}
+
+.view-image {
+  max-width: 95%; /* Slightly less than 100% to avoid touching edges */
+  max-height: 95%; /* Slightly less than 100% to avoid touching edges */
+  transition: transform 0.3s ease;
+  object-fit: contain; /* Ensure the image maintains aspect ratio */
+}
+
+.image-controls {
+  display: flex;
+  justify-content: center;
+  gap: 10px;
+  margin-bottom: 20px;
+}
+
+.control-btn {
+  min-width: 80px;
+}
+
+/* Classifications styles */
+.class-buttons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 10px;
+  margin-bottom: 15px;
+}
+
+.class-button {
+  padding: 8px 12px;
+  background-color: #4361ee; /* Primary color background */
+  border: 1px solid #3f37c9; /* Darker border */
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  color: white; /* White text for maximum contrast */
+  font-weight: 600; /* Bolder text */
+}
+
+.class-button:hover {
+  background-color: #3f37c9; /* Darker on hover */
+}
+
+.class-button.selected {
+  background-color: var(--success-color);
+  color: white;
+  border-color: #388E3C;
+}
+
+.classifications-list, .comments-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.classification-item, .comment-item {
+  padding: 10px;
+  margin-bottom: 10px;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  background-color: #f9f9f9;
+}
+
+/* Comments styles */
+.comment-header {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 5px;
+  font-size: 0.9em;
+  color: #666;
+}
+
+.comment-content {
+  margin-bottom: 10px;
+}
+
+.comment-actions, .classification-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 5px;
+}
+
+.close-alert {
+  background: none;
+  border: none;
+  color: inherit;
+  font-size: 1.2em;
+  cursor: pointer;
+  float: right;
+}
+
 /* Loading styles */
 .loading-container {
   display: flex;
