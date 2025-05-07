@@ -80,7 +80,7 @@ COPY ./frontend/public ./frontend/public
 # Copy src directory
 COPY ./frontend/src ./frontend/src
 # Copy config files
-COPY ./frontend/.env ./frontend/.gitignore ./frontend/config-overrides.js ./frontend/README.md ./frontend/
+COPY ./frontend/.gitignore ./frontend/config-overrides.js ./frontend/README.md ./frontend/
 
 # Install frontend dependencies and build
 WORKDIR /app/frontend
