@@ -1,6 +1,9 @@
 from fastapi import FastAPI, Request, status
 from fastapi.staticfiles import StaticFiles
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, HTMLResponse
+from fastapi.templating import Jinja2Templates
+import os
+from pathlib import Path
 from contextlib import asynccontextmanager
 from pydantic import ValidationError
 import traceback
@@ -39,6 +42,11 @@ app = FastAPI(
     title=settings.APP_NAME,
     lifespan=lifespan
 )
+
+# Mount static files
+app.mount("/static", StaticFiles(directory=Path("app/ui/static")), name="static")
+app.mount("/static/js", StaticFiles(directory=Path("app/ui/static/js")), name="js")
+app.mount("/static/css", StaticFiles(directory=Path("app/ui/static/css")), name="css")
 
 from fastapi.middleware.cors import CORSMiddleware
 # Add CORS middleware
@@ -125,3 +133,14 @@ from fastapi.responses import RedirectResponse
 @app.get("/", tags=["Root"])
 async def read_root():
     return RedirectResponse(url="/ui")
+
+@app.get("/ui/{rest_of_path:path}", response_class=HTMLResponse)
+async def serve_ui(request: Request, rest_of_path: str = ""):
+    # Serve the index.html for any UI route to support client-side routing
+    index_path = Path("app/ui/index.html")
+    if index_path.exists():
+        with open(index_path, "r") as f:
+            html_content = f.read()
+        return HTMLResponse(content=html_content)
+    else:
+        return HTMLResponse(content="UI not found. Make sure the frontend is built correctly.", status_code=404)

@@ -45,7 +45,9 @@ services:
     restart: unless-stopped
 
   app:
-    build: .
+    build:
+      context: .
+      target: final
     container_name: fastapi_app
     env_file:
       - .env
@@ -53,6 +55,8 @@ services:
       - "8000:8000"
     volumes:
       - ./app:/app/app
+      - ./frontend:/app/frontend
+      - ./app/ui:/app/app/ui
     networks:
       - data_mgmt_net
     depends_on:

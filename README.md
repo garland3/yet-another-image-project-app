@@ -129,18 +129,65 @@ A web-based system for managing images, projects, and annotations.
 
 ### Prerequisites
 - Docker and Docker Compose
-- Python 3.9+
+- Python 3.11+
+- Node.js 20+
 
-### Installation
+### Installation with Docker
 1. Clone the repository
 2. Copy `.env.example` to `.env` and update the values
 3. Run `docker-compose up -d`
+   - This will build a Docker container using Ubuntu as the base image
+   - Python 3.11 and uv package installer will be set up in a virtual environment
+   - The frontend will be built and served from the same uvicorn app
 4. Access the application at `http://localhost:8000`
 
-### Development
-1. Install dependencies: `pip install -r requirements.txt`
-2. Run the application: `uvicorn app.main:app --reload`
+### Development Setup
+1. Make sure you have Python 3.11+ installed (or the script will attempt to install it)
+2. Run the start script: `./start.sh`
+   - This will:
+     - Check for Python 3.11 and install it if needed (requires sudo)
+     - Create a Python virtual environment
+     - Install uv package installer
+     - Install dependencies using uv
+     - Build the frontend if needed
+     - Start the application with hot reloading
 3. Access the application at `http://localhost:8000`
+
+### Manual Development Setup
+If you prefer to set up manually:
+
+1. Create a Python virtual environment:
+   ```bash
+   python3 -m venv venv
+   source venv/bin/activate
+   ```
+
+2. Install uv package installer:
+   ```bash
+   pip install uv
+   ```
+
+3. Install dependencies using uv:
+   ```bash
+   uv pip install -r requirements.txt
+   ```
+
+4. Build the frontend:
+   ```bash
+   cd frontend
+   npm install
+   npm run build
+   cd ..
+   mkdir -p app/ui/static
+   cp -r frontend/build/* app/ui/
+   ```
+
+5. Run the application:
+   ```bash
+   uvicorn app.main:app --reload
+   ```
+
+6. Access the application at `http://localhost:8000`
 
 ## License
 This project is licensed under the MIT License - see the LICENSE file for details.
