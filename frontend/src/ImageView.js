@@ -29,7 +29,7 @@ function ImageView() {
       setLoading(true);
       
       // Fetch image metadata
-      const response = await fetch(`/images/${imageId}`);
+      const response = await fetch(`/api/images/${imageId}`);
       
       if (!response.ok) {
         throw new Error(`HTTP error! Status: ${response.status}`);
@@ -53,7 +53,7 @@ function ImageView() {
   const loadProjectImages = useCallback(async () => {
     try {
       console.log('Fetching images for project:', projectId);
-      const response = await fetch(`/projects/${projectId}/images/`);
+      const response = await fetch(`/api/projects/${projectId}/images/`);
       
       if (!response.ok) {
         throw new Error(`HTTP error! Status: ${response.status}`);
@@ -81,7 +81,7 @@ function ImageView() {
   // Load classes for the project
   const loadClasses = useCallback(async () => {
     try {
-      const response = await fetch(`/projects/${projectId}/classes`);
+      const response = await fetch(`/api/projects/${projectId}/classes`);
       
       if (!response.ok) {
         throw new Error(`HTTP error! Status: ${response.status}`);

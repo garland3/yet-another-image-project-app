@@ -100,15 +100,14 @@ ENV PATH="/opt/venv/bin:$PATH"
 
 # Copy backend code
 COPY --from=builder /app/app /app/app
+# Copy frontend build files
+COPY --from=builder /app/frontend/build /app/ui2
 
-# Create ui directory and copy built frontend files
-RUN mkdir -p /app/app/ui/static
-# Check if build directory exists and copy its contents
-RUN if [ -d "/app/frontend/build" ]; then \
-    cp -r /app/frontend/build/* /app/app/ui/; \
-    else \
-    echo "Build directory not found, creating empty ui directory"; \
-    fi
+
+# RUN cp -R /app/frontend/build/* /app/ui2
+# SEt the env var FRONTEND_BUILD_PATH
+ENV FRONTEND_BUILD_PATH=/app/ui2
+
 
 WORKDIR /app
 EXPOSE 8000

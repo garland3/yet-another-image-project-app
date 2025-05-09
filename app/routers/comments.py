@@ -9,6 +9,7 @@ from app.config import settings
 from app.routers.image_classes import check_image_access
 
 router = APIRouter(
+    prefix="/api",
     tags=["Comments"],
 )
 

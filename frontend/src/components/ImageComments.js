@@ -18,7 +18,7 @@ function ImageComments({ imageId, loading, setLoading, setError }) {
   useEffect(() => {
     const loadComments = async () => {
       try {
-        const response = await fetch(`/images/${imageId}/comments`);
+        const response = await fetch(`/api/images/${imageId}/comments`);
         
         if (!response.ok) {
           throw new Error(`HTTP error! Status: ${response.status}`);
@@ -59,7 +59,7 @@ function ImageComments({ imageId, loading, setLoading, setError }) {
       
       console.log("Comment request payload:", JSON.stringify(payload, null, 2));
       
-      const response = await fetch(`/images/${imageId}/comments`, {
+      const response = await fetch(`/api/images/${imageId}/comments`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -99,7 +99,7 @@ function ImageComments({ imageId, loading, setLoading, setError }) {
     try {
       setLoading(true);
       
-      const response = await fetch(`/comments/${editingComment.id}`, {
+      const response = await fetch(`/api/comments/${editingComment.id}`, {
         method: 'PATCH',
         headers: {
           'Content-Type': 'application/json',
@@ -144,7 +144,7 @@ function ImageComments({ imageId, loading, setLoading, setError }) {
     try {
       setLoading(true);
       
-      const response = await fetch(`/comments/${id}`, {
+      const response = await fetch(`/api/comments/${id}`, {
         method: 'DELETE',
       });
       

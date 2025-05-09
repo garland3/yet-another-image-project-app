@@ -25,7 +25,7 @@ function Project() {
         setLoading(true);
         
         // Fetch project details
-        const projectResponse = await fetch(`/projects/${id}`);
+        const projectResponse = await fetch(`/api/projects/${id}`);
         if (!projectResponse.ok) {
           throw new Error(`HTTP error! status: ${projectResponse.status}`);
         }
@@ -33,14 +33,14 @@ function Project() {
         setProject(projectData);
         
         // Fetch project metadata
-        const metadataResponse = await fetch(`/projects/${id}/metadata-dict`);
+        const metadataResponse = await fetch(`/api/projects/${id}/metadata-dict`);
         if (metadataResponse.ok) {
           const metadataData = await metadataResponse.json();
           setMetadata(metadataData);
         }
         
         // Fetch project classes
-        const classesResponse = await fetch(`/projects/${id}/classes`);
+        const classesResponse = await fetch(`/api/projects/${id}/classes`);
         if (classesResponse.ok) {
           const classesData = await classesResponse.json();
           setClasses(classesData);
@@ -48,7 +48,7 @@ function Project() {
         
         // Fetch project images
         console.log(`Fetching images for project ${id}...`);
-        const imagesResponse = await fetch(`/projects/${id}/images`);
+        const imagesResponse = await fetch(`/api/projects/${id}/images`);
         if (imagesResponse.ok) {
           const imagesData = await imagesResponse.json();
           console.log(`Received ${imagesData.length} images for project ${id}`);

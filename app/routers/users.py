@@ -8,7 +8,7 @@ from app.dependencies import get_current_user
 from app.config import settings
 
 router = APIRouter(
-    prefix="/users",
+    prefix="/api/users",
     tags=["Users"],
 )
 

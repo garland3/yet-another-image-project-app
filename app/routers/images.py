@@ -16,6 +16,7 @@ from aiocache.serializers import JsonSerializer
 from PIL import Image
 
 router = APIRouter(
+    prefix="/api",
     tags=["Images"],
 )
 

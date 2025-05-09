@@ -24,7 +24,7 @@ function ImageDisplay({ imageId, image, isTransitioning }) {
     
     try {
       // Get the direct content URL
-      const contentUrl = `/images/${imageId}/content`;
+      const contentUrl = `/api/images/${imageId}/content`;
       
       // Create a temporary link element
       const link = document.createElement('a');
@@ -73,7 +73,7 @@ function ImageDisplay({ imageId, image, isTransitioning }) {
           </div>
         ) : (
           <img 
-            src={`/images/${imageId}/content`}
+            src={`/api/images/${imageId}/content`}
             alt={image.filename || 'Image'} 
             id="main-image"
             className="view-image"

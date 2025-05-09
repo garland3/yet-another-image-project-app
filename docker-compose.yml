@@ -1,5 +1,3 @@
-version: '3.8'
-
 services:
   db:
     image: postgres:15
@@ -52,11 +50,12 @@ services:
     env_file:
       - .env
     ports:
-      - "8000:8000"
-    volumes:
-      - ./app:/app/app
-      - ./frontend:/app/frontend
-      - ./app/ui:/app/app/ui
+    # for testing use some obscure port
+      - "8007:8000"
+    # volumes:
+    #   - ./app:/app/app
+    #   - ./frontend:/app/frontend
+    #   - ./app/ui:/app/app/ui
     networks:
       - data_mgmt_net
     depends_on:

@@ -35,7 +35,7 @@ function ImageGallery({ projectId, images, loading }) {
                 onClick={() => navigate(`/view/${image.id}?project=${projectId}`)}
               >
                 <img 
-                  src={`/images/${image.id}/thumbnail?width=200&height=200`} 
+                  src={`/api/images/${image.id}/thumbnail?width=200&height=200`} 
                   alt={image.filename || 'Image'} 
                   onLoad={() => {
                     console.log(`Thumbnail for image ${image.id} loaded successfully`);
@@ -47,7 +47,7 @@ function ImageGallery({ projectId, images, loading }) {
                   onError={(e) => {
                     console.error(`Error loading thumbnail for image ${image.id}:`, e);
                     // Try to fetch the image URL to see if we get a more detailed error
-                    fetch(`/images/${image.id}/download`)
+                    fetch(`/api/images/${image.id}/download`)
                       .then(response => {
                         console.log(`Download URL response for ${image.id}:`, response.status, response.statusText);
                         return response.json();
@@ -55,7 +55,7 @@ function ImageGallery({ projectId, images, loading }) {
                       .then(data => {
                         console.log(`Download URL data for ${image.id}:`, data);
                         // Try to fetch the content URL directly
-                        return fetch(`/images/${image.id}/thumbnail?width=200&height=200`);
+                        return fetch(`/api/images/${image.id}/thumbnail?width=200&height=200`);
                       })
                       .then(response => {
                         console.log(`Thumbnail URL response for ${image.id}:`, response.status, response.statusText);
@@ -120,7 +120,7 @@ function ImageGallery({ projectId, images, loading }) {
                 console.log(`Testing image loading for ${testImage.id}...`);
                 
                 // Test the download URL endpoint
-                fetch(`/images/${testImage.id}/download`)
+                fetch(`/api/images/${testImage.id}/download`)
                   .then(response => {
                     console.log(`Download URL response: ${response.status} ${response.statusText}`);
                     return response.json();
@@ -129,14 +129,14 @@ function ImageGallery({ projectId, images, loading }) {
                     console.log('Download URL data:', data);
                     
                     // Test the content URL endpoint
-                    return fetch(`/images/${testImage.id}/content`);
+                    return fetch(`/api/images/${testImage.id}/content`);
                   })
                   .then(response => {
                     console.log(`Content URL response: ${response.status} ${response.statusText}`);
                     console.log('Content-Type:', response.headers.get('content-type'));
                     
                     // Test the thumbnail URL endpoint
-                    return fetch(`/images/${testImage.id}/thumbnail?width=200&height=200`);
+                    return fetch(`/api/images/${testImage.id}/thumbnail?width=200&height=200`);
                   })
                   .then(response => {
                     console.log(`Thumbnail URL response: ${response.status} ${response.statusText}`);
@@ -146,12 +146,12 @@ function ImageGallery({ projectId, images, loading }) {
                     const img1 = new Image();
                     img1.onload = () => console.log('Full image loaded successfully');
                     img1.onerror = (e) => console.error('Full image failed to load:', e);
-                    img1.src = `/images/${testImage.id}/content`;
+                    img1.src = `/api/images/${testImage.id}/content`;
                     
                     const img2 = new Image();
                     img2.onload = () => console.log('Thumbnail loaded successfully');
                     img2.onerror = (e) => console.error('Thumbnail failed to load:', e);
-                    img2.src = `/images/${testImage.id}/thumbnail?width=200&height=200`;
+                    img2.src = `/api/images/${testImage.id}/thumbnail?width=200&height=200`;
                   })
                   .catch(err => {
                     console.error('Error testing image URLs:', err);
@@ -174,7 +174,7 @@ function ImageGallery({ projectId, images, loading }) {
                 console.log(`Testing direct URL loading for ${testImage.id}...`);
                 
                 // Get the URL from the download endpoint
-                fetch(`/images/${testImage.id}/download`)
+                fetch(`/api/images/${testImage.id}/download`)
                   .then(response => response.json())
                   .then(data => {
                     console.log('Download URL data:', data);
@@ -203,7 +203,7 @@ function ImageGallery({ projectId, images, loading }) {
                     
                     // Create four test images with different URLs
                     const img1 = document.createElement('img');
-                    img1.src = `/images/${testImage.id}/content`;
+                    img1.src = `/api/images/${testImage.id}/content`;
                     img1.style.maxWidth = '200px';
                     img1.style.display = 'block';
                     img1.style.marginBottom = '10px';
@@ -211,7 +211,7 @@ function ImageGallery({ projectId, images, loading }) {
                     img1.onerror = (e) => console.error('Error loading with /content URL:', e);
                     
                     const img2 = document.createElement('img');
-                    img2.src = `/images/${testImage.id}/download`;
+                    img2.src = `/api/images/${testImage.id}/download`;
                     img2.style.maxWidth = '200px';
                     img2.style.display = 'block';
                     img2.style.marginBottom = '10px';
@@ -227,7 +227,7 @@ function ImageGallery({ projectId, images, loading }) {
                     img3.onerror = (e) => console.error('Error loading with response URL:', e);
                     
                     const img4 = document.createElement('img');
-                    img4.src = `/images/${testImage.id}/thumbnail?width=200&height=200`;
+                    img4.src = `/api/images/${testImage.id}/thumbnail?width=200&height=200`;
                     img4.style.maxWidth = '200px';
                     img4.style.display = 'block';
                     img4.style.marginBottom = '10px';
@@ -236,12 +236,12 @@ function ImageGallery({ projectId, images, loading }) {
                     
                     // Add labels and images
                     const label1 = document.createElement('div');
-                    label1.innerText = '/content URL:';
+                    label1.innerText = '/api/content URL:';
                     testDiv.appendChild(label1);
                     testDiv.appendChild(img1);
                     
                     const label2 = document.createElement('div');
-                    label2.innerText = '/download URL:';
+                    label2.innerText = '/api/download URL:';
                     testDiv.appendChild(label2);
                     testDiv.appendChild(img2);
                     
@@ -251,7 +251,7 @@ function ImageGallery({ projectId, images, loading }) {
                     testDiv.appendChild(img3);
                     
                     const label4 = document.createElement('div');
-                    label4.innerText = '/thumbnail URL:';
+                    label4.innerText = '/api/thumbnail URL:';
                     testDiv.appendChild(label4);
                     testDiv.appendChild(img4);
                     

@@ -1,4 +1,11 @@
-from fastapi import FastAPI, Request, status
+
+from fastapi.responses import RedirectResponse
+# import app router. 
+from fastapi.routing import APIRouter
+
+from fastapi.middleware.cors import CORSMiddleware
+import time
+from fastapi import FastAPI, Request, status, HTTPException
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import JSONResponse, HTMLResponse
 from fastapi.templating import Jinja2Templates
@@ -33,22 +40,29 @@ async def lifespan(app: FastAPI):
             print(f"MinIO bucket '{settings.MINIO_BUCKET_NAME}' is ready.")
     else:
         print("WARNING: MinIO client not initialized. Object storage operations will fail.")
+    # mkdir if it does not exist
+    os.makedirs("/ui2", exist_ok=True)
+    # if frontend/build exist, then copy the contents of frontend/build to /ui2
+    # if os.path.exists("/app/frontend/build"):
+        # Copy the contents of frontend/build to /ui2
+        # os.system("cp -r /app/frontend/build /ui2/")
+        # print("Frontend build copied to /ui2")
+    # else:
+        # print("Frontend build not found, serving empty ui directory")
     print("Application startup complete.")
     yield
     print("Application shutdown...")
     print("Application shutdown complete.")
+
+
 
 app = FastAPI(
     title=settings.APP_NAME,
     lifespan=lifespan
 )
 
-# Mount static files
-app.mount("/static", StaticFiles(directory=Path("app/ui/static")), name="static")
-app.mount("/static/js", StaticFiles(directory=Path("app/ui/static/js")), name="js")
-app.mount("/static/css", StaticFiles(directory=Path("app/ui/static/css")), name="css")
 
-from fastapi.middleware.cors import CORSMiddleware
+
 # Add CORS middleware
 app.add_middleware(
     CORSMiddleware,
@@ -57,6 +71,31 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# Add debug middleware to catch exceptions and print debug information
+@app.middleware("http")
+async def debug_exception_middleware(request: Request, call_next):
+    start_time = time.time()
+    try:
+        response = await call_next(request)
+        process_time = time.time() - start_time
+        print(f"Request: {request.method} {request.url.path} completed in {process_time:.4f}s")
+        return response
+    except Exception as e:
+        process_time = time.time() - start_time
+        print(f"ERROR in {request.method} {request.url.path} after {process_time:.4f}s")
+        print(f"Exception: {str(e)}")
+        print(f"Exception type: {type(e).__name__}")
+        print(f"Request headers: {request.headers}")
+        print(f"Request query params: {request.query_params}")
+        try:
+            body = await request.body()
+            if body:
+                print(f"Request body: {body.decode()}")
+        except Exception as body_err:
+            print(f"Could not read request body: {str(body_err)}")
+        print(f"Traceback: {traceback.format_exc()}")
+        raise  # Re-raise the exception for FastAPI to handle
 
 # Add middleware that prints the request type and path to the console
 # Custom JSON encoder to handle MetaData objects
@@ -78,33 +117,6 @@ class CustomJSONResponse(JSONResponse):
             cls=CustomJSONEncoder,
         ).encode("utf-8")
 
-# @app.middleware("http")
-# async def log_request(request, call_next):
-#     print(f"Request: {request.method} {request.url}")
-#     try:
-#         response = await call_next(request)
-#         return response
-#     except ValidationError as e:
-#         # Log the detailed error
-#         print(f"Pydantic ValidationError: {str(e)}")
-#         print(f"Error details: {e.errors()}")
-#         print(f"Traceback: {traceback.format_exc()}")
-        
-#         # Return a more informative error response
-#         return CustomJSONResponse(
-#             status_code=422,
-#             content={
-#                 "detail": "Validation Error",
-#                 "errors": e.errors(),
-#                 "message": str(e)
-#             }
-#         )
-#     except Exception as e:
-#         # Log other exceptions
-#         print(f"Unhandled exception: {str(e)}")
-#         print(f"Traceback: {traceback.format_exc()}")
-        # raise
-
 # Global exception handler for Pydantic ValidationError
 @app.exception_handler(ValidationError)
 async def validation_exception_handler(request: Request, exc: ValidationError):
@@ -120,27 +132,53 @@ async def validation_exception_handler(request: Request, exc: ValidationError):
 
 
 
-app.include_router(projects.router)
-app.include_router(images.router)
-app.include_router(users.router)
-app.include_router(image_classes.router)
-app.include_router(comments.router)
-app.include_router(project_metadata.router)
-# app.include_router(ui.router)
 
-from fastapi.responses import RedirectResponse
+# Create an API router 
+api_router = APIRouter()
 
-@app.get("/", tags=["Root"])
-async def read_root():
-    return RedirectResponse(url="/ui")
+# Include all API routers under the /api prefix
+api_router.include_router(projects.router)
+api_router.include_router(images.router)
+api_router.include_router(users.router)
+api_router.include_router(image_classes.router)
+api_router.include_router(comments.router)
+api_router.include_router(project_metadata.router)
 
-@app.get("/ui/{rest_of_path:path}", response_class=HTMLResponse)
-async def serve_ui(request: Request, rest_of_path: str = ""):
-    # Serve the index.html for any UI route to support client-side routing
-    index_path = Path("app/ui/index.html")
-    if index_path.exists():
-        with open(index_path, "r") as f:
-            html_content = f.read()
-        return HTMLResponse(content=html_content)
-    else:
-        return HTMLResponse(content="UI not found. Make sure the frontend is built correctly.", status_code=404)
+# Include the API router in the main app
+app.include_router(api_router)
+
+# for other routes, cehck the ui2 folder for html, js, css
+# Set up static files serving
+
+# serve index.html at /ui2
+# just read the file directly and return it
+# read env var, front_end_build_path
+# use default frontend/build
+front_end_build_path = os.getenv("FRONTEND_BUILD_PATH", "/app/frontend/build")
+# serve the static files from the build directory
+# Mount the static folder
+app.mount(
+    "/static",
+    StaticFiles(directory=os.path.join(front_end_build_path, "static")),
+    name="static_files"
+)
+
+# import fileresponse. 
+from fastapi.responses import FileResponse
+# Mount individual files using separate handlers
+@app.get("/favicon.ico")
+async def get_favicon():
+    return FileResponse(os.path.join(front_end_build_path, "favicon.ico"))
+
+# 3 route for logo192.png
+@app.get("/logo192.png")
+async def get_logo192():
+    return FileResponse(os.path.join(front_end_build_path, "logo192.png"))
+
+@app.get("/manifest.json")
+async def get_manifest():
+    return FileResponse(os.path.join(front_end_build_path, "manifest.json"))
+
+@app.get("/")
+async def get_index():
+    return FileResponse(os.path.join(front_end_build_path, "index.html"))

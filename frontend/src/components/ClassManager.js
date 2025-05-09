@@ -20,7 +20,7 @@ function ClassManager({ projectId, classes, setClasses, loading, setLoading, set
     try {
       setLoading(true);
       
-      const response = await fetch(`/projects/${projectId}/classes`, {
+      const response = await fetch(`/api/projects/${projectId}/classes`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -56,7 +56,7 @@ function ClassManager({ projectId, classes, setClasses, loading, setLoading, set
     try {
       setLoading(true);
       
-      const response = await fetch(`/classes/${editingClass.id}`, {
+      const response = await fetch(`/api/classes/${editingClass.id}`, {
         method: 'PATCH',
         headers: {
           'Content-Type': 'application/json',
@@ -99,7 +99,7 @@ function ClassManager({ projectId, classes, setClasses, loading, setLoading, set
     try {
       setLoading(true);
       
-      const response = await fetch(`/classes/${id}`, {
+      const response = await fetch(`/api/classes/${id}`, {
         method: 'DELETE',
       });
       

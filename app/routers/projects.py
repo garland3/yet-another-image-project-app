@@ -10,7 +10,7 @@ from aiocache import cached
 from aiocache.serializers import JsonSerializer
 
 router = APIRouter(
-    prefix="/projects",
+    prefix="/api/projects",
     tags=["Projects"],
 )
 

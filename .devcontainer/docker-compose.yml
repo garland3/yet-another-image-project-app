@@ -8,7 +8,7 @@ services:
       target: base
     volumes:
       - ..:/app:delegate
-      - node_modules_volume:/app/frontend/node_modules
+      - node_modules_volume:/app/frontend/node_modules    
       - npm_cache:/root/.npm
     command: sleep infinity
     networks:
@@ -20,3 +20,7 @@ networks:
   data_mgmt_net:
     external: true
     name: data_mgmt_net
+
+volumes:
+  node_modules_volume:
+  npm_cache:

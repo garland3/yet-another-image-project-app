@@ -45,7 +45,7 @@ function MetadataManager({
     try {
       setLoading(true);
       
-      const response = await fetch(`/projects/${projectId}/metadata/${newMetadata.key}`, {
+      const response = await fetch(`/api/projects/${projectId}/metadata/${newMetadata.key}`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -91,7 +91,7 @@ function MetadataManager({
       
       setLoading(true);
       
-      const response = await fetch(`/projects/${projectId}/metadata-dict`, {
+      const response = await fetch(`/api/projects/${projectId}/metadata-dict`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -118,7 +118,7 @@ function MetadataManager({
     try {
       setLoading(true);
       
-      const response = await fetch(`/projects/${projectId}/metadata/${editingMetadata.key}`, {
+      const response = await fetch(`/api/projects/${projectId}/metadata/${editingMetadata.key}`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -164,7 +164,7 @@ function MetadataManager({
     try {
       setLoading(true);
       
-      const response = await fetch(`/projects/${projectId}/metadata/${key}`, {
+      const response = await fetch(`/api/projects/${projectId}/metadata/${key}`, {
         method: 'DELETE',
       });
       

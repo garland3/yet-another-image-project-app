@@ -54,7 +54,7 @@ function ImageMetadata({ imageId, image, setImage, loading, setLoading, setError
     try {
       setLoading(true);
       
-      const response = await fetch(`/images/${imageId}/metadata`, {
+      const response = await fetch(`/api/images/${imageId}/metadata`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -101,7 +101,7 @@ function ImageMetadata({ imageId, image, setImage, loading, setLoading, setError
     try {
       setLoading(true);
       
-      const response = await fetch(`/images/${imageId}/metadata`, {
+      const response = await fetch(`/api/images/${imageId}/metadata`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -151,7 +151,7 @@ function ImageMetadata({ imageId, image, setImage, loading, setLoading, setError
     try {
       setLoading(true);
       
-      const response = await fetch(`/images/${imageId}/metadata/${key}`, {
+      const response = await fetch(`/api/images/${imageId}/metadata/${key}`, {
         method: 'DELETE',
       });
       

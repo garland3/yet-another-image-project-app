@@ -9,6 +9,8 @@ from app.config import settings
 from app.routers.images import check_project_access
 
 router = APIRouter(
+    # prefix /api
+    prefix="/api",
     tags=["Project Metadata"],
 )
 

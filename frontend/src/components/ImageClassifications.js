@@ -10,7 +10,7 @@ function ImageClassifications({ imageId, classes, loading, setLoading, setError 
       try {
         // Ensure imageId is a string to match the format expected by the backend
         const imageIdStr = String(imageId);
-        const response = await fetch(`/images/${imageIdStr}/classifications`);
+        const response = await fetch(`/api/images/${imageIdStr}/classifications`);
         
         if (!response.ok) {
           throw new Error(`HTTP error! Status: ${response.status}`);
@@ -66,7 +66,7 @@ function ImageClassifications({ imageId, classes, loading, setLoading, setError 
       
       console.log("Request payload:", JSON.stringify(payload, null, 2));
       
-      const response = await fetch(`/images/${imageIdStr}/classifications`, {
+      const response = await fetch(`/api/images/${imageIdStr}/classifications`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -104,7 +104,7 @@ function ImageClassifications({ imageId, classes, loading, setLoading, setError 
       // Ensure id is a string to match the format expected by the backend
       const idStr = String(id);
       
-      const response = await fetch(`/classifications/${idStr}`, {
+      const response = await fetch(`/api/classifications/${idStr}`, {
         method: 'DELETE',
       });
       
