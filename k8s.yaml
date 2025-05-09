@@ -88,6 +88,20 @@ spec:
           volumeMounts:
             - name: postgres-storage
               mountPath: /var/lib/postgresql/data
+          readinessProbe:
+            exec:
+              command: ["pg_isready", "-U", "$(POSTGRES_USER)", "-d", "$(POSTGRES_DB)"]
+            initialDelaySeconds: 10
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 5
+          livenessProbe:
+            exec:
+              command: ["pg_isready", "-U", "$(POSTGRES_USER)", "-d", "$(POSTGRES_DB)"]
+            initialDelaySeconds: 30
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 3
       volumes:
         - name: postgres-storage
           persistentVolumeClaim:
@@ -146,6 +160,22 @@ spec:
           volumeMounts:
             - name: minio-storage
               mountPath: /data
+          readinessProbe:
+            httpGet:
+              path: /minio/health/live
+              port: 9000
+            initialDelaySeconds: 30
+            periodSeconds: 30
+            timeoutSeconds: 10
+            failureThreshold: 3
+          livenessProbe:
+            httpGet:
+              path: /minio/health/live
+              port: 9000
+            initialDelaySeconds: 60
+            periodSeconds: 30
+            timeoutSeconds: 10
+            failureThreshold: 3
       volumes:
         - name: minio-storage
           persistentVolumeClaim:
@@ -183,13 +213,22 @@ spec:
     spec:
       containers:
         - name: fastapi-app
-          image: <your-dockerhub-username>/project-management-ui:latest
+          image: quay.io/${QUAY_USERNAME}/yet-another-image-project-app:latest
           ports:
             - containerPort: 8000
           envFrom:
             - secretRef:
                 name: app-env-secret
-      imagePullSecrets: []
+          readinessProbe:
+            httpGet:
+              path: /docs
+              port: 8000
+            initialDelaySeconds: 10
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 3
+      imagePullSecrets:
+        - name: quay-registry-secret
 ---
 apiVersion: v1
 kind: Service
@@ -214,7 +253,7 @@ spec:
   ports:
     - port: 8000
       targetPort: 8000
-      nodePort: 30080
+      nodePort: 30807
   selector:
     app: fastapi-app
 ---
@@ -231,3 +270,12 @@ spec:
       nodePort: 30909
   selector:
     app: minio
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: quay-registry-secret
+  namespace: data-mgmt
+type: kubernetes.io/dockerconfigjson
+data:
+  .dockerconfigjson: ${QUAY_REGISTRY_SECRET}

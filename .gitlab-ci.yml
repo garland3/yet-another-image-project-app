@@ -1,0 +1,27 @@
+# GitLab CI/CD configuration for building and pushing Docker images to Quay.io
+
+# Define variables at the top
+variables:
+  QUAY_USERNAME: ${QUAY_USERNAME}
+  QUAY_IMAGE_NAME: yet-another-image-project-app
+  QUAY_REGISTRY: quay.io
+
+# Define stages
+stages:
+  - build
+
+# Build and push Docker image
+build:
+  stage: build
+  image: docker:latest
+  services:
+    - docker:dind
+  before_script:
+    - echo "$QUAY_PASSWORD" | docker login quay.io -u "$QUAY_USERNAME" --password-stdin
+  script:
+    - docker build -t $QUAY_REGISTRY/$QUAY_USERNAME/$QUAY_IMAGE_NAME:latest -t $QUAY_REGISTRY/$QUAY_USERNAME/$QUAY_IMAGE_NAME:$CI_COMMIT_SHA .
+    - docker push $QUAY_REGISTRY/$QUAY_USERNAME/$QUAY_IMAGE_NAME:latest
+    - docker push $QUAY_REGISTRY/$QUAY_USERNAME/$QUAY_IMAGE_NAME:$CI_COMMIT_SHA
+  only:
+    - main
+    - merge_requests
