@@ -8,7 +8,7 @@ from pydantic import BaseModel
 from app import crud, schemas, models
 from app.database import get_db
 from app.dependencies import get_current_user, check_mock_user_in_group
-from app.minio_client import upload_file_to_minio, get_presigned_download_url
+from app.boto3_client import upload_file_to_minio, get_presigned_download_url
 from app.config import settings
 import json
 from aiocache import cached
