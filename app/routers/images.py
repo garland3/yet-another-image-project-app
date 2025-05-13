@@ -58,7 +58,7 @@ async def upload_image_to_project(
     file_data = io.BytesIO(contents)
     file_size = len(contents)
     success = await upload_file_to_minio(
-        bucket_name=settings.MINIO_BUCKET_NAME,
+        bucket_name=settings.S3_BUCKET,
         object_name=object_storage_key,
         file_data=file_data,
         length=file_size,
@@ -295,7 +295,7 @@ async def get_image_download_url(
     
     # Get the presigned URL for internal use
     internal_url = get_presigned_download_url(
-        bucket_name=settings.MINIO_BUCKET_NAME,
+        bucket_name=settings.S3_BUCKET,
         object_name=db_image.object_storage_key
     )
     if not internal_url:
@@ -331,7 +331,7 @@ async def get_image_content(
     
     # Get the presigned URL for internal use
     internal_url = get_presigned_download_url(
-        bucket_name=settings.MINIO_BUCKET_NAME,
+        bucket_name=settings.S3_BUCKET,
         object_name=db_image.object_storage_key
     )
     if not internal_url:
@@ -384,7 +384,7 @@ async def get_image_thumbnail(
     
     # Get the presigned URL for internal use
     internal_url = get_presigned_download_url(
-        bucket_name=settings.MINIO_BUCKET_NAME,
+        bucket_name=settings.S3_BUCKET,
         object_name=db_image.object_storage_key
     )
     if not internal_url:

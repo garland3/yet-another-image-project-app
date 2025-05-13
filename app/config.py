@@ -15,11 +15,11 @@ class Settings(BaseSettings):
     POSTGRES_PORT: int = 5432
     DATABASE_URL: str
 
-    MINIO_ENDPOINT: str
-    MINIO_ACCESS_KEY: str
-    MINIO_SECRET_KEY: str
-    MINIO_BUCKET_NAME: str = "data-storage"
-    MINIO_USE_SSL: bool = False
+    S3_ENDPOINT: str
+    S3_ACCESS_KEY: str
+    S3_SECRET_KEY: str
+    S3_BUCKET: str = "data-storage"
+    S3_USE_SSL: bool = False
 
     @property
     def MOCK_USER_GROUPS(self) -> List[str]:

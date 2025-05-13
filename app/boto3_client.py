@@ -8,9 +8,9 @@ try:
     # Initialize boto3 client for S3
     boto3_client = boto3.client(
         's3',
-        endpoint_url=f"http://{settings.MINIO_ENDPOINT}",
-        aws_access_key_id=settings.MINIO_ACCESS_KEY,
-        aws_secret_access_key=settings.MINIO_SECRET_KEY,
+        endpoint_url=f"http://{settings.S3_ENDPOINT}",
+        aws_access_key_id=settings.S3_ACCESS_KEY,
+        aws_secret_access_key=settings.S3_SECRET_KEY,
         # Use path-style URLs (required for MinIO)
         config=boto3.session.Config(signature_version='s3v4', s3={'addressing_style': 'path'})
     )

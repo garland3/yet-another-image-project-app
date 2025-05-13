@@ -31,13 +31,13 @@ async def lifespan(app: FastAPI):
     
     # Run migrations to set up new tables and migrate existing data
     await run_migrations()
-    print(f"Checking/Creating S3 bucket: {settings.MINIO_BUCKET_NAME}")
+    print(f"Checking/Creating S3 bucket: {settings.S3_BUCKET}")
     if boto3_client:
-         bucket_exists = ensure_bucket_exists(boto3_client, settings.MINIO_BUCKET_NAME)
+         bucket_exists = ensure_bucket_exists(boto3_client, settings.S3_BUCKET)
          if not bucket_exists:
-             print(f"FATAL: Could not ensure S3 bucket '{settings.MINIO_BUCKET_NAME}' exists. Uploads/Downloads will fail.")
+             print(f"FATAL: Could not ensure S3 bucket '{settings.S3_BUCKET}' exists. Uploads/Downloads will fail.")
          else:
-            print(f"S3 bucket '{settings.MINIO_BUCKET_NAME}' is ready.")
+            print(f"S3 bucket '{settings.S3_BUCKET}' is ready.")
     else:
         print("WARNING: Boto3 S3 client not initialized. Object storage operations will fail.")
     # mkdir if it does not exist
