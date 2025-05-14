@@ -20,6 +20,7 @@
    
    "build": "react-app-rewired build",
     "test": "react-app-rewired test",
+
     "eject": "react-scripts eject"
   },
   "eslintConfig": {
@@ -40,11 +41,10 @@
       "last 1 safari version"
     ]
   },
+  
 
   "devDependencies": {
     "cross-env": "^7.0.3",
     "react-app-rewired": "^2.2.1"
-
   }
-
 }

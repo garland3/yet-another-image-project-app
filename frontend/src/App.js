@@ -28,6 +28,7 @@ function App() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [showModal, setShowModal] = useState(false);
+  const [currentUser, setCurrentUser] = useState(null);
   const [newProject, setNewProject] = useState({
     name: '',
     description: '',
@@ -35,6 +36,28 @@ function App() {
   });
 
   useEffect(() => {
+    // Fetch the current user
+    fetch('/api/users/me')
+      .then(response => {
+        if (!response.ok) {
+          // If we get a 401, it's expected when authentication is disabled
+          if (response.status === 401) {
+            console.log("Authentication is disabled or user is not logged in");
+            return null;
+          }
+          throw new Error(`HTTP error! status: ${response.status}`);
+        }
+        return response.json();
+      })
+      .then(userData => {
+        if (userData) {
+          setCurrentUser(userData);
+        }
+      })
+      .catch(err => {
+        console.error("Failed to fetch current user:", err);
+      });
+
     // Fetch projects from the API
     fetch('/api/projects')
       .then(response => {
@@ -97,7 +120,14 @@ function App() {
   const HomePage = () => (
     <div className="App">
       <header className="App-header">
-        <h1>Image Manager</h1>
+        <div className="header-content">
+          <h1>Image Manager</h1>
+          {currentUser && (
+            <div className="user-info">
+              <span>Logged in as: {currentUser.email}</span>
+            </div>
+          )}
+        </div>
         <button 
           className="btn" 
           onClick={() => setShowModal(true)}

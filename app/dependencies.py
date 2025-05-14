@@ -7,7 +7,7 @@ from app.schemas import User, UserCreate
 from app.database import get_db
 from app import crud
 
-def check_mock_user_in_group(user: User, group_id: str) -> bool:
+def check_user_in_group(user: User, group_id: str) -> bool:
     return group_id in user.groups
 
 async def get_current_user(
@@ -51,8 +51,8 @@ async def requires_group_membership(
     current_user: User = Depends(get_current_user)
 ) -> bool:
     is_member = False
-    if settings.SKIP_HEADER_CHECK:
-        is_member = check_mock_user_in_group(current_user, required_group_id)
+    if settings.CHECK_MOCK_MEMBERSHIP:
+        is_member = check_user_in_group(current_user, required_group_id)
     else:
         is_member = required_group_id in current_user.groups
     if not is_member:

@@ -7,7 +7,7 @@ from typing import List, Optional, Dict, Any
 from pydantic import BaseModel
 from app import crud, schemas, models
 from app.database import get_db
-from app.dependencies import get_current_user, check_mock_user_in_group
+from app.dependencies import get_current_user, check_user_in_group
 from app.boto3_client import upload_file_to_minio, get_presigned_download_url
 from app.config import settings
 import json
@@ -25,8 +25,8 @@ async def check_project_access(project_id: uuid.UUID, db: AsyncSession, current_
     if db_project is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Project not found")
     is_member = False
-    if settings.SKIP_HEADER_CHECK:
-        is_member = check_mock_user_in_group(current_user, db_project.meta_group_id)
+    if settings.CHECK_MOCK_MEMBERSHIP:
+        is_member = check_user_in_group(current_user, db_project.meta_group_id)
     else:
         is_member = db_project.meta_group_id in current_user.groups
     if not is_member:
@@ -213,8 +213,8 @@ async def get_image_metadata(
     if db_image is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Image not found")
     is_member = False
-    if settings.SKIP_HEADER_CHECK:
-        is_member = check_mock_user_in_group(current_user, db_image.project.meta_group_id)
+    if settings.CHECK_MOCK_MEMBERSHIP:
+        is_member = check_user_in_group(current_user, db_image.project.meta_group_id)
     else:
         is_member = db_image.project.meta_group_id in current_user.groups
     if not is_member:
@@ -283,8 +283,8 @@ async def get_image_download_url(
     if db_image is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Image not found")
     is_member = False
-    if settings.SKIP_HEADER_CHECK:
-        is_member = check_mock_user_in_group(current_user, db_image.project.meta_group_id)
+    if settings.CHECK_MOCK_MEMBERSHIP:
+        is_member = check_user_in_group(current_user, db_image.project.meta_group_id)
     else:
         is_member = db_image.project.meta_group_id in current_user.groups
     if not is_member:
@@ -319,8 +319,8 @@ async def get_image_content(
     
     # Check access permissions
     is_member = False
-    if settings.SKIP_HEADER_CHECK:
-        is_member = check_mock_user_in_group(current_user, db_image.project.meta_group_id)
+    if settings.CHECK_MOCK_MEMBERSHIP:
+        is_member = check_user_in_group(current_user, db_image.project.meta_group_id)
     else:
         is_member = db_image.project.meta_group_id in current_user.groups
     if not is_member:
@@ -373,7 +373,7 @@ async def get_image_thumbnail(
     # Check access permissions
     is_member = False
     if settings.SKIP_HEADER_CHECK:
-        is_member = check_mock_user_in_group(current_user, db_image.project.meta_group_id)
+        is_member = check_user_in_group(current_user, db_image.project.meta_group_id)
     else:
         is_member = db_image.project.meta_group_id in current_user.groups
     if not is_member:
@@ -460,7 +460,7 @@ async def update_image_metadata(
     # Check access permissions
     is_member = False
     if settings.SKIP_HEADER_CHECK:
-        is_member = check_mock_user_in_group(current_user, db_image.project.meta_group_id)
+        is_member = check_user_in_group(current_user, db_image.project.meta_group_id)
     else:
         is_member = db_image.project.meta_group_id in current_user.groups
     if not is_member:
@@ -546,7 +546,7 @@ async def delete_image_metadata(
     # Check access permissions
     is_member = False
     if settings.SKIP_HEADER_CHECK:
-        is_member = check_mock_user_in_group(current_user, db_image.project.meta_group_id)
+        is_member = check_user_in_group(current_user, db_image.project.meta_group_id)
     else:
         is_member = db_image.project.meta_group_id in current_user.groups
     if not is_member:

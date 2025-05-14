@@ -4,7 +4,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from typing import List
 from app import crud, schemas, models
 from app.database import get_db
-from app.dependencies import get_current_user, requires_group_membership, check_mock_user_in_group
+from app.dependencies import get_current_user, requires_group_membership, check_user_in_group
 from app.config import settings
 from aiocache import cached
 from aiocache.serializers import JsonSerializer
@@ -21,8 +21,8 @@ async def create_new_project(
     current_user: schemas.User = Depends(get_current_user),
 ):
     is_member = False
-    if settings.SKIP_HEADER_CHECK:
-        is_member = check_mock_user_in_group(current_user, project.meta_group_id)
+    if settings.CHECK_MOCK_MEMBERSHIP:
+        is_member = check_user_in_group(current_user, project.meta_group_id)
     else:
         is_member = project.meta_group_id in current_user.groups
     if not is_member:
@@ -55,8 +55,8 @@ async def read_project(
     if db_project is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Project not found")
     is_member = False
-    if settings.SKIP_HEADER_CHECK:
-        is_member = check_mock_user_in_group(current_user, db_project.meta_group_id)
+    if settings.CHECK_MOCK_MEMBERSHIP:
+        is_member = check_user_in_group(current_user, db_project.meta_group_id)
     else:
         is_member = db_project.meta_group_id in current_user.groups
     if not is_member:

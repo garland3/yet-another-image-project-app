@@ -4,7 +4,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from typing import List
 from app import crud, schemas, models
 from app.database import get_db
-from app.dependencies import get_current_user, check_mock_user_in_group
+from app.dependencies import get_current_user, check_user_in_group
 from app.config import settings
 from app.routers.images import check_project_access
 
@@ -120,7 +120,7 @@ async def check_image_access(image_id: uuid.UUID, db: AsyncSession, current_user
     # Check if the user has access to the project
     is_member = False
     if settings.SKIP_HEADER_CHECK:
-        is_member = check_mock_user_in_group(current_user, db_image.project.meta_group_id)
+        is_member = check_user_in_group(current_user, db_image.project.meta_group_id)
     else:
         is_member = db_image.project.meta_group_id in current_user.groups
     

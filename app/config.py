@@ -5,6 +5,7 @@ from typing import List, Optional
 class Settings(BaseSettings):
     APP_NAME: str = "Data Management API"
     SKIP_HEADER_CHECK: bool = False
+    CHECK_MOCK_MEMBERSHIP: bool = True
     MOCK_USER_EMAIL: str = "test@example.com"
     MOCK_USER_GROUPS_JSON: str = '[]'
 

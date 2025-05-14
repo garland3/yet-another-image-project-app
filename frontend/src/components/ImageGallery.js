@@ -1,9 +1,32 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 
 function ImageGallery({ projectId, images, loading }) {
   const navigate = useNavigate();
   const [imageLoadStatus, setImageLoadStatus] = useState({});
+  const [currentPage, setCurrentPage] = useState(1);
+  const [debugExpanded, setDebugExpanded] = useState(false); // Debug section collapsed by default
+  const imagesPerPage = 50; // Limit to 50 thumbnails per page
+  
+  // Calculate total pages
+  const totalPages = Math.ceil(images.length / imagesPerPage);
+  
+  // Get current images for the page
+  const indexOfLastImage = currentPage * imagesPerPage;
+  const indexOfFirstImage = indexOfLastImage - imagesPerPage;
+  const currentImages = images.slice(indexOfFirstImage, indexOfLastImage);
+  
+  // Reset to first page when images array changes
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [images.length]);
+  
+  // Page change handler
+  const handlePageChange = (pageNumber) => {
+    setCurrentPage(pageNumber);
+    // Scroll to top of gallery
+    document.getElementById('images-container')?.scrollIntoView({ behavior: 'smooth' });
+  };
 
   // Helper function to format file size
   const formatFileSize = (bytes) => {
@@ -27,8 +50,13 @@ function ImageGallery({ projectId, images, loading }) {
         )}
         
         {!loading && images.length > 0 && (
-          <div className="image-gallery">
-            {images.map(image => (
+          <>
+            <div className="pagination-info">
+              <p>Showing {indexOfFirstImage + 1}-{Math.min(indexOfLastImage, images.length)} of {images.length} images</p>
+            </div>
+            
+            <div className="image-gallery">
+              {currentImages.map(image => (
               <div 
                 key={image.id} 
                 className="image-card"
@@ -78,38 +106,99 @@ function ImageGallery({ projectId, images, loading }) {
                   <small>{formatFileSize(image.size_bytes)}</small>
                 </div>
               </div>
-            ))}
-          </div>
+              ))}
+            </div>
+            
+            {totalPages > 1 && (
+              <div className="pagination-controls">
+                <button 
+                  onClick={() => handlePageChange(1)} 
+                  disabled={currentPage === 1}
+                  className="pagination-button"
+                >
+                  First
+                </button>
+                
+                <button 
+                  onClick={() => handlePageChange(currentPage - 1)} 
+                  disabled={currentPage === 1}
+                  className="pagination-button"
+                >
+                  Previous
+                </button>
+                
+                <span className="pagination-info">
+                  Page {currentPage} of {totalPages}
+                </span>
+                
+                <button 
+                  onClick={() => handlePageChange(currentPage + 1)} 
+                  disabled={currentPage === totalPages}
+                  className="pagination-button"
+                >
+                  Next
+                </button>
+                
+                <button 
+                  onClick={() => handlePageChange(totalPages)} 
+                  disabled={currentPage === totalPages}
+                  className="pagination-button"
+                >
+                  Last
+                </button>
+              </div>
+            )}
+          </>
         )}
 
         {/* Debug information section */}
         <div style={{ marginBottom: '20px', padding: '10px', border: '1px solid #ddd', borderRadius: '4px', backgroundColor: '#f9f9f9' }}>
-          <h3 style={{ marginTop: '0' }}>Debug Information</h3>
-          <p>Image loading status: {Object.keys(imageLoadStatus).length} / {images.length} images tracked</p>
-          <ul style={{ maxHeight: '150px', overflowY: 'auto', fontSize: '12px', fontFamily: 'monospace' }}>
-            {Object.entries(imageLoadStatus).map(([imageId, status]) => (
-              <li key={imageId} style={{ 
-                color: status.status === 'loaded' ? 'green' : 'red',
-                marginBottom: '5px'
-              }}>
-                {imageId}: {status.status} at {status.timestamp}
-                {status.error && <div>Error: {status.error}</div>}
-              </li>
-            ))}
-          </ul>
-          <div style={{ display: 'flex', gap: '10px', marginTop: '10px' }}>
-            <button 
-              onClick={() => {
-                console.log('Current image load status:', imageLoadStatus);
-                console.log('Images data:', images);
-              }}
-              style={{ padding: '5px 10px', fontSize: '12px' }}
-            >
-              Log Debug Info to Console
-            </button>
-            
-            <button 
-              onClick={() => {
+          <div 
+            style={{ 
+              display: 'flex', 
+              justifyContent: 'space-between', 
+              alignItems: 'center', 
+              cursor: 'pointer' 
+            }}
+            onClick={() => setDebugExpanded(!debugExpanded)}
+          >
+            <h3 style={{ marginTop: '0', marginBottom: debugExpanded ? '15px' : '0' }}>
+              Debug Information
+            </h3>
+            <span style={{ fontSize: '18px', fontWeight: 'bold' }}>
+              {debugExpanded ? '▼' : '►'}
+            </span>
+          </div>
+          
+          {debugExpanded && (
+            <>
+              <p>Image loading status: {Object.keys(imageLoadStatus).length} / {images.length} images tracked</p>
+              <ul style={{ maxHeight: '150px', overflowY: 'auto', fontSize: '12px', fontFamily: 'monospace' }}>
+                {Object.entries(imageLoadStatus).map(([imageId, status]) => (
+                  <li key={imageId} style={{ 
+                    color: status.status === 'loaded' ? 'green' : 'red',
+                    marginBottom: '5px'
+                  }}>
+                    {imageId}: {status.status} at {status.timestamp}
+                    {status.error && <div>Error: {status.error}</div>}
+                  </li>
+                ))}
+              </ul>
+              <div style={{ display: 'flex', gap: '10px', marginTop: '10px' }}>
+                <button 
+                  onClick={(e) => {
+                    e.stopPropagation(); // Prevent toggling the debug section
+                    console.log('Current image load status:', imageLoadStatus);
+                    console.log('Images data:', images);
+                  }}
+                  style={{ padding: '5px 10px', fontSize: '12px' }}
+                >
+                  Log Debug Info to Console
+                </button>
+                
+                <button 
+                  onClick={(e) => {
+                    e.stopPropagation(); // Prevent toggling the debug section
                 if (images.length === 0) {
                   console.log('No images to test');
                   return;
@@ -156,14 +245,15 @@ function ImageGallery({ projectId, images, loading }) {
                   .catch(err => {
                     console.error('Error testing image URLs:', err);
                   });
-              }}
-              style={{ padding: '5px 10px', fontSize: '12px' }}
-            >
-              Test Image Loading
-            </button>
-            
-            <button 
-              onClick={() => {
+                  }}
+                  style={{ padding: '5px 10px', fontSize: '12px' }}
+                >
+                  Test Image Loading
+                </button>
+                
+                <button 
+                  onClick={(e) => {
+                    e.stopPropagation(); // Prevent toggling the debug section
                 if (images.length === 0) {
                   console.log('No images to test');
                   return;
@@ -260,12 +350,14 @@ function ImageGallery({ projectId, images, loading }) {
                   .catch(err => {
                     console.error('Error testing direct URL loading:', err);
                   });
-              }}
-              style={{ padding: '5px 10px', fontSize: '12px' }}
-            >
-              Test Direct URLs
-            </button>
-          </div>
+                  }}
+                  style={{ padding: '5px 10px', fontSize: '12px' }}
+                >
+                  Test Direct URLs
+                </button>
+              </div>
+            </>
+          )}
         </div>
       </div>
     </div>

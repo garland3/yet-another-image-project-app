@@ -17,8 +17,31 @@ function Project() {
   const [classes, setClasses] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [currentUser, setCurrentUser] = useState(null);
 
   useEffect(() => {
+    // Fetch the current user
+    fetch('/api/users/me')
+      .then(response => {
+        if (!response.ok) {
+          // If we get a 401, it's expected when authentication is disabled
+          if (response.status === 401) {
+            console.log("Authentication is disabled or user is not logged in");
+            return null;
+          }
+          throw new Error(`HTTP error! status: ${response.status}`);
+        }
+        return response.json();
+      })
+      .then(userData => {
+        if (userData) {
+          setCurrentUser(userData);
+        }
+      })
+      .catch(err => {
+        console.error("Failed to fetch current user:", err);
+      });
+
     // Load project data, metadata, classes, and images
     const fetchProjectData = async () => {
       try {
@@ -86,6 +109,11 @@ function Project() {
           </button>
           <h1>{project ? project.name : 'Loading project...'}</h1>
           <p>{project ? (project.description || 'No description') : ''}</p>
+          {currentUser && (
+            <div className="user-info">
+              <span>Logged in as: {currentUser.email}</span>
+            </div>
+          )}
         </div>
       </header>
 

@@ -22,6 +22,7 @@ function ImageView() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [isTransitioning, setIsTransitioning] = useState(false);
+  const [currentUser, setCurrentUser] = useState(null);
 
   // Load image data
   const loadImageData = useCallback(async () => {
@@ -103,6 +104,28 @@ function ImageView() {
       return;
     }
     
+    // Fetch the current user
+    fetch('/api/users/me')
+      .then(response => {
+        if (!response.ok) {
+          // If we get a 401, it's expected when authentication is disabled
+          if (response.status === 401) {
+            console.log("Authentication is disabled or user is not logged in");
+            return null;
+          }
+          throw new Error(`HTTP error! status: ${response.status}`);
+        }
+        return response.json();
+      })
+      .then(userData => {
+        if (userData) {
+          setCurrentUser(userData);
+        }
+      })
+      .catch(err => {
+        console.error("Failed to fetch current user:", err);
+      });
+    
     loadImageData();
     loadProjectImages();
     loadClasses();
@@ -163,6 +186,11 @@ function ImageView() {
             ← Back to Project
           </button>
           <h1>{image ? image.filename : 'Loading image...'}</h1>
+          {currentUser && (
+            <div className="user-info">
+              <span>Logged in as: {currentUser.email}</span>
+            </div>
+          )}
         </div>
       </header>
 
