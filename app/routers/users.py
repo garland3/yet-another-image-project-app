@@ -45,13 +45,19 @@ async def read_current_user_groups(
     Get all groups that the current user has access to.
     This includes both the user's direct groups and groups they have access to through projects.
     """
-    # If using mock membership, return all groups the user is a member of
+    # If using mock membership, get user's accessible groups by checking each project
     if settings.CHECK_MOCK_MEMBERSHIP:
-        # Get all groups where the user is a member
+        # Get all projects from the database
+        all_projects = await crud.get_all_projects(db)
+        
+        # Initialize empty list for accessible groups
         user_groups = []
-        for group_id, members in MOCK_GROUP_MEMBERS.items():
-            if current_user.email in members and group_id not in user_groups:
-                user_groups.append(group_id)
+        
+        # For each project, check if the user is a member of the project's group
+        for project in all_projects:
+            if check_user_in_group(current_user, project.meta_group_id) and project.meta_group_id not in user_groups:
+                user_groups.append(project.meta_group_id)
+        
         return user_groups
     else:
         # Otherwise, return the user's groups from their profile
