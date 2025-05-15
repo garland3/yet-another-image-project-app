@@ -1,10 +1,11 @@
 import uuid
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
-from typing import List, Optional
-from app import crud, schemas, models
+from typing import List
+from app import crud, schemas
 from app.database import get_db
-from app.dependencies import get_current_user
+from app.dependencies import get_current_user, get_user_accessible_groups, MOCK_GROUP_MEMBERS
+from app.config import settings
 from app.config import settings
 
 router = APIRouter(
@@ -34,6 +35,27 @@ async def read_current_user(
     current_user: schemas.User = Depends(get_current_user),
 ):
     return current_user
+
+@router.get("/me/groups", response_model=List[str])
+async def read_current_user_groups(
+    current_user: schemas.User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    Get all groups that the current user has access to.
+    This includes both the user's direct groups and groups they have access to through projects.
+    """
+    # If using mock membership, return all groups the user is a member of
+    if settings.CHECK_MOCK_MEMBERSHIP:
+        # Get all groups where the user is a member
+        user_groups = []
+        for group_id, members in MOCK_GROUP_MEMBERS.items():
+            if current_user.email in members and group_id not in user_groups:
+                user_groups.append(group_id)
+        return user_groups
+    else:
+        # Otherwise, return the user's groups from their profile
+        return current_user.groups
 
 @router.get("/{user_id}", response_model=schemas.User)
 async def read_user(

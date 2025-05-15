@@ -44,11 +44,43 @@ async def get_project(db: AsyncSession, project_id: uuid.UUID) -> Optional[model
     return result.scalars().first()
 
 async def get_projects_by_group_ids(db: AsyncSession, group_ids: List[str], skip: int = 0, limit: int = 100) -> List[models.Project]:
+    """
+    Legacy method to get projects by group IDs.
+    This checks if the project's meta_group_id is in the user's groups list.
+    
+    Args:
+        db: Database session
+        group_ids: List of group IDs the user is a member of
+        skip: Number of records to skip
+        limit: Maximum number of records to return
+        
+    Returns:
+        List of projects the user has access to
+    """
     if not group_ids:
         return []
     result = await db.execute(
         select(models.Project)
         .where(models.Project.meta_group_id.in_(group_ids))
+        .offset(skip)
+        .limit(limit)
+    )
+    return result.scalars().all()
+
+async def get_all_projects(db: AsyncSession, skip: int = 0, limit: int = 100) -> List[models.Project]:
+    """
+    Get all projects in the database.
+    
+    Args:
+        db: Database session
+        skip: Number of records to skip
+        limit: Maximum number of records to return
+        
+    Returns:
+        List of all projects
+    """
+    result = await db.execute(
+        select(models.Project)
         .offset(skip)
         .limit(limit)
     )
