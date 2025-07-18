@@ -1,5 +1,5 @@
 import uuid
-from sqlalchemy import Column, String, Text, ForeignKey, DateTime, JSON, BigInteger, Boolean, ARRAY, UniqueConstraint
+from sqlalchemy import Column, String, Text, ForeignKey, DateTime, JSON, BigInteger, Boolean, UniqueConstraint
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
@@ -11,7 +11,6 @@ class User(Base):
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     email = Column(String(255), unique=True, nullable=False, index=True)
     username = Column(String(255), nullable=True)
-    groups = Column(ARRAY(String), nullable=False, default=[])
     is_active = Column(Boolean, default=True, nullable=False)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
@@ -20,6 +19,7 @@ class User(Base):
     uploaded_images = relationship("DataInstance", back_populates="uploader")
     comments = relationship("ImageComment", back_populates="author")
     classifications = relationship("ImageClassification", back_populates="created_by")
+    api_keys = relationship("ApiKey", back_populates="user")
 
 class Project(Base):
     __tablename__ = "projects"
@@ -120,3 +120,18 @@ class ProjectMetadata(Base):
         # This ensures each project can only have one entry for each metadata key
         UniqueConstraint('project_id', 'key', name='uix_project_metadata_project_id_key'),
     )
+
+class ApiKey(Base):
+    __tablename__ = "api_keys"
+    
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    user_id = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False)
+    key_hash = Column(String(255), nullable=False, unique=True, index=True)
+    name = Column(String(255), nullable=False)
+    is_active = Column(Boolean, default=True, nullable=False)
+    last_used_at = Column(DateTime(timezone=True), nullable=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), onupdate=func.now())
+    
+    # Relationships
+    user = relationship("User", back_populates="api_keys")

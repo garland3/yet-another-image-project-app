@@ -1,32 +1,22 @@
-# Use Ubuntu as the base image
+# Use Fedora as the base image
 # use multi-stage build to enable the dev environment to only use the base image
-FROM ubuntu:22.04 AS base
-
-# Set noninteractive installation
-ENV DEBIAN_FRONTEND=noninteractive
+FROM fedora:latest AS base
 
 # Install system dependencies and tools for development
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    build-essential \
-    libpq-dev \
+RUN dnf update -y && dnf install -y \
+    gcc \
+    gcc-c++ \
+    postgresql-devel \
     git \
     curl \
     vim \
     wget \
     ca-certificates \
     gnupg \
-    software-properties-common \
-    && apt-get clean && rm -rf /var/lib/apt/lists/*
-
-# Add deadsnakes PPA for Python 3.11
-RUN add-apt-repository ppa:deadsnakes/ppa && \
-    apt-get update && \
-    apt-get install -y --no-install-recommends \
     python3.11 \
-    python3.11-venv \
-    python3.11-dev \
+    python3.11-devel \
     python3-pip \
-    && apt-get clean && rm -rf /var/lib/apt/lists/*
+    && dnf clean all
 
 # Create symbolic links for python and pip
 RUN ln -sf /usr/bin/python3.11 /usr/bin/python && \
@@ -39,13 +29,8 @@ ENV PATH="/opt/venv/bin:$PATH"
 # Install uv package installer
 RUN pip install --no-cache-dir uv
 
-# Install Node.js (includes npm) using NodeSource repository
-RUN mkdir -p /etc/apt/keyrings && \
-    curl -fsSL https://deb.nodesource.com/gpgkey/nodesource-repo.gpg.key | gpg --dearmor -o /etc/apt/keyrings/nodesource.gpg && \
-    NODE_MAJOR=20 && \
-    echo "deb [signed-by=/etc/apt/keyrings/nodesource.gpg] https://deb.nodesource.com/node_$NODE_MAJOR.x nodistro main" | tee /etc/apt/sources.list.d/nodesource.list && \
-    apt-get update && apt-get install nodejs -y --no-install-recommends && \
-    apt-get clean && rm -rf /var/lib/apt/lists/*
+# Install Node.js (includes npm) using Fedora packages
+RUN dnf install -y nodejs npm && dnf clean all
 
 # Install debugging tools
 RUN pip install --no-cache-dir debugpy
@@ -55,10 +40,7 @@ WORKDIR /app
 ENV PYTHONDONTWRITEBYTECODE=1
 ENV PYTHONUNBUFFERED=1
 
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    build-essential \
-    libpq-dev \
-    && apt-get clean && rm -rf /var/lib/apt/lists/*
+RUN dnf install -y gcc gcc-c++ postgresql-devel && dnf clean all
 
 FROM base AS builder
 

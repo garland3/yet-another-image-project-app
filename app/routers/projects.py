@@ -4,7 +4,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from typing import List
 from app import crud, schemas, models
 from app.database import get_db
-from app.dependencies import get_current_user, requires_group_membership, check_user_in_group
+from app.dependencies import get_current_user, requires_group_membership, check_user_in_group, get_user_context, UserContext
 from app.config import settings
 from aiocache import cached
 from aiocache.serializers import JsonSerializer
@@ -28,14 +28,11 @@ async def create_new_project(
     is_member = check_user_in_group(current_user, project.meta_group_id)
     
     if not is_member:
-        # Get the user's accessible groups for a more helpful error message
-        user_groups = current_user.groups
-        
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail=f"User '{current_user.email}' cannot create projects in group '{project.meta_group_id}'. You have access to these groups: {', '.join(user_groups)}. Please select one of these groups or contact an administrator for access.",
+            detail=f"User '{current_user.email}' cannot create projects in group '{project.meta_group_id}'. Please contact an administrator for access.",
         )
-    db_project = await crud.create_project(db=db, project=project)
+    db_project = await crud.create_project(db=db, project=project, created_by=current_user.email)
     return db_project
 
 @router.get("/", response_model=List[schemas.Project])

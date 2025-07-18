@@ -1,9 +1,15 @@
 {
   "name": "Python FastAPI Development",
   "image": "mcr.microsoft.com/devcontainers/python:3.11",
+  "remoteUser": "root",
+  "features": {
+    "ghcr.io/devcontainers/features/node:1": {
+      "version": "lts"
+    }
+  },
   "workspaceFolder": "/workspaces/yet-another-image-project-app",
   "forwardPorts": [8000, 5432],
-  "postCreateCommand": "bash .devcontainer/setup.sh",
+  // "postCreateCommand": "bash .devcontainer/setup.sh",
   "remoteEnv": {
     "DATABASE_URL": "postgresql://postgres:postgres@localhost:5432/postgres"
   },

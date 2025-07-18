@@ -1,13 +1,12 @@
-import json
 from pydantic_settings import BaseSettings
-from typing import List, Optional
+from typing import Optional
 
 class Settings(BaseSettings):
     APP_NAME: str = "Data Management API"
     SKIP_HEADER_CHECK: bool = False
     CHECK_MOCK_MEMBERSHIP: bool = True
     MOCK_USER_EMAIL: str = "test@example.com"
-    MOCK_USER_GROUPS_JSON: str = '[]'
+    AUTH_SERVER_URL: Optional[str] = None
 
     POSTGRES_USER: str
     POSTGRES_PASSWORD: str
@@ -21,14 +20,6 @@ class Settings(BaseSettings):
     S3_SECRET_KEY: str
     S3_BUCKET: str = "data-storage"
     S3_USE_SSL: bool = False
-
-    @property
-    def MOCK_USER_GROUPS(self) -> List[str]:
-        try:
-            return json.loads(self.MOCK_USER_GROUPS_JSON)
-        except json.JSONDecodeError:
-            print(f"Warning: Could not parse MOCK_USER_GROUPS_JSON: {self.MOCK_USER_GROUPS_JSON}")
-            return []
 
     class Config:
         env_file = ".env"

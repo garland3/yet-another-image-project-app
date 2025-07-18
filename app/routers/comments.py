@@ -4,7 +4,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from typing import List
 from app import crud, schemas, models
 from app.database import get_db
-from app.dependencies import get_current_user
+from app.dependencies import get_current_user, get_user_context, UserContext
 from app.config import settings
 from app.routers.image_classes import check_image_access
 
@@ -18,42 +18,26 @@ async def create_comment(
     image_id: uuid.UUID,
     comment: schemas.ImageCommentBase,
     db: AsyncSession = Depends(get_db),
-    current_user: schemas.User = Depends(get_current_user),
+    user_context: UserContext = Depends(get_user_context),
 ):
     print(f"Comment request received for image_id: {image_id}")
     print(f"Comment text: {comment.text}")
-    print(f"Current user: {current_user}")
+    print(f"Current user: {user_context.user}")
     
     # Check if the user has access to the image
-    await check_image_access(image_id, db, current_user)
+    await check_image_access(image_id, db, user_context.user)
     
-    # Set up the comment create object
+    # Set up the comment create object - automatic user ID resolution handled by get_user_context
     comment_create = schemas.ImageCommentCreate(
         image_id=image_id,
         text=comment.text,
-        # author_id is now optional in the schema
+        author_id=user_context.id  # Automatically resolved ID
     )
     
     print(f"Created comment object: {comment_create}")
     
-    # Set the author_id based on the current user
-    # We need to ensure we have a valid user ID from a real user in the database
-    if current_user.id:
-        comment_create.author_id = current_user.id
-    else:
-        db_user = await crud.get_user_by_email(db=db, email=current_user.email)
-        if not db_user:
-            # Create a new user
-            user_create = schemas.UserCreate(
-                email=current_user.email,
-                groups=current_user.groups,
-            )
-            db_user = await crud.create_user(db=db, user=user_create)
-        
-        comment_create.author_id = db_user.id
-    
-    # Create the comment
-    return await crud.create_comment(db=db, comment=comment_create)
+    # Create the comment with automatic user context
+    return await crud.create_comment(db=db, comment=comment_create, created_by=user_context.email)
 
 @router.get("/images/{image_id}/comments", response_model=List[schemas.ImageComment])
 async def list_comments(
@@ -98,18 +82,19 @@ async def update_comment(
     # Check if the user has access to the image
     await check_image_access(db_comment.image_id, db, current_user)
     
-    # Only allow the author of the comment or admin users to update it
-    if (current_user.id and str(db_comment.author_id) != str(current_user.id)) and "admin" not in current_user.groups:
+    # Only allow the author of the comment to update it (admin check removed since groups field is gone)
+    if current_user.id and str(db_comment.author_id) != str(current_user.id):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Not authorized to update this comment",
         )
     
-    # Update the comment
+    # Update the comment with automatic user context
     updated_comment = await crud.update_comment(
         db=db, 
         comment_id=comment_id, 
-        comment_data=comment_data.model_dump(exclude_unset=True)
+        comment_data=comment_data.model_dump(exclude_unset=True),
+        updated_by=current_user.email
     )
     
     return updated_comment
@@ -118,7 +103,7 @@ async def update_comment(
 async def delete_comment(
     comment_id: uuid.UUID,
     db: AsyncSession = Depends(get_db),
-    current_user: schemas.User = Depends(get_current_user),
+    user_context: UserContext = Depends(get_user_context),
 ):
     # Get the comment
     db_comment = await crud.get_comment(db=db, comment_id=comment_id)
@@ -126,17 +111,17 @@ async def delete_comment(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Comment not found")
     
     # Check if the user has access to the image
-    await check_image_access(db_comment.image_id, db, current_user)
+    await check_image_access(db_comment.image_id, db, user_context.user)
     
-    # Only allow the author of the comment or admin users to delete it
-    if (current_user.id and str(db_comment.author_id) != str(current_user.id)) and "admin" not in current_user.groups:
+    # Only allow the author of the comment to delete it (admin check removed since groups field is gone)
+    if user_context.id and str(db_comment.author_id) != str(user_context.id):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Not authorized to delete this comment",
         )
     
-    # Delete the comment
-    success = await crud.delete_comment(db=db, comment_id=comment_id)
+    # Delete the comment with automatic user context
+    success = await crud.delete_comment(db=db, comment_id=comment_id, deleted_by=user_context.email)
     if not success:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,

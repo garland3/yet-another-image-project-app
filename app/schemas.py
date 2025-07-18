@@ -7,7 +7,6 @@ from datetime import datetime
 class UserBase(BaseModel):
     email: EmailStr
     username: Optional[str] = None
-    groups: List[str] = []
     is_active: bool = True
 
 class UserCreate(UserBase):
@@ -211,3 +210,27 @@ class PresignedUrlResponse(BaseModel):
     url: str
     object_key: str
     method: str = "GET"
+
+# ApiKey schemas
+class ApiKeyBase(BaseModel):
+    name: str = Field(..., min_length=1, max_length=255)
+
+class ApiKeyCreate(ApiKeyBase):
+    pass
+
+class ApiKey(ApiKeyBase):
+    id: uuid.UUID
+    user_id: uuid.UUID
+    is_active: bool
+    last_used_at: Optional[datetime] = None
+    created_at: datetime
+    updated_at: Optional[datetime] = None
+
+    model_config = {
+        "from_attributes": True,
+        "populate_by_name": True
+    }
+
+class ApiKeyCreateResponse(BaseModel):
+    api_key: ApiKey
+    key: str  # The raw API key (only shown once)

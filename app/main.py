@@ -19,7 +19,7 @@ from app.config import settings
 from app.database import create_db_and_tables
 from app.boto3_client import boto3_client, ensure_bucket_exists
 from app.migrations import run_migrations
-from app.routers import projects, images, users, image_classes, comments, project_metadata
+from app.routers import projects, images, users, image_classes, comments, project_metadata, api_keys
 
 
 @asynccontextmanager
@@ -143,6 +143,7 @@ api_router.include_router(users.router)
 api_router.include_router(image_classes.router)
 api_router.include_router(comments.router)
 api_router.include_router(project_metadata.router)
+api_router.include_router(api_keys.router)
 
 # Include the API router in the main app
 app.include_router(api_router)
