@@ -1,15 +1,9 @@
 {
   "name": "Python FastAPI Development",
   "image": "mcr.microsoft.com/devcontainers/python:3.11",
-  "features": {
-    "ghcr.io/devcontainers/features/postgres:1": {
-      "version": "15",
-      "postgresPassword": "postgres"
-    }
-  },
-  "workspaceFolder": "/workspace",
+  "workspaceFolder": "/workspaces/yet-another-image-project-app",
   "forwardPorts": [8000, 5432],
-  "postCreateCommand": "pip install --no-cache-dir --upgrade -r requirements.txt",
+  "postCreateCommand": "bash .devcontainer/setup.sh",
   "remoteEnv": {
     "DATABASE_URL": "postgresql://postgres:postgres@localhost:5432/postgres"
   },
