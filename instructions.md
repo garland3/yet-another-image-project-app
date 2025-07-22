@@ -1,25 +1,27 @@
-do an extensive tehck fo the current setup and code base. 
+Perform an extensive technical check of the current setup and code base.
 
-assume there is just one dependency to that is not in this repo adn will be setup by the user. The feature is the apbility to call the authorization server. 
-So, if in testing mode only you canmock this one fucntion. 
-otherwise callthe auth server. 
-so update. app/dependencies.py
+Assume there is only one external dependency not included in this repo, which must be set up by the user. This dependency provides the ability to call the authorization server.
 
-the one fucntion you can call for authoriarzaation is a new one you shoudl create `is_use_in_group(user, group)`
+In testing mode only, you may mock this function.
 
-for all db operations, log the user who made the edits. 
+Otherwise, call the real authorization server.
 
-in the db, remove the groups field. 
+Update app/dependencies.py accordingly.
 
-The groups/authoarization if auser is in teh group is alwasy checked at run time. You can put a cache on this for 15 miutes. 
+Create a new function is_user_in_group(user, group) to check if a user belongs to a group. This is the one authorization function. 
 
-make up a fun name when committing. 
+For all database operations, log the user who made the edits.
 
-check if fiels are longer tahn 400 lines, and edit to be < 400 lines. 
+Remove the groups field from the database for the User. 
 
+Group membership and authorization must always be checked at runtime. You may cache these results for 15 minutes.
 
-add a feature to allow a user to create and use an api key to uplaod images, get data bout hte images, ... all the operations in the ui. 
+Choose a fun commit message name for this update.
 
-dont' duplicate coe. try to provide auomatical mapping. 
+Check if any files exceed 400 lines; if so, refactor them to be under 400 lines.
 
-change the dockerfile to sue fedora:latest as the base image.. 
+Add a feature to allow users to create and use API keys for image-related operations, including uploading images and retrieving image data, as exposed in the UI.
+
+Avoid code duplication by providing automatic mapping where possible.
+
+Change the Dockerfile to use fedora:latest as the base image.
