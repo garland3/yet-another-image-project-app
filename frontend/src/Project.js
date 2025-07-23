@@ -100,57 +100,100 @@ function Project() {
   return (
     <div className="App">
       <header className="App-header">
-        <div id="project-header">
-          <button 
-            className="btn btn-secondary" 
-            onClick={() => navigate('/')}
-          >
-            ← Back to Projects
-          </button>
-          <h1>{project ? project.name : 'Loading project...'}</h1>
-          <p>{project ? (project.description || 'No description') : ''}</p>
-          {currentUser && (
-            <div className="user-info">
-              <span>Logged in as: {currentUser.email}</span>
+        <div className="header-content">
+          <div className="header-title">
+            <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-4)', marginBottom: 'var(--space-2)' }}>
+              <button 
+                className="btn btn-secondary" 
+                onClick={() => navigate('/')}
+                style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}
+              >
+                &lt; Back to Dashboard
+              </button>
+              <div>
+                <h1 style={{ margin: 0 }}>{project ? project.name : 'Loading project...'}</h1>
+              </div>
             </div>
-          )}
+            <p style={{ margin: 0, color: 'var(--gray-300)', fontSize: '0.875rem' }}>
+              {project ? (project.description || 'No description provided') : ''}
+            </p>
+            {currentUser && (
+              <div className="user-info">
+                <span>{currentUser.email}</span>
+              </div>
+            )}
+          </div>
         </div>
       </header>
 
       <div className="container">
-        {error && <div className="alert alert-error">Error: {error}</div>}
+        {/* Breadcrumb Navigation */}
+        <div className="nav-breadcrumb">
+          <div className="breadcrumb">
+            <div className="breadcrumb-item">
+              <a href="/" onClick={(e) => { e.preventDefault(); navigate('/'); }}>
+                Dashboard
+              </a>
+            </div>
+            <span className="breadcrumb-separator">/</span>
+            <div className="breadcrumb-item">
+              <span>Projects</span>
+            </div>
+            <span className="breadcrumb-separator">/</span>
+            <div className="breadcrumb-item">
+              <span>{project ? project.name : 'Loading...'}</span>
+            </div>
+          </div>
+        </div>
+
+        {error && (
+          <div className="alert alert-error">
+            <strong>Error:</strong> {error}
+          </div>
+        )}
         
-        <MetadataManager 
-          projectId={id} 
-          metadata={metadata} 
-          setMetadata={setMetadata} 
-          loading={loading} 
-          setLoading={setLoading} 
-          setError={setError} 
-        />
+        {loading && (
+          <div className="loading-container">
+            <div className="spinner"></div>
+            <div className="loading-text">Loading project data...</div>
+          </div>
+        )}
         
-        <ImageGallery 
-          projectId={id} 
-          images={images} 
-          loading={loading} 
-        />
-        
-        <ClassManager 
-          projectId={id} 
-          classes={classes} 
-          setClasses={setClasses} 
-          loading={loading} 
-          setLoading={setLoading} 
-          setError={setError} 
-        />
-        
-        <ImageUploader 
-          projectId={id} 
-          onUploadComplete={handleUploadComplete} 
-          loading={loading} 
-          setLoading={setLoading} 
-          setError={setError} 
-        />
+        {!loading && (
+          <>
+            <MetadataManager 
+              projectId={id} 
+              metadata={metadata} 
+              setMetadata={setMetadata} 
+              loading={loading} 
+              setLoading={setLoading} 
+              setError={setError} 
+            />
+            
+            <ImageGallery 
+              projectId={id} 
+              images={images} 
+              loading={loading} 
+            />
+            
+            <ClassManager 
+              projectId={id} 
+              classes={classes} 
+              setClasses={setClasses} 
+              loading={loading} 
+              setLoading={setLoading} 
+              setError={setError} 
+            />
+            
+            <ImageUploader 
+              projectId={id} 
+              onUploadComplete={handleUploadComplete} 
+              loading={loading} 
+              setLoading={setLoading} 
+              setError={setError} 
+            />
+          </>
+        )}
       </div>
     </div>
   );

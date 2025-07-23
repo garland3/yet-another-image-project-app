@@ -166,7 +166,7 @@ function ImageGallery({ projectId, images, loading }) {
               Debug Information
             </h3>
             <span style={{ fontSize: '18px', fontWeight: 'bold' }}>
-              {debugExpanded ? '▼' : '►'}
+              {debugExpanded ? 'v' : '>'}
             </span>
           </div>
           

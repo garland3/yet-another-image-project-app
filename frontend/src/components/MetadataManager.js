@@ -255,7 +255,7 @@ function MetadataManager({
         <div className="metadata-form-section">
           <div className="section-header" onClick={() => setAddMetadataCollapsed(!addMetadataCollapsed)}>
             <h3>Add Metadata</h3>
-            <span className="toggle-icon">{addMetadataCollapsed ? '▼' : '▲'}</span>
+            <span className="toggle-icon">{addMetadataCollapsed ? 'v' : '^'}</span>
           </div>
           
           {!addMetadataCollapsed && (
@@ -298,7 +298,7 @@ function MetadataManager({
         <div className="metadata-form-section">
           <div className="section-header" onClick={() => setBulkMetadataCollapsed(!bulkMetadataCollapsed)}>
             <h3>Bulk Update Metadata</h3>
-            <span className="toggle-icon">{bulkMetadataCollapsed ? '▼' : '▲'}</span>
+            <span className="toggle-icon">{bulkMetadataCollapsed ? 'v' : '^'}</span>
           </div>
           
           {!bulkMetadataCollapsed && (

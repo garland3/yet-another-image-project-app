@@ -21,9 +21,6 @@ const CreateProjectModal = memo(function CreateProjectModal({ onClose, onSubmit,
   
   // Track focus state for debugging
   const [focusState, setFocusState] = useState('none');
-  const [availableGroups, setAvailableGroups] = useState([]);
-  const [loadingGroups, setLoadingGroups] = useState(true);
-  const [groupError, setGroupError] = useState(null);
   
   // Handle form submission
   const handleSubmit = (e) => {
@@ -62,41 +59,10 @@ const CreateProjectModal = memo(function CreateProjectModal({ onClose, onSubmit,
       nameInputRef.current.focus();
     }
     
-    // If we have a current user, try to get their groups
-    if (currentUser && currentUser.groups) {
-      setAvailableGroups(currentUser.groups);
-      setLoadingGroups(false);
-    } else {
-      // Fetch available groups from the API
-      fetch('/api/users/me/groups')
-        .then(response => {
-          if (!response.ok) {
-            if (response.status === 401) {
-              // If unauthorized, just use some default groups from the mock data
-              setAvailableGroups(['admin', 'project1', 'admin-group', 'data-scientists', 'project-alpha-group']);
-              return null;
-            }
-            throw new Error(`HTTP error! status: ${response.status}`);
-          }
-          return response.json();
-        })
-        .then(data => {
-          if (data) {
-            setAvailableGroups(data);
-          }
-          setLoadingGroups(false);
-        })
-        .catch(err => {
-          console.error("Failed to fetch available groups:", err);
-          setGroupError(err.message);
-          setLoadingGroups(false);
-        });
-    }
-    
     return () => {
       console.log("Modal component unmounted");
     };
-  }, [currentUser]);
+  }, []);
   
   return (
     <div className="modal">
@@ -108,66 +74,71 @@ const CreateProjectModal = memo(function CreateProjectModal({ onClose, onSubmit,
         <div className="modal-body">
           <form id="create-project-form" onSubmit={handleSubmit}>
             <div className="form-group">
-              <label htmlFor="name">Project Name (Current focus: {focusState})</label>
+              <label htmlFor="name">Project Name *</label>
               <input 
                 type="text" 
                 id="name" 
                 ref={nameInputRef}
                 onFocus={() => handleFocus('name')}
                 onBlur={() => handleBlur('name')}
-                required 
+                required
+                placeholder="Enter a descriptive project name"
+                className="form-control"
               />
+              <small className="form-text">
+                Choose a clear, descriptive name for your project
+              </small>
             </div>
+            
             <div className="form-group">
-              <label htmlFor="description">Description (Optional)</label>
+              <label htmlFor="description">Description</label>
               <textarea 
                 id="description" 
                 rows="3"
                 ref={descriptionInputRef}
                 onFocus={() => handleFocus('description')}
                 onBlur={() => handleBlur('description')}
+                placeholder="Describe what this project is for..."
+                className="form-control"
               ></textarea>
+              <small className="form-text">
+                Optional: Add more details about your project's purpose
+              </small>
             </div>
+            
             <div className="form-group">
-              <label htmlFor="meta_group_id">Group ID</label>
-              {loadingGroups ? (
-                <div>Loading available groups...</div>
-              ) : groupError ? (
-                <div className="error-text">{groupError}</div>
-              ) : (
-                <>
-                  <select 
-                    id="meta_group_id" 
-                    ref={groupIdInputRef}
-                    onFocus={() => handleFocus('groupId')}
-                    onBlur={() => handleBlur('groupId')}
-                    required
-                    className="form-control"
-                  >
-                    <option value="">-- Select a group --</option>
-                    {availableGroups.map(group => (
-                      <option key={group} value={group}>{group}</option>
-                    ))}
-                  </select>
-                  <small className="form-text text-muted">
-                    Select a group you have access to
-                  </small>
-                </>
-              )}
-            </div>
-            <div className="modal-footer">
-              <button 
-                type="button" 
-                className="btn btn-secondary"
-                onClick={onClose}
-              >
-                Cancel
-              </button>
-              <button type="submit" className="btn btn-success">
-                Create Project
-              </button>
+              <label htmlFor="meta_group_id">Access Group *</label>
+              <input 
+                type="text" 
+                id="meta_group_id" 
+                ref={groupIdInputRef}
+                onFocus={() => handleFocus('groupId')}
+                onBlur={() => handleBlur('groupId')}
+                required
+                placeholder="Enter the group ID you have access to"
+                className="form-control"
+              />
+              <small className="form-text">
+                Enter the ID of a group you are a member of
+              </small>
             </div>
           </form>
+        </div>
+        <div className="modal-footer">
+          <button 
+            type="button" 
+            className="btn btn-secondary"
+            onClick={onClose}
+          >
+            Cancel
+          </button>
+          <button 
+            type="submit" 
+            form="create-project-form"
+            className="btn btn-success btn-large"
+          >
+            Create Project
+          </button>
         </div>
       </div>
     </div>
@@ -177,16 +148,37 @@ const CreateProjectModal = memo(function CreateProjectModal({ onClose, onSubmit,
 // Memoized ProjectItem component to prevent unnecessary re-renders
 const ProjectItem = memo(function ProjectItem({ project }) {
   return (
-    <li style={{ cursor: 'pointer' }}>
+    <div className="project-card">
       <Link 
         to={`/project/${project.id}`} 
         style={{ textDecoration: 'none', color: 'inherit', display: 'block' }}
       >
-        <h3>{project.name}</h3>
-        <p>{project.description || 'No description'}</p>
-        <small>Group ID: {project.meta_group_id}</small>
+        <div className="project-card-header">
+          <h3 className="project-card-title">{project.name}</h3>
+          <div className="project-card-meta">
+            Project ID: {project.id} | Group: {project.meta_group_id}
+          </div>
+        </div>
+        <div className="project-card-body">
+          <p className="project-card-description">
+            {project.description || 'No description provided'}
+          </p>
+          <div className="project-card-footer">
+            <div className="project-stats">
+              <div className="stat-item">
+                <span>Project</span>
+              </div>
+              <div className="stat-item">
+                <span>Group: {project.meta_group_id}</span>
+              </div>
+            </div>
+            <div className="btn btn-primary btn-small">
+              View Project &gt;
+            </div>
+          </div>
+        </div>
       </Link>
-    </li>
+    </div>
   );
 });
 
@@ -304,20 +296,23 @@ function App() {
     <div className="App">
       <header className="App-header">
         <div className="header-content">
-          <h1>Image Manager</h1>
-          {currentUser && (
-            <div className="user-info">
-              <span>Logged in as: {currentUser.email}</span>
-            </div>
-          )}
+          <div className="header-title">
+            <h1>Image Management Platform</h1>
+            {currentUser && (
+              <div className="user-info">
+                <span>Welcome back, {currentUser.email}</span>
+              </div>
+            )}
+          </div>
+          <button 
+            className="btn btn-primary btn-large" 
+            onClick={() => setShowModal(true)}
+          >
+            New Project
+          </button>
         </div>
-        <button 
-          className="btn" 
-          onClick={() => setShowModal(true)}
-        >
-          New Project
-        </button>
       </header>
+
       <div className="container">
         {/* Toast notification */}
         {toast && (
@@ -329,22 +324,65 @@ function App() {
           />
         )}
         
-        <div className="card">
-          <div className="card-header">
-            <h2>Projects</h2>
-          </div>
-          <div id="projects-container" className="card-content">
-            {loading && <p>Loading projects...</p>}
-            {!loading && projects.length === 0 && <p>No projects found.</p>}
-            {!loading && projects.length > 0 && (
-              <ul>
-                {projects.map(project => (
-                  <ProjectItem key={project.id} project={project} />
-                ))}
-              </ul>
-            )}
+        {/* Projects Section */}
+        <div className="nav-breadcrumb">
+          <div className="breadcrumb">
+            <div className="breadcrumb-item">
+              <span>Dashboard</span>
+            </div>
+            <span className="breadcrumb-separator">/</span>
+            <div className="breadcrumb-item">
+              <span>Projects</span>
+            </div>
           </div>
         </div>
+
+        {loading && (
+          <div className="loading-container">
+            <div className="spinner"></div>
+            <div className="loading-text">Loading your projects...</div>
+          </div>
+        )}
+        
+        {!loading && projects.length === 0 && (
+          <div className="card text-center">
+            <div className="card-content">
+              <div style={{ fontSize: '4rem', marginBottom: 'var(--space-4)' }}>+</div>
+              <h3 style={{ marginBottom: 'var(--space-4)', color: 'var(--gray-600)' }}>
+                No projects yet
+              </h3>
+              <p style={{ color: 'var(--gray-500)', marginBottom: 'var(--space-6)' }}>
+                Get started by creating your first image management project
+              </p>
+              <button 
+                className="btn btn-primary btn-large"
+                onClick={() => setShowModal(true)}
+              >
+                Create Your First Project
+              </button>
+            </div>
+          </div>
+        )}
+        
+        {!loading && projects.length > 0 && (
+          <>
+            <div className="flex justify-between items-center mb-6">
+              <h2 style={{ margin: 0, color: 'var(--gray-900)', fontSize: '1.5rem', fontWeight: '600' }}>
+                Your Projects ({projects.length})
+              </h2>
+              <div className="flex gap-4">
+                <span style={{ fontSize: '0.875rem', color: 'var(--gray-500)' }}>
+                  {projects.length} {projects.length === 1 ? 'project' : 'projects'} total
+                </span>
+              </div>
+            </div>
+            <div className="projects-grid">
+              {projects.map(project => (
+                <ProjectItem key={project.id} project={project} />
+              ))}
+            </div>
+          </>
+        )}
       </div>
 
       {/* Create Project Modal - Now using a separate component */}

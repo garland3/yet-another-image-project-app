@@ -63,7 +63,7 @@ const Toast = ({ message, type = 'info', onClose, duration = 5000 }) => {
           marginLeft: '10px'
         }}
       >
-        ×
+        &times;
       </button>
     </div>
   );

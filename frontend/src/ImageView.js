@@ -183,7 +183,7 @@ function ImageView() {
             className="btn btn-secondary" 
             onClick={() => navigate(`/project/${projectId}`)}
           >
-            ← Back to Project
+            &lt; Back to Project
           </button>
           <h1>{image ? image.filename : 'Loading image...'}</h1>
           {currentUser && (
