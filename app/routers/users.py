@@ -4,7 +4,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from typing import List
 from app import crud, schemas
 from app.database import get_db
-from app.dependencies import get_current_user, get_user_accessible_groups, MOCK_GROUP_MEMBERS
+from app.dependencies import get_current_user, get_user_accessible_groups, is_user_in_group
 from app.config import settings
 from app.config import settings
 
@@ -43,25 +43,20 @@ async def read_current_user_groups(
 ):
     """
     Get all groups that the current user has access to.
-    This includes both the user's direct groups and groups they have access to through projects.
+    This includes groups they have access to through projects.
     """
-    # If using mock membership, get user's accessible groups by checking each project
-    if settings.CHECK_MOCK_MEMBERSHIP:
-        # Get all projects from the database
-        all_projects = await crud.get_all_projects(db)
-        
-        # Initialize empty list for accessible groups
-        user_groups = []
-        
-        # For each project, check if the user is a member of the project's group
-        for project in all_projects:
-            if check_user_in_group(current_user, project.meta_group_id) and project.meta_group_id not in user_groups:
-                user_groups.append(project.meta_group_id)
-        
-        return user_groups
-    else:
-        # Otherwise, return the user's groups from their profile
-        return current_user.groups
+    # Get all projects from the database
+    all_projects = await crud.get_all_projects(db)
+    
+    # Initialize empty list for accessible groups
+    user_groups = []
+    
+    # For each project, check if the user is a member of the project's group
+    for project in all_projects:
+        if is_user_in_group(current_user, project.meta_group_id) and project.meta_group_id not in user_groups:
+            user_groups.append(project.meta_group_id)
+    
+    return user_groups
 
 @router.get("/{user_id}", response_model=schemas.User)
 async def read_user(
@@ -82,7 +77,8 @@ async def update_user(
     current_user: schemas.User = Depends(get_current_user),
 ):
     # Only allow users to update their own profile or admin users
-    if str(user_id) != str(current_user.id) and "admin" not in current_user.groups:
+    is_admin = is_user_in_group(current_user, "admin")
+    if str(user_id) != str(current_user.id) and not is_admin:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Not authorized to update this user",

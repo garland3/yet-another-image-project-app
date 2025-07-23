@@ -4,7 +4,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from typing import List
 from app import crud, schemas, models
 from app.database import get_db
-from app.dependencies import get_current_user, requires_group_membership, check_user_in_group, get_user_context, UserContext
+from app.dependencies import get_current_user, requires_group_membership, is_user_in_group, get_user_context, UserContext
 from app.config import settings
 from aiocache import cached
 from aiocache.serializers import JsonSerializer
@@ -25,7 +25,7 @@ async def create_new_project(
     This uses the new approach of checking if the user is a member of the project's group.
     """
     # Check if the user is a member of the project's group
-    is_member = check_user_in_group(current_user, project.meta_group_id)
+    is_member = is_user_in_group(current_user, project.meta_group_id)
     
     if not is_member:
         raise HTTPException(
@@ -75,14 +75,11 @@ async def read_project(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Project not found")
     
     # Check if the user is a member of the project's group
-    is_member = check_user_in_group(current_user, db_project.meta_group_id)
+    is_member = is_user_in_group(current_user, db_project.meta_group_id)
     
     if not is_member:
-        # Get the user's accessible groups for a more helpful error message
-        user_groups = current_user.groups
-        
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail=f"User '{current_user.email}' does not have access to project '{project_id}' (group '{db_project.meta_group_id}'). You have access to these groups: {', '.join(user_groups)}. Please contact an administrator if you need access to this project.",
+            detail=f"User '{current_user.email}' does not have access to project '{project_id}' (group '{db_project.meta_group_id}'). Please contact an administrator if you need access to this project.",
         )
     return db_project

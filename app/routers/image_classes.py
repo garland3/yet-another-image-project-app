@@ -4,7 +4,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from typing import List
 from app import crud, schemas, models
 from app.database import get_db
-from app.dependencies import get_current_user, check_user_in_group
+from app.dependencies import get_current_user, is_user_in_group
 from app.config import settings
 from app.routers.images import check_project_access
 
@@ -118,11 +118,7 @@ async def check_image_access(image_id: uuid.UUID, db: AsyncSession, current_user
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Image not found")
     
     # Check if the user has access to the project
-    is_member = False
-    if settings.SKIP_HEADER_CHECK:
-        is_member = check_user_in_group(current_user, db_image.project.meta_group_id)
-    else:
-        is_member = db_image.project.meta_group_id in current_user.groups
+    is_member = is_user_in_group(current_user, db_image.project.meta_group_id)
     
     if not is_member:
         raise HTTPException(
@@ -181,7 +177,6 @@ async def classify_image(
             # Create a new user
             user_create = schemas.UserCreate(
                 email=current_user.email,
-                groups=current_user.groups,
             )
             db_user = await crud.create_user(db=db, user=user_create)
         
@@ -220,7 +215,8 @@ async def delete_classification(
     await check_image_access(db_classification.image_id, db, current_user)
     
     # Only allow the user who created the classification or admin users to delete it
-    if (current_user.id and str(db_classification.created_by_id) != str(current_user.id)) and "admin" not in current_user.groups:
+    is_admin = is_user_in_group(current_user, "admin")
+    if (current_user.id and str(db_classification.created_by_id) != str(current_user.id)) and not is_admin:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Not authorized to delete this classification",

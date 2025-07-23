@@ -1,31 +1,16 @@
 from fastapi import Depends, HTTPException, status, Header, Request
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
-from typing import Optional, List, Dict
+from typing import Optional, List
 from sqlalchemy.ext.asyncio import AsyncSession
 import uuid
-import httpx
 import hashlib
 import secrets
 from app.config import settings
 from app.schemas import User, UserCreate
 from app.database import get_db
 from app import crud, models
-from aiocache import cached, Cache
-from aiocache.serializers import JsonSerializer
 
 security = HTTPBearer(auto_error=False)
-
-# Mock AD group membership data
-# In a real implementation, this would be replaced with actual AD queries
-MOCK_GROUP_MEMBERS: Dict[str, List[str]] = {
-    "admin": ["test@example.com", "admin@example.com"],
-    "project1": ["test@example.com", "user1@example.com"],
-    "project2": ["user2@example.com", "user3@example.com"],
-    "admin-group": ["test@example.com", "admin@example.com"],
-    "data-scientists": ["test@example.com", "scientist@example.com"],
-    "project-alpha-group": ["test@example.com", "alpha@example.com"],
-    # Add more mock groups as needed
-}
 
 # Function to get a user's accessible groups
 async def get_user_accessible_groups(
@@ -52,7 +37,7 @@ async def get_user_accessible_groups(
     
     # For each project, check if the user is a member of the project's group
     for project in all_projects:
-        if check_user_in_group(user, project.meta_group_id) and project.meta_group_id not in groups:
+        if is_user_in_group(user, project.meta_group_id) and project.meta_group_id not in groups:
             groups.append(project.meta_group_id)
     
     return groups
@@ -86,96 +71,28 @@ async def get_accessible_projects_for_user(
     
     # For each project, check if the user is a member of the project's group
     for project in all_projects:
-        if check_user_in_group(user, project.meta_group_id):
+        if is_user_in_group(user, project.meta_group_id):
             accessible_projects.append(project)
     
     return accessible_projects
 
-def get_group_members(group_id: str) -> List[str]:
-    """
-    Get all members of a specific group from AD.
-    In this mock implementation, returns members from the MOCK_GROUP_MEMBERS dictionary.
-    
-    Args:
-        group_id: The ID of the group to get members for
-        
-    Returns:
-        List of email addresses of users who are members of the group
-    """
-    # In a real implementation, this would query AD for group members
-    return MOCK_GROUP_MEMBERS.get(group_id, [])
 
-async def call_authorization_server(user: User, group_id: str) -> bool:
-    """
-    Call the external authorization server to check group membership.
-    This is the actual implementation that would call an external service.
-    """
-    try:
-        auth_server_url = getattr(settings, 'AUTH_SERVER_URL', None)
-        if not auth_server_url:
-            raise ValueError("AUTH_SERVER_URL not configured")
-            
-        async with httpx.AsyncClient() as client:
-            response = await client.post(
-                f"{auth_server_url}/check-membership",
-                json={"user_email": user.email, "group_id": group_id},
-                timeout=10.0
-            )
-            response.raise_for_status()
-            result = response.json()
-            return result.get("is_member", False)
-    except Exception as e:
-        print(f"ERROR: Failed to call authorization server: {e}")
-        return False
 
-@cached(ttl=900, cache=Cache.MEMORY, serializer=JsonSerializer())
-async def is_user_in_group(user: User, group_id: str) -> bool:
+
+def is_user_in_group(user: User, group_id: str) -> bool:
     """
-    Check if a user is a member of a specific group with 15-minute caching.
-    This is the main function to use for authorization checks.
+    Check if a user is a member of a specific group.
+    For mocking, always returns True and prints a mock message.
     
     Args:
         user: The user to check
         group_id: The ID of the group to check membership for
         
     Returns:
-        True if the user is a member of the group, False otherwise
+        True if the user is a member of the group (always True in mock mode)
     """
-    if settings.CHECK_MOCK_MEMBERSHIP:
-        # Use mock implementation for testing
-        group_members = get_group_members(group_id)
-        is_member = user.email in group_members
-        
-        print(f"DEBUG: [MOCK] Checking if user '{user.email}' is in group '{group_id}'")
-        print(f"DEBUG: [MOCK] Group members: {group_members}")
-        print(f"DEBUG: [MOCK] Is member: {is_member}")
-        
-        return is_member
-    else:
-        # Call the actual authorization server
-        print(f"DEBUG: [AUTH_SERVER] Checking if user '{user.email}' is in group '{group_id}'")
-        is_member = await call_authorization_server(user, group_id)
-        print(f"DEBUG: [AUTH_SERVER] Is member: {is_member}")
-        return is_member
-
-def check_user_in_group(user: User, group_id: str) -> bool:
-    """
-    Legacy synchronous function for backward compatibility.
-    This will be replaced by is_user_in_group throughout the codebase.
-    """
-    if settings.CHECK_MOCK_MEMBERSHIP:
-        group_members = get_group_members(group_id)
-        is_member = user.email in group_members
-        
-        print(f"DEBUG: [LEGACY] Checking if user '{user.email}' is in group '{group_id}'")
-        print(f"DEBUG: [LEGACY] Group members: {group_members}")
-        print(f"DEBUG: [LEGACY] Is member: {is_member}")
-        
-        return is_member
-    else:
-        # Since we removed the groups field, always call authorization server for non-mock mode
-        print(f"DEBUG: [LEGACY] Non-mock mode - groups field removed, should use async is_user_in_group instead")
-        return False
+    print(f"MOCKING: Checking if user '{user.email}' is in group '{group_id}' - returning True")
+    return True
 
 def generate_api_key() -> str:
     """Generate a secure API key"""
@@ -272,15 +189,12 @@ async def requires_group_membership(
     Raises:
         HTTPException: If the user is not a member of the group
     """
-    is_member = check_user_in_group(current_user, required_group_id)
+    is_member = is_user_in_group(current_user, required_group_id)
     
     if not is_member:
-        # Get the available groups for a more helpful error message
-        available_groups = list(MOCK_GROUP_MEMBERS.keys()) if settings.CHECK_MOCK_MEMBERSHIP else []
-        
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail=f"User '{current_user.email}' does not have access to group '{required_group_id}'. Available groups in the system: {', '.join(available_groups)}.",
+            detail=f"User '{current_user.email}' does not have access to group '{required_group_id}'.",
         )
     return True
 

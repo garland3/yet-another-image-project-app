@@ -148,14 +148,19 @@ api_router.include_router(api_keys.router)
 # Include the API router in the main app
 app.include_router(api_router)
 
-# for other routes, cehck the ui2 folder for html, js, css
+# for other routes, check the frontend build folder for html, js, css
 # Set up static files serving
 
-# serve index.html at /ui2
-# just read the file directly and return it
-# read env var, front_end_build_path
-# use default frontend/build
-front_end_build_path = os.getenv("FRONTEND_BUILD_PATH", "/app/frontend/build")
+# Get frontend build path from settings
+front_end_build_path = settings.FRONTEND_BUILD_PATH
+# Convert to absolute path if it's relative
+if not os.path.isabs(front_end_build_path):
+    # Make it relative to the project root (parent of app directory)
+    project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    front_end_build_path = os.path.join(project_root, front_end_build_path)
+
+print(f"Frontend build path: {front_end_build_path}")
+
 # serve the static files from the build directory
 # Mount the static folder
 app.mount(
