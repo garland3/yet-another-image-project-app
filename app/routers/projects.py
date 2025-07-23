@@ -6,7 +6,7 @@ from app import crud, schemas, models
 from app.database import get_db
 from app.dependencies import get_current_user, requires_group_membership, is_user_in_group, get_user_context, UserContext
 from app.config import settings
-from aiocache import cached
+from aiocache import cached, Cache
 from aiocache.serializers import JsonSerializer
 
 router = APIRouter(
@@ -33,10 +33,24 @@ async def create_new_project(
             detail=f"User '{current_user.email}' cannot create projects in group '{project.meta_group_id}'. Please contact an administrator for access.",
         )
     db_project = await crud.create_project(db=db, project=project, created_by=current_user.email)
+    
+    # Invalidate all projects cache entries for this user since we added a new project
+    cache = Cache()
+    # Delete cache entries for common pagination patterns
+    cache_patterns = [
+        f"projects:user:{current_user.email}:skip:0:limit:100",
+        f"projects:user:{current_user.email}:skip:0:limit:50", 
+        f"projects:user:{current_user.email}:skip:0:limit:20",
+        f"projects:user:{current_user.email}:skip:0:limit:10"
+    ]
+    
+    for cache_key in cache_patterns:
+        await cache.delete(cache_key)
+    
     return db_project
 
 @router.get("/", response_model=List[schemas.Project])
-@cached(ttl=3600, key_builder=lambda *args, **kwargs: f"projects:user:{kwargs['current_user'].email}:skip:{kwargs.get('skip', 0)}:limit:{kwargs.get('limit', 100)}")
+#@cached(ttl=3600, key_builder=lambda *args, **kwargs: f"projects:user:{kwargs['current_user'].email}:skip:{kwargs.get('skip', 0)}:limit:{kwargs.get('limit', 100)}")
 async def read_projects(
     skip: int = 0,
     limit: int = 100,
@@ -60,7 +74,7 @@ async def read_projects(
     return projects
 
 @router.get("/{project_id}", response_model=schemas.Project)
-@cached(ttl=3600, key_builder=lambda *args, **kwargs: f"project:{kwargs['project_id']}:user:{kwargs['current_user'].email}")
+#@cached(ttl=3600, key_builder=lambda *args, **kwargs: f"project:{kwargs['project_id']}:user:{kwargs['current_user'].email}")
 async def read_project(
     project_id: uuid.UUID,
     db: AsyncSession = Depends(get_db),

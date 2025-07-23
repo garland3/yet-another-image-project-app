@@ -120,7 +120,7 @@ async def upload_image_to_project(
     return response_data
 
 @router.get("/projects/{project_id}/images", response_model=List[schemas.DataInstance])
-@cached(ttl=3600, key_builder=lambda *args, **kwargs: f"project_images:{kwargs['project_id']}:skip:{kwargs.get('skip', 0)}:limit:{kwargs.get('limit', 100)}")
+#@cached(ttl=3600, key_builder=lambda *args, **kwargs: f"project_images:{kwargs['project_id']}:skip:{kwargs.get('skip', 0)}:limit:{kwargs.get('limit', 100)}")
 async def list_images_in_project(
     project_id: uuid.UUID,
     skip: int = 0,
@@ -198,8 +198,89 @@ async def list_images_in_project(
     
     return response_images
 
+# Add trailing slash version to handle frontend requests
+@router.get("/projects/{project_id}/images/", response_model=List[schemas.DataInstance])
+# #@cached(ttl=3600, key_builder=lambda *args, **kwargs: f"project_images:{kwargs['project_id']}:skip:{kwargs.get('skip', 0)}:limit:{kwargs.get('limit', 100)}")
+async def list_images_in_project_with_slash(
+    project_id: uuid.UUID,
+    skip: int = 0,
+    limit: int = 100,
+    db: AsyncSession = Depends(get_db),
+    current_user: schemas.User = Depends(get_current_user),
+):
+    """Same as list_images_in_project but with trailing slash to handle frontend requests."""
+    # First check if the project exists and user has access
+    try:
+        await check_project_access(project_id, db, current_user)
+    except HTTPException as e:
+        if e.status_code == status.HTTP_404_NOT_FOUND:
+            # If project doesn't exist, return empty list instead of 404
+            return []
+        # Re-raise other exceptions (like permission issues)
+        raise
+        
+    # Get images for the project
+    images = await crud.get_data_instances_for_project(db=db, project_id=project_id, skip=skip, limit=limit)
+    
+    # If no images found, return empty list
+    if not images:
+        return []
+        
+    # Process images
+    response_images = []
+    for img in images:
+        # Create a dictionary from the SQLAlchemy model
+        img_dict = {}
+        for c in img.__table__.columns:
+            if c.name == "metadata_":
+                # Special handling for metadata
+                if img.metadata_ is not None:
+                    try:
+                        # Try to get the raw value from the SQLAlchemy JSON type
+                        if hasattr(img.metadata_, "_asdict"):
+                            img_dict["metadata_"] = img.metadata_._asdict()
+                        elif hasattr(img.metadata_, "items"):
+                            img_dict["metadata_"] = dict(img.metadata_.items())
+                        elif hasattr(img.metadata_, "__class__") and img.metadata_.__class__.__name__ == "MetaData":
+                            # Handle MetaData object by converting it to an empty dict
+                            img_dict["metadata_"] = {}
+                        # Check if it's a string that can be parsed as JSON
+                        elif isinstance(img.metadata_, str):
+                            try:
+                                import json
+                                img_dict["metadata_"] = json.loads(img.metadata_)
+                            except json.JSONDecodeError:
+                                img_dict["metadata_"] = {"value": img.metadata_}
+                        else:
+                            # If it's already a dict or can be converted to one
+                            try:
+                                img_dict["metadata_"] = dict(img.metadata_) if img.metadata_ else None
+                            except (TypeError, ValueError):
+                                # If conversion to dict fails, use an empty dict
+                                img_dict["metadata_"] = {}
+                    except (TypeError, ValueError, AttributeError) as e:
+                        print(f"Error converting metadata to dict: {e}")
+                        img_dict["metadata_"] = {}
+                else:
+                    img_dict["metadata_"] = None
+            else:
+                # Normal column handling
+                img_dict[c.name] = getattr(img, c.name)
+        
+        try:
+            # Validate with Pydantic
+            img_schema = schemas.DataInstance.model_validate(img_dict)
+            response_images.append(img_schema)
+        except Exception as e:
+            print(f"Error validating DataInstance: {e}")
+            print(f"Input data: {img_dict}")
+            # Skip this image but continue processing others
+            continue
+    
+    return response_images
+
 @router.get("/images/{image_id}", response_model=schemas.DataInstance)
-@cached(ttl=3600, key_builder=lambda *args, **kwargs: f"image:{kwargs['image_id']}")
+#@cached(ttl=3600, key_builder=lambda *args, **kwargs: f"image:{kwargs['image_id']}")
 async def get_image_metadata(
     image_id: uuid.UUID,
     db: AsyncSession = Depends(get_db),
@@ -265,7 +346,7 @@ import httpx
 from fastapi.responses import StreamingResponse
 
 @router.get("/images/{image_id}/download", response_model=schemas.PresignedUrlResponse)
-@cached(ttl=3600, key_builder=lambda *args, **kwargs: f"image_download:{kwargs['image_id']}")
+#@cached(ttl=3600, key_builder=lambda *args, **kwargs: f"image_download:{kwargs['image_id']}")
 async def get_image_download_url(
     image_id: uuid.UUID,
     db: AsyncSession = Depends(get_db),

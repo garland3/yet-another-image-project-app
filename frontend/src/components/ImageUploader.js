@@ -3,6 +3,7 @@ import React, { useState } from 'react';
 function ImageUploader({ projectId, onUploadComplete, loading, setLoading, setError }) {
   const [selectedFiles, setSelectedFiles] = useState([]);
   const [uploadMetadata, setUploadMetadata] = useState('');
+  const [isDragOver, setIsDragOver] = useState(false);
 
   // Handle file input change
   const handleFileChange = (e) => {
@@ -11,9 +12,20 @@ function ImageUploader({ projectId, onUploadComplete, loading, setLoading, setEr
     }
   };
 
-  // Handle drag and drop
+  // Handle drag and drop events
+  const handleDragOver = (e) => {
+    e.preventDefault();
+    setIsDragOver(true);
+  };
+
+  const handleDragLeave = (e) => {
+    e.preventDefault();
+    setIsDragOver(false);
+  };
+
   const handleDrop = (e) => {
     e.preventDefault();
+    setIsDragOver(false);
     if (e.dataTransfer.files) {
       setSelectedFiles(Array.from(e.dataTransfer.files));
     }
@@ -28,10 +40,10 @@ function ImageUploader({ projectId, onUploadComplete, loading, setLoading, setEr
       return;
     }
     
-    let parsedMetadata = null;
+    // Validate metadata if provided
     if (uploadMetadata.trim()) {
       try {
-        parsedMetadata = JSON.parse(uploadMetadata);
+        JSON.parse(uploadMetadata);
       } catch (err) {
         setError('Invalid JSON format for metadata.');
         return;
@@ -88,16 +100,28 @@ function ImageUploader({ projectId, onUploadComplete, loading, setLoading, setEr
       <div className="card-content">
         <form onSubmit={handleUpload}>
           <div 
-            className="upload-area"
-            onDragOver={(e) => e.preventDefault()}
-            onDragLeave={(e) => e.preventDefault()}
+            className={`upload-area ${isDragOver ? 'drag-over' : ''}`}
+            onDragOver={handleDragOver}
+            onDragLeave={handleDragLeave}
             onDrop={handleDrop}
             onClick={() => document.getElementById('file-input').click()}
           >
-            <p>Drag and drop images here, or click to select files</p>
-            <p>{selectedFiles.length > 0 
-              ? `${selectedFiles.length} ${selectedFiles.length === 1 ? 'file' : 'files'} selected` 
-              : 'No file selected'}</p>
+            <div className="upload-area-content">
+              <div className="upload-area-icon">
+                +
+              </div>
+              <div className="upload-area-text">
+                Drag and drop images here, or click to select files
+              </div>
+              <div className="upload-area-subtext">
+                Supports multiple image files (JPG, PNG, GIF, etc.)
+              </div>
+              <div className={`upload-area-status ${selectedFiles.length > 0 ? 'has-files' : 'no-files'}`}>
+                {selectedFiles.length > 0 
+                  ? `${selectedFiles.length} ${selectedFiles.length === 1 ? 'file' : 'files'} selected` 
+                  : 'No files selected'}
+              </div>
+            </div>
             <input 
               type="file" 
               id="file-input" 

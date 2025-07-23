@@ -1,4 +1,3 @@
-
 from fastapi.responses import RedirectResponse
 # import app router. 
 from fastapi.routing import APIRouter
@@ -187,4 +186,18 @@ async def get_manifest():
 
 @app.get("/")
 async def get_index():
+    return FileResponse(os.path.join(front_end_build_path, "index.html"))
+
+# Catch-all route for React Router - this must be last
+@app.get("/{full_path:path}")
+async def serve_react_app(full_path: str):
+    """
+    Catch-all route to serve the React app for any path that doesn't match
+    an API route or static file. This enables React Router to handle client-side routing.
+    """
+    # Don't handle API routes through this catch-all
+    if full_path.startswith("api/"):
+        raise HTTPException(status_code=404, detail="API endpoint not found")
+    
+    # Serve the React app's index.html for all other routes
     return FileResponse(os.path.join(front_end_build_path, "index.html"))

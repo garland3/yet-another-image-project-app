@@ -717,6 +717,225 @@ ul li:hover {
 .text-left { text-align: left; }
 .text-right { text-align: right; }
 
+/* Upload Area Styles */
+.upload-area {
+  border: 2px dashed var(--border-medium);
+  border-radius: var(--radius-lg);
+  padding: var(--space-12);
+  margin: var(--space-4) 0;
+  text-align: center;
+  background: linear-gradient(135deg, var(--gray-50) 0%, #fafbfc 100%);
+  cursor: pointer;
+  transition: all var(--transition-normal);
+  position: relative;
+  overflow: hidden;
+}
+
+.upload-area:hover {
+  border-color: var(--primary-color);
+  background: linear-gradient(135deg, var(--primary-light) 0%, #f0f9ff 100%);
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-lg);
+}
+
+.upload-area.drag-over {
+  border-color: var(--accent-color);
+  background: linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%);
+  box-shadow: var(--shadow-xl);
+  transform: scale(1.02);
+}
+
+.upload-area::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: linear-gradient(135deg, transparent 0%, rgba(37, 99, 235, 0.05) 100%);
+  opacity: 0;
+  transition: opacity var(--transition-normal);
+  pointer-events: none;
+}
+
+.upload-area:hover::before {
+  opacity: 1;
+}
+
+.upload-area-content {
+  position: relative;
+  z-index: 1;
+}
+
+.upload-area-icon {
+  width: 48px;
+  height: 48px;
+  margin: 0 auto var(--space-4) auto;
+  background: linear-gradient(135deg, var(--primary-color) 0%, var(--primary-hover) 100%);
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: white;
+  font-size: 1.5rem;
+  font-weight: bold;
+  transition: all var(--transition-normal);
+}
+
+.upload-area:hover .upload-area-icon {
+  transform: scale(1.1);
+  box-shadow: var(--shadow-lg);
+}
+
+.upload-area-text {
+  font-size: 1.125rem;
+  font-weight: 600;
+  color: var(--gray-700);
+  margin-bottom: var(--space-2);
+  transition: color var(--transition-fast);
+}
+
+.upload-area:hover .upload-area-text {
+  color: var(--primary-color);
+}
+
+.upload-area-subtext {
+  font-size: 0.875rem;
+  color: var(--gray-500);
+  margin-bottom: var(--space-4);
+}
+
+.upload-area-status {
+  font-size: 0.875rem;
+  font-weight: 500;
+  padding: var(--space-2) var(--space-4);
+  border-radius: var(--radius-md);
+  display: inline-block;
+  transition: all var(--transition-fast);
+}
+
+.upload-area-status.has-files {
+  background: linear-gradient(135deg, var(--accent-color) 0%, var(--accent-hover) 100%);
+  color: white;
+  box-shadow: var(--shadow-sm);
+}
+
+.upload-area-status.no-files {
+  background: var(--gray-200);
+  color: var(--gray-600);
+}
+
+/* Upload area responsive design */
+@media (max-width: 768px) {
+  .upload-area {
+    padding: var(--space-8);
+  }
+  
+  .upload-area-icon {
+    width: 40px;
+    height: 40px;
+    font-size: 1.25rem;
+  }
+  
+  .upload-area-text {
+    font-size: 1rem;
+  }
+}
+
+/* Image Display Styles */
+#image-display {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-height: 400px;
+  background: var(--bg-primary);
+  border: 1px solid var(--border-light);
+  border-radius: var(--radius-lg);
+  margin: var(--space-6) 0;
+  padding: var(--space-4);
+  box-shadow: var(--shadow-md);
+  overflow: auto;
+  position: relative;
+}
+
+#image-display .loading-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-4);
+}
+
+#image-display .view-image {
+  max-width: 100%;
+  max-height: 80vh;
+  height: auto;
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-lg);
+  transition: transform var(--transition-normal);
+  cursor: zoom-in;
+}
+
+#image-display.transitioning .view-image {
+  opacity: 0.7;
+  transition: opacity var(--transition-fast);
+}
+
+.image-controls {
+  display: flex;
+  justify-content: center;
+  gap: var(--space-3);
+  margin: var(--space-4) 0;
+  flex-wrap: wrap;
+}
+
+.control-btn {
+  min-width: 100px;
+}
+
+.image-view-container {
+  max-width: 100%;
+  margin: 0 auto;
+}
+
+.image-navigation {
+  display: flex;
+  justify-content: center;
+  gap: var(--space-4);
+  margin: var(--space-6) 0;
+}
+
+.navigation-btn {
+  min-width: 120px;
+}
+
+/* Responsive adjustments for image display */
+@media (max-width: 768px) {
+  #image-display {
+    min-height: 300px;
+    margin: var(--space-4) 0;
+    padding: var(--space-3);
+  }
+  
+  #image-display .view-image {
+    max-height: 60vh;
+  }
+  
+  .image-controls {
+    gap: var(--space-2);
+  }
+  
+  .control-btn {
+    min-width: 80px;
+    font-size: 0.875rem;
+    padding: var(--space-2) var(--space-3);
+  }
+  
+  .navigation-btn {
+    min-width: 100px;
+  }
+}
+
 .mt-0 { margin-top: 0; }
 .mt-2 { margin-top: var(--space-2); }
 .mt-4 { margin-top: var(--space-4); }
