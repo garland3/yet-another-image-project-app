@@ -1,28 +1,26 @@
 {
   "name": "Python FastAPI Development",
   "image": "mcr.microsoft.com/devcontainers/python:3.11",
-  "remoteUser": "root",
+
+  // Enable Docker-in-Docker
   "features": {
-    "ghcr.io/devcontainers/features/node:1": {
-      "version": "lts"
+    "ghcr.io/devcontainers/features/docker-in-docker:2": {
+      "version": "latest"
     }
   },
-  "workspaceFolder": "/workspaces/yet-another-image-project-app",
-  "forwardPorts": [8000, 5432],
-  // "postCreateCommand": "bash .devcontainer/setup.sh",
-  "remoteEnv": {
-    "DATABASE_URL": "postgresql://postgres:postgres@localhost:5432/postgres"
-  },
+  "runArgs": ["--privileged"],
+  "mounts": [
+    "source=dind-var-lib-docker,target=/var/lib/docker,type=volume"
+  ],
+  "init": true,
+
+  "forwardPorts": [8000],
   "customizations": {
     "vscode": {
       "extensions": [
         "ms-python.python",
-        "ms-python.vscode-pylance",
-        "saoudrizwan.claude-dev"
-      ],
-      "settings": {
-        "python.defaultInterpreterPath": "/usr/local/bin/python"
-      }
+        "ms-python.vscode-pylance"
+      ]
     }
   }
 }

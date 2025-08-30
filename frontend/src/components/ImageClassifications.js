@@ -1,5 +1,4 @@
 import React, { useState, useEffect } from 'react';
-import { v4 as uuidv4 } from 'uuid'; // Add UUID library
 
 function ImageClassifications({ imageId, classes, loading, setLoading, setError }) {
   const [imageClassifications, setImageClassifications] = useState([]);
