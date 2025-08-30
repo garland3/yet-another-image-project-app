@@ -8,6 +8,7 @@ class UserBase(BaseModel):
     email: EmailStr
     username: Optional[str] = None
     is_active: bool = True
+    groups: Optional[List[str]] = None
 
 class UserCreate(UserBase):
     pass

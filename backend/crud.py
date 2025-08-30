@@ -29,7 +29,11 @@ async def get_user_by_id(db: AsyncSession, user_id: uuid.UUID) -> Optional[model
     return result.scalars().first()
 
 async def create_user(db: AsyncSession, user: schemas.UserCreate, created_by: Optional[str] = None) -> models.User:
-    db_user = models.User(**user.model_dump())
+    # Only include fields that exist on the SQLAlchemy model
+    payload = user.model_dump()
+    allowed_keys = {"email", "username", "is_active"}
+    filtered = {k: v for k, v in payload.items() if k in allowed_keys}
+    db_user = models.User(**filtered)
     db.add(db_user)
     await db.commit()
     await db.refresh(db_user)

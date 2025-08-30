@@ -1,14 +1,22 @@
 from pydantic_settings import BaseSettings
+from pydantic import field_validator
 from typing import Optional
 import os
 
 class Settings(BaseSettings):
     APP_NAME: str = "Data Management API"
+    DEBUG: bool = False
     SKIP_HEADER_CHECK: bool = False
     CHECK_MOCK_MEMBERSHIP: bool = True
     MOCK_USER_EMAIL: str = "test@example.com"
     MOCK_USER_GROUPS_JSON: str = '["admin-group", "data-scientists", "project-alpha-group"]'
     AUTH_SERVER_URL: Optional[str] = None
+    # Trust proxy-provided user/group headers in production (only behind a secure proxy)
+    TRUST_X_USER_GROUPS_HEADERS: bool = False
+    PROXY_SHARED_SECRET: Optional[str] = None
+    X_USER_ID_HEADER: str = "X-User-Id"
+    X_USER_GROUPS_HEADER: str = "X-User-Groups"
+    X_PROXY_SECRET_HEADER: str = "X-Proxy-Secret"
 
     POSTGRES_USER: str
     POSTGRES_PASSWORD: str
@@ -28,8 +36,16 @@ class Settings(BaseSettings):
     # Frontend build path configuration
     FRONTEND_BUILD_PATH: str = "frontend/build"
 
+    @field_validator('DEBUG', 'SKIP_HEADER_CHECK', 'S3_USE_SSL', 'TRUST_X_USER_GROUPS_HEADERS', mode='before')
+    @classmethod
+    def parse_bool_with_strip(cls, v):
+        if isinstance(v, str):
+            v = v.strip()
+        return v
+
     class Config:
-        env_file = ".env"
+        # Check for .env in current directory first, then parent directory
+        env_file = [".env", "../.env"]
         env_file_encoding = 'utf-8'
         extra = "allow"
     

@@ -3,6 +3,7 @@ from fastapi.responses import RedirectResponse
 from fastapi.routing import APIRouter
 
 from fastapi.middleware.cors import CORSMiddleware
+import logging
 import time
 from fastapi import FastAPI, Request, status, HTTPException
 from fastapi.staticfiles import StaticFiles
@@ -39,8 +40,8 @@ async def lifespan(app: FastAPI):
             print(f"S3 bucket '{settings.S3_BUCKET}' is ready.")
     else:
         print("WARNING: Boto3 S3 client not initialized. Object storage operations will fail.")
-    # mkdir if it does not exist
-    os.makedirs("/ui2", exist_ok=True)
+    # Ensure a writable tmp dir exists for any runtime needs
+    os.makedirs(os.path.join(os.getcwd(), "tmp"), exist_ok=True)
     # if frontend/build exist, then copy the contents of frontend/build to /ui2
     # if os.path.exists("/app/frontend/build"):
         # Copy the contents of frontend/build to /ui2
@@ -63,38 +64,32 @@ app = FastAPI(
 
 
 # Add CORS middleware
+cors_origins = os.getenv("CORS_ORIGINS", "http://localhost:3000").split(",")
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000"],
+    allow_origins=[o.strip() for o in cors_origins if o.strip()],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
-# Add debug middleware to catch exceptions and print debug information
-@app.middleware("http")
-async def debug_exception_middleware(request: Request, call_next):
-    start_time = time.time()
-    try:
-        response = await call_next(request)
-        process_time = time.time() - start_time
-        print(f"Request: {request.method} {request.url.path} completed in {process_time:.4f}s")
-        return response
-    except Exception as e:
-        process_time = time.time() - start_time
-        print(f"ERROR in {request.method} {request.url.path} after {process_time:.4f}s")
-        print(f"Exception: {str(e)}")
-        print(f"Exception type: {type(e).__name__}")
-        print(f"Request headers: {request.headers}")
-        print(f"Request query params: {request.query_params}")
+if settings.DEBUG:
+    # Add debug middleware to catch exceptions and print debug information
+    @app.middleware("http")
+    async def debug_exception_middleware(request: Request, call_next):
+        start_time = time.time()
         try:
-            body = await request.body()
-            if body:
-                print(f"Request body: {body.decode()}")
-        except Exception as body_err:
-            print(f"Could not read request body: {str(body_err)}")
-        print(f"Traceback: {traceback.format_exc()}")
-        raise  # Re-raise the exception for FastAPI to handle
+            response = await call_next(request)
+            process_time = time.time() - start_time
+            print(f"Request: {request.method} {request.url.path} completed in {process_time:.4f}s")
+            return response
+        except Exception as e:
+            process_time = time.time() - start_time
+            print(f"ERROR in {request.method} {request.url.path} after {process_time:.4f}s: {type(e).__name__}: {str(e)}")
+            # Avoid dumping headers/body in non-dev logs
+            if settings.DEBUG:
+                print(f"Traceback: {traceback.format_exc()}")
+            raise  # Re-raise the exception for FastAPI to handle
 
 # Add middleware that prints the request type and path to the console
 # Custom JSON encoder to handle MetaData objects
@@ -160,13 +155,16 @@ if not os.path.isabs(front_end_build_path):
 
 print(f"Frontend build path: {front_end_build_path}")
 
-# serve the static files from the build directory
-# Mount the static folder
-app.mount(
-    "/static",
-    StaticFiles(directory=os.path.join(front_end_build_path, "static")),
-    name="static_files"
-)
+# Serve the static files from the build directory if it exists
+static_dir = os.path.join(front_end_build_path, "static")
+if os.path.isdir(static_dir):
+    app.mount(
+        "/static",
+        StaticFiles(directory=static_dir),
+        name="static_files"
+    )
+else:
+    print(f"Static directory not found at {static_dir}; skipping static mount")
 
 # import fileresponse. 
 from fastapi.responses import FileResponse

@@ -1,5 +1,6 @@
 import uuid
 import io
+import os
 from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, File, Form, Query, Body
 from sqlalchemy import update
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -10,7 +11,7 @@ from database import get_db
 from dependencies import get_current_user, is_user_in_group
 from boto3_client import upload_file_to_minio, get_presigned_download_url
 from config import settings
-import json
+import json as _json
 from aiocache import cached
 from aiocache.serializers import JsonSerializer
 from PIL import Image
@@ -46,18 +47,27 @@ async def upload_image_to_project(
     parsed_metadata: Optional[Dict[str, Any]] = None
     if metadata_json:
         try:
-            parsed_metadata = json.loads(metadata_json)
-        except json.JSONDecodeError:
+            parsed_metadata = _json.loads(metadata_json)
+        except _json.JSONDecodeError:
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid JSON format for metadata")
     # If metadata_json is None or empty string, parsed_metadata remains None
-    contents = await file.read()
-    file_data = io.BytesIO(contents)
-    file_size = len(contents)
+    # Basic validation
+    max_size = int(os.getenv("MAX_UPLOAD_BYTES", "10485760"))  # 10MB default
+    # Try to read a small chunk to estimate streaming health, but do not load all into memory
+    try:
+        file.file.seek(0, io.SEEK_END)
+        file_size = file.file.tell()
+        file.file.seek(0)
+        if file_size and file_size > max_size:
+            raise HTTPException(status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE, detail="File too large")
+    except Exception:
+        # If we cannot get size ahead of time, proceed to stream; S3 client will handle
+        file_size = None
     success = await upload_file_to_minio(
         bucket_name=settings.S3_BUCKET,
         object_name=object_storage_key,
-        file_data=file_data,
-        length=file_size,
+        file_data=file.file,
+        length=file_size or 0,
         content_type=file.content_type
     )
     if not success:
@@ -90,9 +100,9 @@ async def upload_image_to_project(
                         # Check if it's a string that can be parsed as JSON
                         elif isinstance(db_data_instance.metadata_, str):
                             try:
-                                import json
-                                db_dict["metadata_"] = json.loads(db_data_instance.metadata_)
-                            except json.JSONDecodeError:
+                                import json as _j
+                                db_dict["metadata_"] = _j.loads(db_data_instance.metadata_)
+                            except _json.JSONDecodeError:
                                 db_dict["metadata_"] = {"value": db_data_instance.metadata_}
                         else:
                             # If it's already a dict or can be converted to one
@@ -166,9 +176,9 @@ async def list_images_in_project(
                         # Check if it's a string that can be parsed as JSON
                         elif isinstance(img.metadata_, str):
                             try:
-                                import json
-                                img_dict["metadata_"] = json.loads(img.metadata_)
-                            except json.JSONDecodeError:
+                                import json as _j
+                                img_dict["metadata_"] = _j.loads(img.metadata_)
+                            except _json.JSONDecodeError:
                                 img_dict["metadata_"] = {"value": img.metadata_}
                         else:
                             # If it's already a dict or can be converted to one
@@ -247,9 +257,9 @@ async def list_images_in_project_with_slash(
                         # Check if it's a string that can be parsed as JSON
                         elif isinstance(img.metadata_, str):
                             try:
-                                import json
-                                img_dict["metadata_"] = json.loads(img.metadata_)
-                            except json.JSONDecodeError:
+                                import json as _j
+                                img_dict["metadata_"] = _j.loads(img.metadata_)
+                            except _json.JSONDecodeError:
                                 img_dict["metadata_"] = {"value": img.metadata_}
                         else:
                             # If it's already a dict or can be converted to one
@@ -313,9 +323,9 @@ async def get_image_metadata(
                         # Check if it's a string that can be parsed as JSON
                         elif isinstance(db_image.metadata_, str):
                             try:
-                                import json
-                                db_dict["metadata_"] = json.loads(db_image.metadata_)
-                            except json.JSONDecodeError:
+                                import json as _j
+                                db_dict["metadata_"] = _j.loads(db_image.metadata_)
+                            except _json.JSONDecodeError:
                                 db_dict["metadata_"] = {"value": db_image.metadata_}
                         else:
                             # If it's already a dict or can be converted to one
@@ -409,11 +419,13 @@ async def get_image_content(
             response.raise_for_status()
             
             # Create a streaming response with the same content type
+            # Sanitize filename for header
+            safe_filename = db_image.filename.replace('\n', '_').replace('\r', '_').replace('"', '')
             return StreamingResponse(
                 content=response.iter_bytes(),
                 media_type=db_image.content_type or "application/octet-stream",
                 headers={
-                    "Content-Disposition": f'inline; filename="{db_image.filename}"'
+                    "Content-Disposition": f'inline; filename="{safe_filename}"'
                 }
             )
         except httpx.HTTPError as e:
@@ -431,6 +443,8 @@ async def get_image_thumbnail(
     current_user: schemas.User = Depends(get_current_user),
 ):
     """Generate and return a thumbnail of the image"""
+    if width <= 0 or height <= 0:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Width and height must be positive integers")
     db_image = await crud.get_data_instance(db=db, image_id=image_id)
     if db_image is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Image not found")
@@ -483,11 +497,12 @@ async def get_image_thumbnail(
                 content_type = content_type_map.get(img_format, 'image/jpeg')
                 
                 # Return the thumbnail
+                safe_filename = db_image.filename.replace('\n', '_').replace('\r', '_').replace('"', '')
                 return StreamingResponse(
                     content=output_buffer,
                     media_type=content_type,
                     headers={
-                        "Content-Disposition": f'inline; filename="thumbnail_{db_image.filename}"'
+                        "Content-Disposition": f'inline; filename="thumbnail_{safe_filename}"'
                     }
                 )
             except Exception as e:
@@ -495,7 +510,6 @@ async def get_image_thumbnail(
                     status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
                     detail=f"Error generating thumbnail: {str(e)}"
                 )
-                
         except httpx.HTTPError as e:
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
@@ -559,9 +573,9 @@ async def update_image_metadata(
                     # Check if it's a string that can be parsed as JSON
                     elif isinstance(db_image.metadata_, str):
                         try:
-                            import json
-                            db_dict["metadata_"] = json.loads(db_image.metadata_)
-                        except json.JSONDecodeError:
+                            import json as _j
+                            db_dict["metadata_"] = _j.loads(db_image.metadata_)
+                        except _json.JSONDecodeError:
                             db_dict["metadata_"] = {"value": db_image.metadata_}
                     else:
                         # If it's already a dict or can be converted to one
