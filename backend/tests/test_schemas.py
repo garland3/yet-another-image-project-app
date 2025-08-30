@@ -1,7 +1,7 @@
 import uuid
 import pytest
 from pydantic import ValidationError
-import schemas
+from core import schemas
 
 
 def test_user_schema_optional_groups():

@@ -2,11 +2,12 @@ import uuid
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 from typing import List
-import crud, schemas, models
-from database import get_db
-from dependencies import get_current_user, is_user_in_group
-from config import settings
-from routers.images import check_project_access
+import utils.crud as crud
+from core import schemas, models
+from core.database import get_db
+from core.config import settings
+from core.group_auth_helper import is_user_in_group
+from utils.dependencies import get_current_user, get_project_or_403, get_image_or_403
 
 router = APIRouter(
     prefix="/api",
@@ -22,7 +23,7 @@ async def create_image_class(
     current_user: schemas.User = Depends(get_current_user),
 ):
     # Check if the user has access to the project
-    await check_project_access(project_id, db, current_user)
+    await get_project_or_403(project_id, db, current_user)
     
     # Ensure the project_id in the path matches the one in the request body
     if project_id != image_class.project_id:
@@ -41,7 +42,7 @@ async def list_image_classes(
     current_user: schemas.User = Depends(get_current_user),
 ):
     # Check if the user has access to the project
-    await check_project_access(project_id, db, current_user)
+    await get_project_or_403(project_id, db, current_user)
     
     # Get all image classes for the project
     return await crud.get_image_classes_for_project(db=db, project_id=project_id)
@@ -58,7 +59,7 @@ async def get_image_class(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Image class not found")
     
     # Check if the user has access to the project
-    await check_project_access(db_class.project_id, db, current_user)
+    await get_project_or_403(db_class.project_id, db, current_user)
     
     return db_class
 
@@ -75,7 +76,7 @@ async def update_image_class(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Image class not found")
     
     # Check if the user has access to the project
-    await check_project_access(db_class.project_id, db, current_user)
+    await get_project_or_403(db_class.project_id, db, current_user)
     
     # Update the image class
     updated_class = await crud.update_image_class(
@@ -98,7 +99,7 @@ async def delete_image_class(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Image class not found")
     
     # Check if the user has access to the project
-    await check_project_access(db_class.project_id, db, current_user)
+    await get_project_or_403(db_class.project_id, db, current_user)
     
     # Delete the image class
     success = await crud.delete_image_class(db=db, class_id=class_id)
@@ -111,22 +112,6 @@ async def delete_image_class(
     return None
 
 # Image Classifications endpoints
-async def check_image_access(image_id: uuid.UUID, db: AsyncSession, current_user: schemas.User) -> models.DataInstance:
-    # Get the image
-    db_image = await crud.get_data_instance(db=db, image_id=image_id)
-    if db_image is None:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Image not found")
-    
-    # Check if the user has access to the project
-    is_member = is_user_in_group(current_user, db_image.project.meta_group_id)
-    
-    if not is_member:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail=f"User '{current_user.email}' does not have access to image '{image_id}'",
-        )
-    
-    return db_image
 
 @router.post("/images/{image_id}/classifications", response_model=schemas.ImageClassification, status_code=status.HTTP_201_CREATED)
 async def classify_image(
@@ -139,7 +124,7 @@ async def classify_image(
     print(f"Request body: {classification}")
     
     # Check if the user has access to the image
-    db_image = await check_image_access(image_id, db, current_user)
+    db_image = await get_image_or_403(image_id, db, current_user)
     
     # Ensure the image_id in the path matches the one in the request body
     # Convert both to strings for comparison to handle different UUID object types
@@ -195,7 +180,7 @@ async def list_image_classifications(
     current_user: schemas.User = Depends(get_current_user),
 ):
     # Check if the user has access to the image
-    await check_image_access(image_id, db, current_user)
+    await get_image_or_403(image_id, db, current_user)
     
     # Get all classifications for the image
     return await crud.get_classifications_for_image(db=db, image_id=image_id)
@@ -212,10 +197,10 @@ async def delete_classification(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Classification not found")
     
     # Check if the user has access to the image
-    await check_image_access(db_classification.image_id, db, current_user)
+    await get_image_or_403(db_classification.image_id, db, current_user)
     
     # Only allow the user who created the classification or admin users to delete it
-    is_admin = is_user_in_group(current_user, "admin")
+    is_admin = is_user_in_group(current_user.email, "admin")
     if (current_user.id and str(db_classification.created_by_id) != str(current_user.id)) and not is_admin:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,

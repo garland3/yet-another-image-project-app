@@ -1,12 +1,11 @@
 import os
 from importlib import reload
-import config as config_mod
+import core.config as config_mod
 
 
 def test_bool_parsing_extended(monkeypatch):
     monkeypatch.setenv("DEBUG", " true\n")
     monkeypatch.setenv("SKIP_HEADER_CHECK", "false ")
-    monkeypatch.setenv("TRUST_X_USER_GROUPS_HEADERS", " true ")
     monkeypatch.setenv("DATABASE_URL", "postgresql://u:p@db:5432/x")
     monkeypatch.setenv("POSTGRES_USER", "u")
     monkeypatch.setenv("POSTGRES_PASSWORD", "p")
@@ -15,4 +14,4 @@ def test_bool_parsing_extended(monkeypatch):
     m = reload(config_mod)
     s = m.settings
     assert s.DEBUG is True
-    assert s.TRUST_X_USER_GROUPS_HEADERS is True
+    assert s.SKIP_HEADER_CHECK is False

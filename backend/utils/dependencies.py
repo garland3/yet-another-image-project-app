@@ -5,56 +5,15 @@ from sqlalchemy.ext.asyncio import AsyncSession
 import uuid
 import hashlib
 import secrets
-from config import settings
-from schemas import User, UserCreate
-from database import get_db
-import crud, models
+from core.config import settings
+from core.schemas import User, UserCreate
+from core.database import get_db
+from core.group_auth_helper import is_user_in_group
+# Direct access to request.state - no need for wrapper functions
+import utils.crud as crud
+from core import models
 
 security = HTTPBearer(auto_error=False)
-
-# Helpers for trusting proxy headers and parsing user groups
-def _headers_trusted(request: Request) -> bool:
-    """Return True if we should trust X-User-* headers on this request."""
-    if not settings.TRUST_X_USER_GROUPS_HEADERS:
-        return False
-    secret = settings.PROXY_SHARED_SECRET
-    if not secret:
-        return True
-    header_name = getattr(settings, "X_PROXY_SECRET_HEADER", "X-Proxy-Secret")
-    return request.headers.get(header_name) == secret
-
-def _parse_groups_header(raw: Optional[str]):
-    if not raw:
-        return None
-    raw = raw.strip()
-    # Try JSON list first
-    try:
-        import json
-        data = json.loads(raw)
-        if isinstance(data, list):
-            groups = [str(x).strip() for x in data if str(x).strip()]
-            # Dedupe preserving order
-            seen = set()
-            uniq = []
-            for g in groups:
-                if g not in seen:
-                    seen.add(g)
-                    uniq.append(g)
-            return uniq
-    except Exception:
-        pass
-    # Fallback: comma-separated list
-    parts = [p.strip() for p in raw.split(",")]
-    groups = [p for p in parts if p]
-    if not groups:
-        return None
-    seen = set()
-    uniq = []
-    for g in groups:
-        if g not in seen:
-            seen.add(g)
-            uniq.append(g)
-    return uniq
 
 # Function to get a user's accessible groups
 async def get_user_accessible_groups(
@@ -81,7 +40,7 @@ async def get_user_accessible_groups(
     
     # For each project, check if the user is a member of the project's group
     for project in all_projects:
-        if is_user_in_group(user, project.meta_group_id) and project.meta_group_id not in groups:
+        if is_user_in_group(user.email, project.meta_group_id) and project.meta_group_id not in groups:
             groups.append(project.meta_group_id)
     
     return groups
@@ -115,33 +74,64 @@ async def get_accessible_projects_for_user(
     
     # For each project, check if the user is a member of the project's group
     for project in all_projects:
-        if is_user_in_group(user, project.meta_group_id):
+        if is_user_in_group(user.email, project.meta_group_id):
             accessible_projects.append(project)
     
     return accessible_projects
 
 
-
-
-def is_user_in_group(user: User, group_id: str) -> bool:
+async def get_project_or_403(project_id: uuid.UUID, db: AsyncSession, current_user: User) -> models.Project:
     """
-    Check if a user is a member of a specific group.
-    In DEBUG, we mock and return True; in non-DEBUG, deny by default until real provider is implemented.
+    Get a project and check if the current user has access to it.
+    Raises 403 if user doesn't have access.
     
     Args:
-        user: The user to check
-        group_id: The ID of the group to check membership for
+        project_id: The ID of the project to retrieve
+        db: Database session
+        current_user: The current authenticated user
         
     Returns:
-        True if the user is a member of the group (always True in mock mode)
+        The project if user has access
+        
+    Raises:
+        HTTPException: 404 if project doesn't exist, 403 if user doesn't have access
     """
-    if settings.DEBUG:
-        print(f"MOCKING: Checking if user '{user.email}' is in group '{group_id}' - returning True")
-        return True
-    # Use groups attached to the user, if present
-    if getattr(user, "groups", None):
-        return group_id in user.groups
-    return False
+    db_project = await crud.get_project(db, project_id)
+    if not db_project:
+        raise HTTPException(status_code=404, detail="Project not found")
+    
+    is_member = is_user_in_group(current_user.email, db_project.meta_group_id)
+    if not is_member:
+        raise HTTPException(status_code=403, detail="Access forbidden")
+    
+    return db_project
+
+
+async def get_image_or_403(image_id: uuid.UUID, db: AsyncSession, current_user: User) -> models.DataInstance:
+    """
+    Get an image and check if the current user has access to it.
+    Raises 403 if user doesn't have access.
+    
+    Args:
+        image_id: The ID of the image to retrieve
+        db: Database session
+        current_user: The current authenticated user
+        
+    Returns:
+        The image if user has access
+        
+    Raises:
+        HTTPException: 404 if image doesn't exist, 403 if user doesn't have access
+    """
+    db_image = await crud.get_image(db, image_id)
+    if not db_image:
+        raise HTTPException(status_code=404, detail="Image not found")
+    
+    is_member = is_user_in_group(current_user.email, db_image.project.meta_group_id)
+    if not is_member:
+        raise HTTPException(status_code=403, detail="Access forbidden")
+    
+    return db_image
 
 def generate_api_key() -> str:
     """Generate a secure API key"""
@@ -171,10 +161,9 @@ async def get_user_from_api_key(
     # Update last used timestamp
     await crud.update_api_key_last_used(db, api_key.id)
     
-    # Optionally attach groups from trusted headers
-    user_groups = None
-    if _headers_trusted(request):
-        user_groups = _parse_groups_header(request.headers.get(settings.X_USER_GROUPS_HEADER))
+    # For API key users, groups will be looked up server-side by the auth system
+    # We don't need to parse headers for API key authentication
+    user_groups = []  # Will be populated by auth system lookup
 
     # Return the user associated with this API key
     return User(
@@ -192,55 +181,42 @@ async def get_current_user(
     db: AsyncSession = Depends(get_db),
     api_user: Optional[User] = Depends(get_user_from_api_key)
 ) -> User:
+    """
+    Get the current authenticated user from multiple sources:
+    1. API key authentication (if provided)
+    2. Proxy authentication middleware (if user was set in request.state.auth)
+    3. Otherwise raise 401 Unauthorized
+    
+    This is much simpler than the previous implementation.
+    """
     # If API key authentication was successful, return that user
     if api_user:
         return api_user
     
-    if settings.DEBUG and settings.SKIP_HEADER_CHECK:
-        # Create a mock user object (groups field no longer exists)
-        mock_user = User(email=settings.MOCK_USER_EMAIL)
-        
-        # Check if the user exists in the database
-        db_user = await crud.get_user_by_email(db=db, email=mock_user.email)
-        
-        # If the user doesn't exist, create it
-        if not db_user:
-            user_create = UserCreate(
-                email=mock_user.email,
-            )
-            db_user = await crud.create_user(db=db, user=user_create)
+    # Check if auth middleware set a user
+    user_email = getattr(request.state, 'user_email', None)
+    if user_email:
+            # Ensure user exists in database for API key operations
+            db_user = await crud.get_user_by_email(db=db, email=user_email)
+            if not db_user:
+                user_create = UserCreate(email=user_email)
+                db_user = await crud.create_user(db=db, user=user_create)
             
-            # Update the mock user with the database user's ID
-            mock_user.id = db_user.id
-        else:
-            # Update the mock user with the database user's ID
-            mock_user.id = db_user.id
-        
-        return mock_user
-    # If behind a trusted proxy, accept headers for auth
-    if _headers_trusted(request):
-        user_email = request.headers.get(settings.X_USER_ID_HEADER)
-        if not user_email:
-            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Missing user header")
-        groups = _parse_groups_header(request.headers.get(settings.X_USER_GROUPS_HEADER)) or []
-        # Ensure user exists
-        db_user = await crud.get_user_by_email(db=db, email=user_email)
-        if not db_user:
-            db_user = await crud.create_user(db=db, user=UserCreate(email=user_email))
-        return User(
-            id=db_user.id,
-            email=db_user.email,
-            username=db_user.username,
-            is_active=db_user.is_active,
-            created_at=db_user.created_at,
-            updated_at=db_user.updated_at,
-            groups=groups
-        )
-    # In a real application, validate headers or other auth here.
-    # For now, require API key auth if mocking is disabled.
+            # Return user with database ID
+            return User(
+                id=db_user.id,
+                email=db_user.email,
+                username=db_user.username,
+                is_active=db_user.is_active,
+                created_at=db_user.created_at,
+                updated_at=db_user.updated_at,
+                groups=[]  # Groups handled by auth system
+            )
+    
+    # No authentication found
     raise HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
-        detail="Authentication required",
+        detail="Authentication required. Provide API key or ensure proxy auth headers are present.",
     )
 
 async def requires_group_membership(
@@ -261,7 +237,7 @@ async def requires_group_membership(
     Raises:
         HTTPException: If the user is not a member of the group
     """
-    is_member = is_user_in_group(current_user, required_group_id)
+    is_member = is_user_in_group(current_user.email, required_group_id)
     
     if not is_member:
         raise HTTPException(

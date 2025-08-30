@@ -4,7 +4,7 @@ from sqlalchemy.exc import OperationalError
 import asyncpg
 import socket
 import sys
-from config import settings
+from .config import settings
 
 engine = create_async_engine(
     settings.DATABASE_URL,

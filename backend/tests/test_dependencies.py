@@ -4,21 +4,13 @@ import uuid
 import pytest
 from fastapi.testclient import TestClient
 
-from config import settings
-import dependencies as deps
-import crud, schemas
+from core.config import settings
+import utils.dependencies as deps
+import utils.crud as crud
+from core import schemas
 
 
-def test_parse_groups_header_json_list():
-    raw = '["a", "b", "a", " ", "c" ]'
-    groups = deps._parse_groups_header(raw)
-    assert groups == ["a", "b", "c"]
-
-
-def test_parse_groups_header_csv():
-    raw = 'alpha, beta, gamma, alpha, , delta'
-    groups = deps._parse_groups_header(raw)
-    assert groups == ["alpha", "beta", "gamma", "delta"]
+# Removed group header parsing tests since groups are now server-side only
 
 
 def test_generate_and_hash_api_key():
@@ -31,18 +23,18 @@ def test_generate_and_hash_api_key():
     assert h != key1
 
 
-def test_trusted_headers_auth_flow(client, monkeypatch):
-    # Force non-mock path and enable trusted headers
+def test_server_side_auth_flow(client, monkeypatch):
+    # Force production mode with server-side group lookup
     monkeypatch.setattr(settings, "DEBUG", False)
     monkeypatch.setattr(settings, "SKIP_HEADER_CHECK", False)
-    monkeypatch.setattr(settings, "TRUST_X_USER_GROUPS_HEADERS", True)
     monkeypatch.setattr(settings, "PROXY_SHARED_SECRET", "shh")
 
     # Minimal request that triggers get_current_user
     headers = {
         settings.X_PROXY_SECRET_HEADER: "shh",
         settings.X_USER_ID_HEADER: "proxyuser@example.com",
-        settings.X_USER_GROUPS_HEADER: '["grp1","grp2"]',
+        # Groups header is ignored - groups looked up server-side
+        "x-user-groups": '["grp1","grp2"]',  
     }
 
     # Hitting projects list should succeed with auth via headers

@@ -2,9 +2,10 @@ import uuid
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 from typing import List
-import crud, schemas
-from database import get_db
-from dependencies import get_current_user, generate_api_key, hash_api_key
+import utils.crud as crud
+from core import schemas
+from core.database import get_db
+from utils.dependencies import get_current_user, generate_api_key, hash_api_key
 
 router = APIRouter(
     prefix="/api",

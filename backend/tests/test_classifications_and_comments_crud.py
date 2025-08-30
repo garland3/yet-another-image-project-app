@@ -1,6 +1,6 @@
 import pytest
 import uuid
-import crud, schemas
+import utils.crud as crud, schemas
 
 
 @pytest.mark.asyncio
@@ -10,6 +10,12 @@ async def test_image_classifications_crud(db_session):
         db_session,
         schemas.ProjectCreate(name="IProj", description=None, meta_group_id="g"),
         created_by="u@example.com",
+    )
+    # Create a user to associate as classifier
+    user = await crud.create_user(
+        db_session,
+        schemas.UserCreate(email="u@example.com", username=None, is_active=True),
+        created_by="system",
     )
     # Image
     di = await crud.create_data_instance(
@@ -32,7 +38,7 @@ async def test_image_classifications_crud(db_session):
     # Classification
     cl = await crud.create_image_classification(
         db_session,
-        schemas.ImageClassificationCreate(image_id=di.id, class_id=ic.id),
+        schemas.ImageClassificationCreate(image_id=di.id, class_id=ic.id, created_by_id=user.id),
         created_by="u@example.com",
     )
     assert cl.image_id == di.id
@@ -49,6 +55,12 @@ async def test_image_comments_crud(db_session):
         schemas.ProjectCreate(name="ComProj", description=None, meta_group_id="g"),
         created_by="u@example.com",
     )
+    # Create a user to associate as comment author
+    user = await crud.create_user(
+        db_session,
+        schemas.UserCreate(email="u@example.com", username=None, is_active=True),
+        created_by="system",
+    )
     # Image
     di = await crud.create_data_instance(
         db_session,
@@ -64,7 +76,7 @@ async def test_image_comments_crud(db_session):
     # Create comment
     c = await crud.create_comment(
         db_session,
-        schemas.ImageCommentCreate(text="nice", image_id=di.id),
+        schemas.ImageCommentCreate(text="nice", image_id=di.id, author_id=user.id),
         created_by="u@example.com",
     )
     assert c.text == "nice"

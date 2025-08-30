@@ -3,7 +3,7 @@ from sqlalchemy import Column, String, Text, ForeignKey, DateTime, JSON, BigInte
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
-from database import Base
+from .database import Base
 
 class User(Base):
     __tablename__ = "users"

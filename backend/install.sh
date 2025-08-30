@@ -41,12 +41,12 @@ install_backend_dependencies() {
     fi
     
     # Install Python dependencies
-    if [[ -f ../requirements.txt ]]; then
+    if [[ -f requirements.txt ]]; then
         say "Installing Python dependencies"
-        uv pip install -r ../requirements.txt
+        uv pip install -r requirements.txt
         say "Backend dependencies installed successfully"
     else
-        say "requirements.txt not found in parent directory; skipping pip install"
+        say "requirements.txt not found in backend directory; skipping pip install"
     fi
 }
 

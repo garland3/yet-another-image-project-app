@@ -2,11 +2,12 @@ import uuid
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 from typing import List
-import crud, schemas
-from database import get_db
-from dependencies import get_current_user, get_user_accessible_groups, is_user_in_group
-from config import settings
-from config import settings
+import utils.crud as crud
+from core import schemas, models
+from core.database import get_db
+from core.config import settings
+from core.group_auth_helper import is_user_in_group
+from utils.dependencies import get_current_user, get_user_accessible_groups
 
 router = APIRouter(
     prefix="/api/users",
@@ -53,7 +54,7 @@ async def read_current_user_groups(
     
     # For each project, check if the user is a member of the project's group
     for project in all_projects:
-        if is_user_in_group(current_user, project.meta_group_id) and project.meta_group_id not in user_groups:
+        if is_user_in_group(current_user.email, project.meta_group_id) and project.meta_group_id not in user_groups:
             user_groups.append(project.meta_group_id)
     
     return user_groups
@@ -77,7 +78,7 @@ async def update_user(
     current_user: schemas.User = Depends(get_current_user),
 ):
     # Only allow users to update their own profile or admin users
-    is_admin = is_user_in_group(current_user, "admin")
+    is_admin = is_user_in_group(current_user.email, "admin")
     if str(user_id) != str(current_user.id) and not is_admin:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,

@@ -59,11 +59,11 @@ install_dependencies() {
     source backend/.venv/bin/activate
     
     # Install Python dependencies
-    if [[ -f requirements.txt ]]; then
+    if [[ -f backend/requirements.txt ]]; then
         say "Installing Python dependencies"
-        uv pip install -r requirements.txt
+        uv pip install -r backend/requirements.txt
     else
-        say "requirements.txt not found; skipping pip install"
+        say "backend/requirements.txt not found; skipping pip install"
     fi
 }
 

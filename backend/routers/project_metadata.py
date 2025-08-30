@@ -2,11 +2,11 @@ import uuid
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 from typing import List, Dict, Any
-import crud, schemas, models
-from database import get_db
-from dependencies import get_current_user
-from config import settings
-from routers.images import check_project_access
+import utils.crud as crud
+from core import schemas, models
+from core.database import get_db
+from core.config import settings
+from utils.dependencies import get_current_user, get_project_or_403
 
 router = APIRouter(
     # prefix /api
@@ -22,7 +22,7 @@ async def create_project_metadata(
     current_user: schemas.User = Depends(get_current_user),
 ):
     # Check if the user has access to the project
-    await check_project_access(project_id, db, current_user)
+    await get_project_or_403(project_id, db, current_user)
     
     # Create the metadata create object
     metadata_create = schemas.ProjectMetadataCreate(
@@ -41,7 +41,7 @@ async def list_project_metadata(
     current_user: schemas.User = Depends(get_current_user),
 ):
     # Check if the user has access to the project
-    await check_project_access(project_id, db, current_user)
+    await get_project_or_403(project_id, db, current_user)
     
     # Get all metadata for the project
     return await crud.get_all_project_metadata(db=db, project_id=project_id)
@@ -54,7 +54,7 @@ async def get_project_metadata(
     current_user: schemas.User = Depends(get_current_user),
 ):
     # Check if the user has access to the project
-    await check_project_access(project_id, db, current_user)
+    await get_project_or_403(project_id, db, current_user)
     
     # Get the metadata
     db_metadata = await crud.get_project_metadata_by_key(db=db, project_id=project_id, key=key)
@@ -72,7 +72,7 @@ async def update_project_metadata(
     current_user: schemas.User = Depends(get_current_user),
 ):
     # Check if the user has access to the project
-    await check_project_access(project_id, db, current_user)
+    await get_project_or_403(project_id, db, current_user)
     
     # Ensure the key in the path matches the one in the request body
     if key != metadata.key:
@@ -99,7 +99,7 @@ async def delete_project_metadata(
     current_user: schemas.User = Depends(get_current_user),
 ):
     # Check if the user has access to the project
-    await check_project_access(project_id, db, current_user)
+    await get_project_or_403(project_id, db, current_user)
     
     # Delete the metadata
     success = await crud.delete_project_metadata_by_key(db=db, project_id=project_id, key=key)
@@ -122,7 +122,7 @@ async def get_project_metadata_as_dict(
     This is a convenience endpoint for clients that want to work with metadata as a simple key-value dictionary.
     """
     # Check if the user has access to the project
-    await check_project_access(project_id, db, current_user)
+    await get_project_or_403(project_id, db, current_user)
     
     # Get all metadata for the project
     metadata_list = await crud.get_all_project_metadata(db=db, project_id=project_id)
@@ -144,7 +144,7 @@ async def update_project_metadata_dict(
     This is a convenience endpoint for clients that want to work with metadata as a simple key-value dictionary.
     """
     # Check if the user has access to the project
-    await check_project_access(project_id, db, current_user)
+    await get_project_or_403(project_id, db, current_user)
     
     # Create or update each metadata entry
     for key, value in metadata_dict.items():

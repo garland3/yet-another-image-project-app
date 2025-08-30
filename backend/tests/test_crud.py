@@ -1,8 +1,8 @@
 import pytest
 from sqlalchemy.ext.asyncio import AsyncSession
-import crud
-import schemas
-from models import User
+import utils.crud as crud
+from core import schemas
+from core.models import User
 
 @pytest.mark.asyncio
 async def test_create_and_get_user(db_session: AsyncSession):

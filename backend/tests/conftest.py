@@ -18,8 +18,8 @@ os.environ["SKIP_HEADER_CHECK"] = "true"
 os.environ["DEBUG"] = "true"
 
 from main import app
-from database import Base, get_db
-from schemas import User
+from core.database import Base, get_db
+from core.schemas import User
 
 # Test database setup
 SQLALCHEMY_DATABASE_URL = "sqlite+aiosqlite:///:memory:"
@@ -57,9 +57,10 @@ def client():
     loop = asyncio.get_event_loop()
     loop.run_until_complete(setup_db())
     # Patch S3 helpers to avoid external calls during tests
+    # Important: Patch where they are used (routers.images.*), not the module defining them
     from unittest.mock import patch
-    with patch('boto3_client.upload_file_to_minio', return_value=True), \
-         patch('boto3_client.get_presigned_download_url', return_value='http://example/presigned'):
+    with patch('routers.images.upload_file_to_minio', return_value=True), \
+         patch('routers.images.get_presigned_download_url', return_value='http://example/presigned'):
         with TestClient(app) as c:
             yield c
     loop.run_until_complete(teardown_db())

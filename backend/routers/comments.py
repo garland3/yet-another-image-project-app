@@ -2,11 +2,11 @@ import uuid
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 from typing import List
-import crud, schemas, models
-from database import get_db
-from dependencies import get_current_user, get_user_context, UserContext
-from config import settings
-from routers.image_classes import check_image_access
+import utils.crud as crud
+from core import schemas, models
+from core.database import get_db
+from core.config import settings
+from utils.dependencies import get_current_user, get_user_context, UserContext, get_image_or_403
 
 router = APIRouter(
     prefix="/api",
@@ -25,7 +25,7 @@ async def create_comment(
     print(f"Current user: {user_context.user}")
     
     # Check if the user has access to the image
-    await check_image_access(image_id, db, user_context.user)
+    await get_image_or_403(image_id, db, user_context.user)
     
     # Set up the comment create object - automatic user ID resolution handled by get_user_context
     comment_create = schemas.ImageCommentCreate(
@@ -46,7 +46,7 @@ async def list_comments(
     current_user: schemas.User = Depends(get_current_user),
 ):
     # Check if the user has access to the image
-    await check_image_access(image_id, db, current_user)
+    await get_image_or_403(image_id, db, current_user)
     
     # Get all comments for the image
     return await crud.get_comments_for_image(db=db, image_id=image_id)
@@ -63,7 +63,7 @@ async def get_comment(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Comment not found")
     
     # Check if the user has access to the image
-    await check_image_access(db_comment.image_id, db, current_user)
+    await get_image_or_403(db_comment.image_id, db, current_user)
     
     return db_comment
 
@@ -80,7 +80,7 @@ async def update_comment(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Comment not found")
     
     # Check if the user has access to the image
-    await check_image_access(db_comment.image_id, db, current_user)
+    await get_image_or_403(db_comment.image_id, db, current_user)
     
     # Only allow the author of the comment to update it (admin check removed since groups field is gone)
     if current_user.id and str(db_comment.author_id) != str(current_user.id):
@@ -111,7 +111,7 @@ async def delete_comment(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Comment not found")
     
     # Check if the user has access to the image
-    await check_image_access(db_comment.image_id, db, user_context.user)
+    await get_image_or_403(db_comment.image_id, db, user_context.user)
     
     # Only allow the author of the comment to delete it (admin check removed since groups field is gone)
     if user_context.id and str(db_comment.author_id) != str(user_context.id):

@@ -2,10 +2,12 @@ import uuid
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 from typing import List
-import crud, schemas, models
-from database import get_db
-from dependencies import get_current_user, requires_group_membership, is_user_in_group, get_user_context, UserContext
-from config import settings
+import utils.crud as crud
+from core import schemas, models
+from core.database import get_db
+from core.config import settings
+from core.group_auth_helper import is_user_in_group
+from utils.dependencies import get_current_user
 from aiocache import cached, Cache
 from aiocache.serializers import JsonSerializer
 
@@ -25,7 +27,7 @@ async def create_new_project(
     This uses the new approach of checking if the user is a member of the project's group.
     """
     # Check if the user is a member of the project's group
-    is_member = is_user_in_group(current_user, project.meta_group_id)
+    is_member = is_user_in_group(current_user.email, project.meta_group_id)
     
     if not is_member:
         raise HTTPException(
@@ -62,7 +64,7 @@ async def read_projects(
     This uses the new approach of iterating through projects and checking if the user
     is a member of each project's group.
     """
-    from dependencies import get_accessible_projects_for_user
+    from utils.dependencies import get_accessible_projects_for_user
     
     # Get all projects the user has access to
     projects = await get_accessible_projects_for_user(
@@ -89,7 +91,7 @@ async def read_project(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Project not found")
     
     # Check if the user is a member of the project's group
-    is_member = is_user_in_group(current_user, db_project.meta_group_id)
+    is_member = is_user_in_group(current_user.email, db_project.meta_group_id)
     
     if not is_member:
         raise HTTPException(

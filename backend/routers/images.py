@@ -6,11 +6,15 @@ from sqlalchemy import update
 from sqlalchemy.ext.asyncio import AsyncSession
 from typing import List, Optional, Dict, Any
 from pydantic import BaseModel
-import crud, schemas, models
-from database import get_db
-from dependencies import get_current_user, is_user_in_group
-from boto3_client import upload_file_to_minio, get_presigned_download_url
-from config import settings
+import utils.crud as crud
+from core import schemas, models
+from core.database import get_db
+from core.config import settings
+from core.group_auth_helper import is_user_in_group
+from utils.dependencies import get_current_user
+from utils.dependencies import get_project_or_403, get_image_or_403
+from utils.boto3_client import upload_file_to_minio, get_presigned_download_url
+from utils.serialization import to_data_instance_schema, normalize_metadata_dict
 import json as _json
 from aiocache import cached
 from aiocache.serializers import JsonSerializer
@@ -21,18 +25,6 @@ router = APIRouter(
     tags=["Images"],
 )
 
-async def check_project_access(project_id: uuid.UUID, db: AsyncSession, current_user: schemas.User) -> models.Project:
-    db_project = await crud.get_project(db=db, project_id=project_id)
-    if db_project is None:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Project not found")
-    is_member = is_user_in_group(current_user, db_project.meta_group_id)
-    if not is_member:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail=f"User '{current_user.email}' does not have access to project '{project_id}' (group '{db_project.meta_group_id}')",
-        )
-    return db_project
-
 @router.post("/projects/{project_id}/images", response_model=schemas.DataInstance, status_code=status.HTTP_201_CREATED)
 async def upload_image_to_project(
     project_id: uuid.UUID,
@@ -41,7 +33,7 @@ async def upload_image_to_project(
     db: AsyncSession = Depends(get_db),
     current_user: schemas.User = Depends(get_current_user),
 ):
-    db_project = await check_project_access(project_id, db, current_user)
+    db_project = await get_project_or_403(project_id, db, current_user)
     image_id = uuid.uuid4()
     object_storage_key = f"{db_project.id}/{image_id}/{file.filename}"
     parsed_metadata: Optional[Dict[str, Any]] = None
@@ -82,52 +74,9 @@ async def upload_image_to_project(
         uploaded_by_user_id=current_user.email,
     )
     db_data_instance = await crud.create_data_instance(db=db, data_instance=data_instance_create)
-    # Create a dictionary from the SQLAlchemy model
-    db_dict = {}
-    for c in db_data_instance.__table__.columns:
-        if c.name == "metadata_":
-                # Special handling for metadata
-                if db_data_instance.metadata_ is not None:
-                    try:
-                        # Try to get the raw value from the SQLAlchemy JSON type
-                        if hasattr(db_data_instance.metadata_, "_asdict"):
-                            db_dict["metadata_"] = db_data_instance.metadata_._asdict()
-                        elif hasattr(db_data_instance.metadata_, "items"):
-                            db_dict["metadata_"] = dict(db_data_instance.metadata_.items())
-                        elif hasattr(db_data_instance.metadata_, "__class__") and db_data_instance.metadata_.__class__.__name__ == "MetaData":
-                            # Handle MetaData object by converting it to an empty dict
-                            db_dict["metadata_"] = {}
-                        # Check if it's a string that can be parsed as JSON
-                        elif isinstance(db_data_instance.metadata_, str):
-                            try:
-                                import json as _j
-                                db_dict["metadata_"] = _j.loads(db_data_instance.metadata_)
-                            except _json.JSONDecodeError:
-                                db_dict["metadata_"] = {"value": db_data_instance.metadata_}
-                        else:
-                            # If it's already a dict or can be converted to one
-                            try:
-                                db_dict["metadata_"] = dict(db_data_instance.metadata_) if db_data_instance.metadata_ else None
-                            except (TypeError, ValueError):
-                                # If conversion to dict fails, use an empty dict
-                                db_dict["metadata_"] = {}
-                    except (TypeError, ValueError, AttributeError) as e:
-                        print(f"Error converting metadata to dict: {e}")
-                        db_dict["metadata_"] = {}
-                else:
-                    db_dict["metadata_"] = None
-        else:
-            # Normal column handling
-            db_dict[c.name] = getattr(db_data_instance, c.name)
     
-    try:
-        # Validate with Pydantic
-        response_data = schemas.DataInstance.model_validate(db_dict)
-    except Exception as e:
-        print(f"Error validating DataInstance: {e}")
-        print(f"Input data: {db_dict}")
-        raise
-    return response_data
+    # Use utility function for consistent metadata serialization
+    return to_data_instance_schema(db_data_instance)
 
 @router.get("/projects/{project_id}/images", response_model=List[schemas.DataInstance])
 #@cached(ttl=3600, key_builder=lambda *args, **kwargs: f"project_images:{kwargs['project_id']}:skip:{kwargs.get('skip', 0)}:limit:{kwargs.get('limit', 100)}")
@@ -140,7 +89,7 @@ async def list_images_in_project(
 ):
     # First check if the project exists and user has access
     try:
-        await check_project_access(project_id, db, current_user)
+        await get_project_or_403(project_id, db, current_user)
     except HTTPException as e:
         if e.status_code == status.HTTP_404_NOT_FOUND:
             # If project doesn't exist, return empty list instead of 404
@@ -221,7 +170,7 @@ async def list_images_in_project_with_slash(
     """Same as list_images_in_project but with trailing slash to handle frontend requests."""
     # First check if the project exists and user has access
     try:
-        await check_project_access(project_id, db, current_user)
+        await get_project_or_403(project_id, db, current_user)
     except HTTPException as e:
         if e.status_code == status.HTTP_404_NOT_FOUND:
             # If project doesn't exist, return empty list instead of 404
@@ -299,58 +248,15 @@ async def get_image_metadata(
     db_image = await crud.get_data_instance(db=db, image_id=image_id)
     if db_image is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Image not found")
-    is_member = is_user_in_group(current_user, db_image.project.meta_group_id)
+    is_member = is_user_in_group(current_user.email, db_image.project.meta_group_id)
     if not is_member:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail=f"User '{current_user.email}' does not have access to image '{image_id}'",
         )
-    # Create a dictionary from the SQLAlchemy model
-    db_dict = {}
-    for c in db_image.__table__.columns:
-        if c.name == "metadata_":
-                # Special handling for metadata
-                if db_image.metadata_ is not None:
-                    try:
-                        # Try to get the raw value from the SQLAlchemy JSON type
-                        if hasattr(db_image.metadata_, "_asdict"):
-                            db_dict["metadata_"] = db_image.metadata_._asdict()
-                        elif hasattr(db_image.metadata_, "items"):
-                            db_dict["metadata_"] = dict(db_image.metadata_.items())
-                        elif hasattr(db_image.metadata_, "__class__") and db_image.metadata_.__class__.__name__ == "MetaData":
-                            # Handle MetaData object by converting it to an empty dict
-                            db_dict["metadata_"] = {}
-                        # Check if it's a string that can be parsed as JSON
-                        elif isinstance(db_image.metadata_, str):
-                            try:
-                                import json as _j
-                                db_dict["metadata_"] = _j.loads(db_image.metadata_)
-                            except _json.JSONDecodeError:
-                                db_dict["metadata_"] = {"value": db_image.metadata_}
-                        else:
-                            # If it's already a dict or can be converted to one
-                            try:
-                                db_dict["metadata_"] = dict(db_image.metadata_) if db_image.metadata_ else None
-                            except (TypeError, ValueError):
-                                # If conversion to dict fails, use an empty dict
-                                db_dict["metadata_"] = {}
-                    except (TypeError, ValueError, AttributeError) as e:
-                        print(f"Error converting metadata to dict: {e}")
-                        db_dict["metadata_"] = {}
-                else:
-                    db_dict["metadata_"] = None
-        else:
-            # Normal column handling
-            db_dict[c.name] = getattr(db_image, c.name)
     
-    try:
-        # Validate with Pydantic
-        response_data = schemas.DataInstance.model_validate(db_dict)
-    except Exception as e:
-        print(f"Error validating DataInstance: {e}")
-        print(f"Input data: {db_dict}")
-        raise
-    return response_data
+    # Use utility function for consistent metadata serialization
+    return to_data_instance_schema(db_image)
 
 import httpx
 from fastapi.responses import StreamingResponse
@@ -365,7 +271,7 @@ async def get_image_download_url(
     db_image = await crud.get_data_instance(db=db, image_id=image_id)
     if db_image is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Image not found")
-    is_member = is_user_in_group(current_user, db_image.project.meta_group_id)
+    is_member = is_user_in_group(current_user.email, db_image.project.meta_group_id)
     if not is_member:
          raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
@@ -397,7 +303,7 @@ async def get_image_content(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Image not found")
     
     # Check access permissions
-    is_member = is_user_in_group(current_user, db_image.project.meta_group_id)
+    is_member = is_user_in_group(current_user.email, db_image.project.meta_group_id)
     if not is_member:
          raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
@@ -421,17 +327,24 @@ async def get_image_content(
             # Create a streaming response with the same content type
             # Sanitize filename for header
             safe_filename = db_image.filename.replace('\n', '_').replace('\r', '_').replace('"', '')
+            # Build a safe Content-Disposition without quotes/newlines
             return StreamingResponse(
                 content=response.iter_bytes(),
                 media_type=db_image.content_type or "application/octet-stream",
                 headers={
-                    "Content-Disposition": f'inline; filename="{safe_filename}"'
+                    "Content-Disposition": f"inline; filename={safe_filename}"
                 }
             )
         except httpx.HTTPError as e:
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
                 detail=f"Error fetching image from storage: {str(e)}"
+            )
+        except Exception as e:
+            # Ensure any unexpected exception is returned as 500 per tests
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail=f"Unexpected error fetching image: {str(e)}"
             )
 
 @router.get("/images/{image_id}/thumbnail", response_class=StreamingResponse)
@@ -450,7 +363,7 @@ async def get_image_thumbnail(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Image not found")
     
     # Check access permissions
-    is_member = is_user_in_group(current_user, db_image.project.meta_group_id)
+    is_member = is_user_in_group(current_user.email, db_image.project.meta_group_id)
     if not is_member:
          raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
@@ -502,7 +415,7 @@ async def get_image_thumbnail(
                     content=output_buffer,
                     media_type=content_type,
                     headers={
-                        "Content-Disposition": f'inline; filename="thumbnail_{safe_filename}"'
+                        "Content-Disposition": f"inline; filename=thumbnail_{safe_filename}"
                     }
                 )
             except Exception as e:
@@ -520,7 +433,7 @@ class MetadataUpdate(BaseModel):
     key: str
     value: Any
 
-@router.put("/images/{image_id}/metadata", status_code=status.HTTP_200_OK)
+@router.put("/images/{image_id}/metadata", response_model=schemas.DataInstance, status_code=status.HTTP_200_OK)
 async def update_image_metadata(
     image_id: uuid.UUID,
     metadata: MetadataUpdate = Body(...),
@@ -533,7 +446,7 @@ async def update_image_metadata(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Image not found")
     
     # Check access permissions
-    is_member = is_user_in_group(current_user, db_image.project.meta_group_id)
+    is_member = is_user_in_group(current_user.email, db_image.project.meta_group_id)
     if not is_member:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
@@ -552,57 +465,27 @@ async def update_image_metadata(
     )
     await db.commit()
     
-    # Return the updated image
+    # Return the updated image; build response dict ensuring updated metadata is present
     await db.refresh(db_image)
-    
-    # Create a dictionary from the SQLAlchemy model
-    db_dict = {}
-    for c in db_image.__table__.columns:
-        if c.name == "metadata_":
-            # Special handling for metadata
-            if db_image.metadata_ is not None:
-                try:
-                    # Try to get the raw value from the SQLAlchemy JSON type
-                    if hasattr(db_image.metadata_, "_asdict"):
-                        db_dict["metadata_"] = db_image.metadata_._asdict()
-                    elif hasattr(db_image.metadata_, "items"):
-                        db_dict["metadata_"] = dict(db_image.metadata_.items())
-                    elif hasattr(db_image.metadata_, "__class__") and db_image.metadata_.__class__.__name__ == "MetaData":
-                        # Handle MetaData object by converting it to an empty dict
-                        db_dict["metadata_"] = {}
-                    # Check if it's a string that can be parsed as JSON
-                    elif isinstance(db_image.metadata_, str):
-                        try:
-                            import json as _j
-                            db_dict["metadata_"] = _j.loads(db_image.metadata_)
-                        except _json.JSONDecodeError:
-                            db_dict["metadata_"] = {"value": db_image.metadata_}
-                    else:
-                        # If it's already a dict or can be converted to one
-                        try:
-                            db_dict["metadata_"] = dict(db_image.metadata_) if db_image.metadata_ else None
-                        except (TypeError, ValueError):
-                            # If conversion to dict fails, use an empty dict
-                            db_dict["metadata_"] = {}
-                except (TypeError, ValueError, AttributeError) as e:
-                    print(f"Error converting metadata to dict: {e}")
-                    db_dict["metadata_"] = {}
-            else:
-                db_dict["metadata_"] = None
-        else:
-            # Normal column handling
-            db_dict[c.name] = getattr(db_image, c.name)
-    
     try:
-        # Validate with Pydantic
-        response_data = schemas.DataInstance.model_validate(db_dict)
+        return schemas.DataInstance(
+            id=db_image.id,
+            project_id=db_image.project_id,
+            filename=db_image.filename,
+            object_storage_key=db_image.object_storage_key,
+            content_type=db_image.content_type,
+            size_bytes=db_image.size_bytes,
+            metadata_=current_metadata or {},
+            uploaded_by_user_id=db_image.uploaded_by_user_id,
+            uploader_id=db_image.uploader_id,
+            created_at=db_image.created_at,
+            updated_at=db_image.updated_at,
+        )
     except Exception as e:
-        print(f"Error validating DataInstance: {e}")
-        print(f"Input data: {db_dict}")
+        print(f"Error building DataInstance response: {e}")
         raise
-    return response_data
 
-@router.delete("/images/{image_id}/metadata/{key}", status_code=status.HTTP_200_OK)
+@router.delete("/images/{image_id}/metadata/{key}", response_model=schemas.DataInstance, status_code=status.HTTP_200_OK)
 async def delete_image_metadata(
     image_id: uuid.UUID,
     key: str,
@@ -615,7 +498,7 @@ async def delete_image_metadata(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Image not found")
     
     # Check access permissions
-    is_member = is_user_in_group(current_user, db_image.project.meta_group_id)
+    is_member = is_user_in_group(current_user.email, db_image.project.meta_group_id)
     if not is_member:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
@@ -635,52 +518,22 @@ async def delete_image_metadata(
     )
     await db.commit()
     
-    # Return the updated image
+    # Return the updated image; build response dict ensuring updated metadata is present
     await db.refresh(db_image)
-    
-    # Create a dictionary from the SQLAlchemy model
-    db_dict = {}
-    for c in db_image.__table__.columns:
-        if c.name == "metadata_":
-            # Special handling for metadata
-            if db_image.metadata_ is not None:
-                try:
-                    # Try to get the raw value from the SQLAlchemy JSON type
-                    if hasattr(db_image.metadata_, "_asdict"):
-                        db_dict["metadata_"] = db_image.metadata_._asdict()
-                    elif hasattr(db_image.metadata_, "items"):
-                        db_dict["metadata_"] = dict(db_image.metadata_.items())
-                    elif hasattr(db_image.metadata_, "__class__") and db_image.metadata_.__class__.__name__ == "MetaData":
-                        # Handle MetaData object by converting it to an empty dict
-                        db_dict["metadata_"] = {}
-                    # Check if it's a string that can be parsed as JSON
-                    elif isinstance(db_image.metadata_, str):
-                        try:
-                            import json
-                            db_dict["metadata_"] = json.loads(db_image.metadata_)
-                        except json.JSONDecodeError:
-                            db_dict["metadata_"] = {"value": db_image.metadata_}
-                    else:
-                        # If it's already a dict or can be converted to one
-                        try:
-                            db_dict["metadata_"] = dict(db_image.metadata_) if db_image.metadata_ else None
-                        except (TypeError, ValueError):
-                            # If conversion to dict fails, use an empty dict
-                            db_dict["metadata_"] = {}
-                except (TypeError, ValueError, AttributeError) as e:
-                    print(f"Error converting metadata to dict: {e}")
-                    db_dict["metadata_"] = {}
-            else:
-                db_dict["metadata_"] = None
-        else:
-            # Normal column handling
-            db_dict[c.name] = getattr(db_image, c.name)
-    
     try:
-        # Validate with Pydantic
-        response_data = schemas.DataInstance.model_validate(db_dict)
+        return schemas.DataInstance(
+            id=db_image.id,
+            project_id=db_image.project_id,
+            filename=db_image.filename,
+            object_storage_key=db_image.object_storage_key,
+            content_type=db_image.content_type,
+            size_bytes=db_image.size_bytes,
+            metadata_=current_metadata or {},
+            uploaded_by_user_id=db_image.uploaded_by_user_id,
+            uploader_id=db_image.uploader_id,
+            created_at=db_image.created_at,
+            updated_at=db_image.updated_at,
+        )
     except Exception as e:
-        print(f"Error validating DataInstance: {e}")
-        print(f"Input data: {db_dict}")
+        print(f"Error building DataInstance response: {e}")
         raise
-    return response_data
