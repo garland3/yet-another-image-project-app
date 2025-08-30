@@ -2,10 +2,10 @@ import uuid
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 from typing import List
-from app import crud, schemas, models
-from app.database import get_db
-from app.dependencies import get_current_user, requires_group_membership, is_user_in_group, get_user_context, UserContext
-from app.config import settings
+import crud, schemas, models
+from database import get_db
+from dependencies import get_current_user, requires_group_membership, is_user_in_group, get_user_context, UserContext
+from config import settings
 from aiocache import cached, Cache
 from aiocache.serializers import JsonSerializer
 
@@ -62,7 +62,7 @@ async def read_projects(
     This uses the new approach of iterating through projects and checking if the user
     is a member of each project's group.
     """
-    from app.dependencies import get_accessible_projects_for_user
+    from dependencies import get_accessible_projects_for_user
     
     # Get all projects the user has access to
     projects = await get_accessible_projects_for_user(

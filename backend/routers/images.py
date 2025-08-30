@@ -5,11 +5,11 @@ from sqlalchemy import update
 from sqlalchemy.ext.asyncio import AsyncSession
 from typing import List, Optional, Dict, Any
 from pydantic import BaseModel
-from app import crud, schemas, models
-from app.database import get_db
-from app.dependencies import get_current_user, is_user_in_group
-from app.boto3_client import upload_file_to_minio, get_presigned_download_url
-from app.config import settings
+import crud, schemas, models
+from database import get_db
+from dependencies import get_current_user, is_user_in_group
+from boto3_client import upload_file_to_minio, get_presigned_download_url
+from config import settings
 import json
 from aiocache import cached
 from aiocache.serializers import JsonSerializer

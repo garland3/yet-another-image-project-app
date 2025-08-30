@@ -2,7 +2,7 @@ import uuid
 from sqlalchemy import select, update, delete, and_
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
-from app import models, schemas
+import models, schemas
 from typing import List, Optional, Dict, Any, Union
 import logging
 

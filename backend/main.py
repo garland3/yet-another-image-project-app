@@ -14,11 +14,11 @@ from contextlib import asynccontextmanager
 from pydantic import ValidationError
 import traceback
 import json
-from app.config import settings
-from app.database import create_db_and_tables
-from app.boto3_client import boto3_client, ensure_bucket_exists
-from app.migrations import run_migrations
-from app.routers import projects, images, users, image_classes, comments, project_metadata, api_keys
+from config import settings
+from database import create_db_and_tables
+from boto3_client import boto3_client, ensure_bucket_exists
+from migrations import run_migrations
+from routers import projects, images, users, image_classes, comments, project_metadata, api_keys
 
 
 @asynccontextmanager

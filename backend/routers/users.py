@@ -2,11 +2,11 @@ import uuid
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 from typing import List
-from app import crud, schemas
-from app.database import get_db
-from app.dependencies import get_current_user, get_user_accessible_groups, is_user_in_group
-from app.config import settings
-from app.config import settings
+import crud, schemas
+from database import get_db
+from dependencies import get_current_user, get_user_accessible_groups, is_user_in_group
+from config import settings
+from config import settings
 
 router = APIRouter(
     prefix="/api/users",

@@ -2,11 +2,11 @@ import uuid
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 from typing import List, Dict, Any
-from app import crud, schemas, models
-from app.database import get_db
-from app.dependencies import get_current_user
-from app.config import settings
-from app.routers.images import check_project_access
+import crud, schemas, models
+from database import get_db
+from dependencies import get_current_user
+from config import settings
+from routers.images import check_project_access
 
 router = APIRouter(
     # prefix /api

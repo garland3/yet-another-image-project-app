@@ -1,7 +1,7 @@
 import os
 import boto3
 from botocore.exceptions import ClientError
-from app.config import settings
+from config import settings
 from datetime import timedelta
 import io
 

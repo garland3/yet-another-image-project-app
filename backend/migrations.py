@@ -1,11 +1,11 @@
 import asyncio
 import uuid
 from sqlalchemy import text
-from app.database import engine, AsyncSessionLocal
-from app.models import Base
-from app.config import settings
-from app.crud import get_user_by_email, create_user
-from app.schemas import UserCreate
+from database import engine, AsyncSessionLocal
+from models import Base
+from config import settings
+from crud import get_user_by_email, create_user
+from schemas import UserCreate
 
 async def run_migrations():
     """

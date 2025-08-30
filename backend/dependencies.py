@@ -5,10 +5,10 @@ from sqlalchemy.ext.asyncio import AsyncSession
 import uuid
 import hashlib
 import secrets
-from app.config import settings
-from app.schemas import User, UserCreate
-from app.database import get_db
-from app import crud, models
+from config import settings
+from schemas import User, UserCreate
+from database import get_db
+import crud, models
 
 security = HTTPBearer(auto_error=False)
 

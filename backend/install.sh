@@ -34,6 +34,12 @@ install_backend_dependencies() {
     say "Activating Python virtual environment"
     source .venv/bin/activate
     
+    # Copy .env file from parent directory if it exists and backend doesn't have one
+    if [[ -f ../.env && ! -f .env ]]; then
+        say "Copying .env file from parent directory"
+        cp ../.env .
+    fi
+    
     # Install Python dependencies
     if [[ -f ../requirements.txt ]]; then
         say "Installing Python dependencies"
