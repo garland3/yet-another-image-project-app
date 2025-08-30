@@ -1,21 +1,21 @@
-# Use Fedora as the base image
-# use multi-stage build to enable the dev environment to only use the base image
+# Use Fedora latest as the base image
+# Multi-stage build for optimized production image
 FROM fedora:latest AS base
 
-# Install system dependencies and tools for development
+# Install system dependencies and development tools in a single layer
 RUN dnf update -y && dnf install -y \
     gcc \
     gcc-c++ \
     postgresql-devel \
     git \
     curl \
-    vim \
     wget \
     ca-certificates \
-    gnupg \
     python3.11 \
     python3.11-devel \
     python3-pip \
+    nodejs \
+    npm \
     && dnf clean all
 
 # Create symbolic links for python and pip
@@ -26,21 +26,14 @@ RUN ln -sf /usr/bin/python3.11 /usr/bin/python && \
 RUN python -m venv /opt/venv
 ENV PATH="/opt/venv/bin:$PATH"
 
-# Install uv package installer
-RUN pip install --no-cache-dir uv
-
-# Install Node.js (includes npm) using Fedora packages
-RUN dnf install -y nodejs npm && dnf clean all
-
-# Install debugging tools
-RUN pip install --no-cache-dir debugpy
+# Install uv package installer and debugging tools
+RUN pip install --no-cache-dir --upgrade pip uv debugpy
 
 WORKDIR /app
 
+# Set Python environment variables
 ENV PYTHONDONTWRITEBYTECODE=1
 ENV PYTHONUNBUFFERED=1
-
-RUN dnf install -y gcc gcc-c++ postgresql-devel && dnf clean all
 
 FROM base AS builder
 
@@ -50,19 +43,17 @@ RUN pip install --no-cache-dir --upgrade pip && \
     uv pip install --no-cache-dir -r requirements.txt
 
 # Copy backend code
-COPY ./app /app/app
+COPY ./backend /app/backend
 # COPY .env /app/.env
 
 # Copy frontend files selectively (excluding node_modules)
 WORKDIR /app
-# Copy package.json and package-lock.json
+# Copy package.json and package-lock.json first for better caching
 COPY ./frontend/package.json ./frontend/package-lock.json ./frontend/
-# Copy public directory
+# Copy frontend source and config files
 COPY ./frontend/public ./frontend/public
-# Copy src directory
 COPY ./frontend/src ./frontend/src
-# Copy config files
-COPY ./frontend/.gitignore ./frontend/config-overrides.js ./frontend/README.md ./frontend/
+COPY ./frontend/config-overrides.js ./frontend/.env.local ./frontend/
 
 # Install frontend dependencies and build
 WORKDIR /app/frontend
@@ -81,20 +72,15 @@ COPY --from=builder /opt/venv /opt/venv
 ENV PATH="/opt/venv/bin:$PATH"
 
 # Copy backend code
-COPY --from=builder /app/app /app/app
+COPY --from=builder /app/backend /app/backend
 # Copy frontend build files
 COPY --from=builder /app/frontend/build /app/ui2
 
-
-# RUN cp -R /app/frontend/build/* /app/ui2
-# SEt the env var FRONTEND_BUILD_PATH
+# Set frontend build path environment variable
 ENV FRONTEND_BUILD_PATH=/app/ui2
-
 
 WORKDIR /app
 EXPOSE 8000
 
-# Use uv to run uvicorn
-CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]
-# For production, use:
-# CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
+# Use uvicorn to run the FastAPI app (remove --reload for production)
+CMD ["uvicorn", "backend.main:app", "--host", "0.0.0.0", "--port", "8000"]

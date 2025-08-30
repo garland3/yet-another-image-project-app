@@ -11,7 +11,11 @@
   },
   "scripts": {
     "start": "react-scripts start",
+    "dev": "FAST_REFRESH=true SKIP_PREFLIGHT_CHECK=true react-scripts start",
+    "dev:fast": "FAST_REFRESH=true SKIP_PREFLIGHT_CHECK=true GENERATE_SOURCEMAP=false react-scripts start",
     "build": "react-scripts build",
+    "build:analyze": "npm run build && npx webpack-bundle-analyzer build/static/js/*.js",
+    "build:profile": "react-scripts --profile build",
     "test": "react-scripts test",
     "eject": "react-scripts eject"
   },

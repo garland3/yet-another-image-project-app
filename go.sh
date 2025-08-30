@@ -1,1 +1,0 @@
-claude "look at instructions.md and implement" --dangerously-skip-permissions 

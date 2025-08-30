@@ -127,11 +127,16 @@ celerybeat.pid
 # Environments
 .env
 .venv
+backend/.venv/
 env/
 venv/
 ENV/
 env.bak/
 venv.bak/
+
+# Frontend build cache
+frontend/.webpack-cache/
+frontend/.webpack-cache-prod/
 
 # Spyder project settings
 .spyderproject
