@@ -36,15 +36,19 @@ def to_data_instance_schema(db_image: models.DataInstance) -> schemas.DataInstan
             metadata_dict = {k: v for k, v in db_image.metadata_.__dict__.items() 
                            if not k.startswith('_')}
     
+    # Build schema matching core.schemas.DataInstance fields
     return schemas.DataInstance(
         id=db_image.id,
-        filename=db_image.filename,
-        file_path=db_image.file_path,
         project_id=db_image.project_id,
-        metadata_=metadata_dict,
-        thumbnail_path=db_image.thumbnail_path,
+        filename=db_image.filename,
+        object_storage_key=db_image.object_storage_key,
+        content_type=getattr(db_image, "content_type", None),
+        size_bytes=getattr(db_image, "size_bytes", None),
+        metadata_=metadata_dict or {},
+        uploaded_by_user_id=getattr(db_image, "uploaded_by_user_id", None),
+        uploader_id=getattr(db_image, "uploader_id", None),
         created_at=db_image.created_at,
-        updated_at=db_image.updated_at
+        updated_at=db_image.updated_at,
     )
 
 

@@ -126,6 +126,14 @@ async def get_data_instance(db: AsyncSession, image_id: uuid.UUID) -> Optional[m
         )
     return result.scalars().first()
 
+# Backwards-compatible alias used by dependencies/get_image_or_403
+async def get_image(db: AsyncSession, image_id: uuid.UUID) -> Optional[models.DataInstance]:
+    """
+    Retrieve a DataInstance by id. Maintains compatibility with older call sites
+    that referenced `crud.get_image`.
+    """
+    return await get_data_instance(db, image_id)
+
 async def get_data_instances_for_project(db: AsyncSession, project_id: uuid.UUID, skip: int = 0, limit: int = 100) -> List[models.DataInstance]:
     # First check if the project exists
     project = await get_project(db, project_id)

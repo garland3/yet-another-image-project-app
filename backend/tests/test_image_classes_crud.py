@@ -1,6 +1,7 @@
 import pytest
 import uuid
-import utils.crud as crud, schemas
+import utils.crud as crud
+from core import schemas
 
 
 @pytest.mark.asyncio

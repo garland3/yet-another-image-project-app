@@ -181,7 +181,8 @@ start_backend() {
     uvicorn main:app --host 0.0.0.0 --port 8000
 }
 
-pkill -f 'uvicorn main:app' 
+# Stop any existing uvicorn instance if running (ignore if none)
+pkill -f 'uvicorn main:app' || echo "[backend-run] No existing uvicorn process to stop"
 sleep 3
 # Run the backend
 start_backend

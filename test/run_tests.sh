@@ -24,6 +24,8 @@ echo "🐍 Python version: $(python3 --version 2>/dev/null || echo 'Python not f
 if [ -f "backend/.venv/bin/activate" ]; then
     echo "🔧 Activating virtual environment..."
     source backend/.venv/bin/activate
+    echo "📦 Installing pytest-xdist..."
+    pip install pytest-xdist
     PYTEST_PATH=$(which pytest)
 else
     # Check if pytest is available in system PATH
@@ -52,7 +54,7 @@ echo "----------------------------"
 
 # Run the full test suite with the same options that were successful
 # Specifically target the tests directory to avoid picking up other test files
-"$PYTEST_PATH" -q tests/
+"$PYTEST_PATH" -n auto -q tests/
 
 # Capture the exit code
 TEST_EXIT_CODE=$?

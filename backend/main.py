@@ -87,21 +87,24 @@ logger = setup_logging()
 async def lifespan(app: FastAPI):
     """Application lifespan manager."""
     logger.info("Application startup...")
-    logger.info("Creating database tables if they don't exist...")
-    await create_db_and_tables()
-    logger.info("Database tables checked/created.")
-    
-    # Run migrations to set up new tables and migrate existing data
-    await run_migrations()
-    logger.info(f"Checking/Creating S3 bucket: {settings.S3_BUCKET}")
-    if boto3_client:
-         bucket_exists = ensure_bucket_exists(boto3_client, settings.S3_BUCKET)
-         if not bucket_exists:
-             logger.error(f"FATAL: Could not ensure S3 bucket '{settings.S3_BUCKET}' exists. Uploads/Downloads will fail.")
-         else:
-            logger.info(f"S3 bucket '{settings.S3_BUCKET}' is ready.")
+    if settings.FAST_TEST_MODE:
+        logger.info("FAST_TEST_MODE enabled: skipping DB create/migrate and S3 bucket checks.")
     else:
-        logger.warning("WARNING: Boto3 S3 client not initialized. Object storage operations will fail.")
+        logger.info("Creating database tables if they don't exist...")
+        await create_db_and_tables()
+        logger.info("Database tables checked/created.")
+        
+        # Run migrations to set up new tables and migrate existing data
+        await run_migrations()
+        logger.info(f"Checking/Creating S3 bucket: {settings.S3_BUCKET}")
+        if boto3_client:
+            bucket_exists = ensure_bucket_exists(boto3_client, settings.S3_BUCKET)
+            if not bucket_exists:
+                logger.error(f"FATAL: Could not ensure S3 bucket '{settings.S3_BUCKET}' exists. Uploads/Downloads will fail.")
+            else:
+                logger.info(f"S3 bucket '{settings.S3_BUCKET}' is ready.")
+        else:
+            logger.warning("WARNING: Boto3 S3 client not initialized. Object storage operations will fail.")
     # Ensure a writable tmp dir exists for any runtime needs
     os.makedirs(os.path.join(os.getcwd(), "tmp"), exist_ok=True)
     logger.info("Application startup complete.")

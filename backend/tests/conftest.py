@@ -10,6 +10,7 @@ import uuid
 
 # Set test environment variables before importing app components
 os.environ["DATABASE_URL"] = "sqlite+aiosqlite:///:memory:"
+os.environ["FAST_TEST_MODE"] = "true"
 os.environ["S3_ENDPOINT"] = "localhost:9000"
 os.environ["S3_ACCESS_KEY"] = "test-key"
 os.environ["S3_SECRET_KEY"] = "test-secret"
@@ -54,7 +55,11 @@ def client():
         async with engine.begin() as conn:
             await conn.run_sync(Base.metadata.drop_all)
 
-    loop = asyncio.get_event_loop()
+    try:
+        loop = asyncio.get_event_loop()
+    except RuntimeError:
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
     loop.run_until_complete(setup_db())
     # Patch S3 helpers to avoid external calls during tests
     # Important: Patch where they are used (routers.images.*), not the module defining them

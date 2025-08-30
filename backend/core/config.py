@@ -6,6 +6,8 @@ import os
 class Settings(BaseSettings):
     APP_NAME: str = "Data Management API"
     DEBUG: bool = False
+    # When enabled, avoid any external calls and heavy startup work (for tests)
+    FAST_TEST_MODE: bool = False
     SKIP_HEADER_CHECK: bool = False
     CHECK_MOCK_MEMBERSHIP: bool = True
     MOCK_USER_EMAIL: str = "test@example.com"
@@ -33,7 +35,7 @@ class Settings(BaseSettings):
     # Frontend build path configuration
     FRONTEND_BUILD_PATH: str = "frontend/build"
 
-    @field_validator('DEBUG', 'SKIP_HEADER_CHECK', 'S3_USE_SSL', mode='before')
+    @field_validator('DEBUG', 'FAST_TEST_MODE', 'SKIP_HEADER_CHECK', 'S3_USE_SSL', mode='before')
     @classmethod
     def parse_bool_with_strip(cls, v):
         if isinstance(v, str):
@@ -73,6 +75,10 @@ if os.getenv("MINIO_USE_SSL") and not os.getenv("S3_USE_SSL"):
 # If running outside Docker and DATABASE_URL points at the docker hostname 'db',
 # rewrite to localhost using HOST_DB_PORT (default 5433) for local dev.
 try:
+    # Auto-enable FAST_TEST_MODE when running under pytest if not explicitly set
+    if not getattr(settings, 'FAST_TEST_MODE', False) and os.getenv('PYTEST_CURRENT_TEST'):
+        settings.FAST_TEST_MODE = True  # type: ignore[attr-defined]
+
     if not _running_in_docker() and "@db:" in settings.DATABASE_URL:
         host_port = os.getenv("HOST_DB_PORT", os.getenv("POSTGRES_PORT_HOST", "5433"))
         # common compose default: container exposed on host 5433 -> container 5432
