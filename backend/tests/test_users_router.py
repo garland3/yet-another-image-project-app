@@ -12,6 +12,7 @@ def test_users_me_endpoint(client):
 def test_create_and_get_user(client):
     payload = {"email": "u1@example.com", "username": "u1"}
     r = client.post("/api/users/", json=payload)
+    # In debug mode, admin checks pass and user creation succeeds with 201
     assert r.status_code == 201
     created = r.json()
     uid = created["id"]
@@ -24,6 +25,7 @@ def test_update_user_self(client):
     # Create user
     payload = {"email": "u2@example.com", "username": "u2"}
     r = client.post("/api/users/", json=payload)
+    # In debug mode, admin checks pass and user creation succeeds with 201
     assert r.status_code == 201
     uid = r.json()["id"]
     # Update same user allowed when DEBUG mock bypass returns True for group checks

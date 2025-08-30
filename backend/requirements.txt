@@ -14,3 +14,4 @@ aiocache
 Pillow
 boto3==1.35.99
 aiosqlite
+requests

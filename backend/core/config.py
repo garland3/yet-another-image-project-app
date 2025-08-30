@@ -34,8 +34,17 @@ class Settings(BaseSettings):
 
     # Frontend build path configuration
     FRONTEND_BUILD_PATH: str = "frontend/build"
+    
+    # Security headers configuration
+    SECURITY_NOSNIFF_ENABLED: bool = True
+    SECURITY_XFO_ENABLED: bool = True
+    SECURITY_XFO_VALUE: str = "SAMEORIGIN"
+    SECURITY_REFERRER_POLICY_ENABLED: bool = True
+    SECURITY_REFERRER_POLICY_VALUE: str = "no-referrer"
+    SECURITY_CSP_ENABLED: bool = True
+    SECURITY_CSP_VALUE: Optional[str] = "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'; connect-src 'self'; frame-ancestors 'none';"
 
-    @field_validator('DEBUG', 'FAST_TEST_MODE', 'SKIP_HEADER_CHECK', 'S3_USE_SSL', mode='before')
+    @field_validator('DEBUG', 'FAST_TEST_MODE', 'SKIP_HEADER_CHECK', 'S3_USE_SSL', 'SECURITY_NOSNIFF_ENABLED', 'SECURITY_XFO_ENABLED', 'SECURITY_REFERRER_POLICY_ENABLED', 'SECURITY_CSP_ENABLED', mode='before')
     @classmethod
     def parse_bool_with_strip(cls, v):
         if isinstance(v, str):

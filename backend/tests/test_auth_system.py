@@ -99,17 +99,18 @@ class TestAuthMiddleware:
     
     @pytest.mark.asyncio
     async def test_production_mode_missing_header(self, mock_request, mock_call_next):
-        """Test auth middleware in production mode with missing header returns 401."""
+        """Test auth middleware in production mode with missing header returns 500 when PROXY_SHARED_SECRET is not set."""
         mock_request.headers = {}
         
         with patch.object(settings, 'DEBUG', False):
             with patch.object(settings, 'SKIP_HEADER_CHECK', False):
-                with patch.object(settings, 'X_USER_ID_HEADER', 'X-User-Id'):
-                    response = await auth_middleware(mock_request, mock_call_next)
+                with patch.object(settings, 'PROXY_SHARED_SECRET', None):
+                    with patch.object(settings, 'X_USER_ID_HEADER', 'X-User-Id'):
+                        response = await auth_middleware(mock_request, mock_call_next)
         
-        # Should return JSONResponse with 401 - check if it has status_code attribute
+        # Should return JSONResponse with 500 when PROXY_SHARED_SECRET is not configured
         assert hasattr(response, 'status_code')
-        assert response.status_code == 401
+        assert response.status_code == 500
         mock_call_next.assert_not_called()
     
     @pytest.mark.asyncio  
@@ -308,16 +309,19 @@ class TestConfigIntegration:
         request = Mock()
         request.headers = {
             "x-user-id": "test@example.com",
-            "x-user-groups": "admin,users,guests"  # This should be ignored
+            "x-user-groups": "admin,users,guests",  # This should be ignored
+            "x-proxy-secret": "test-secret"
         }
         request.state = Mock()
         call_next = AsyncMock(return_value=Mock())
         
         with patch.object(settings, 'DEBUG', False):
             with patch.object(settings, 'SKIP_HEADER_CHECK', False):
-                with patch.object(settings, 'X_USER_ID_HEADER', 'X-User-Id'):
-                    import asyncio
-                    asyncio.run(auth_middleware(request, call_next))
+                with patch.object(settings, 'PROXY_SHARED_SECRET', 'test-secret'):
+                    with patch.object(settings, 'X_USER_ID_HEADER', 'X-User-Id'):
+                        with patch.object(settings, 'X_PROXY_SECRET_HEADER', 'X-Proxy-Secret'):
+                            import asyncio
+                            asyncio.run(auth_middleware(request, call_next))
         
         assert request.state.user_email == "test@example.com"
         # Groups should never be set from headers - always looked up server-side

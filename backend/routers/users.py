@@ -3,33 +3,17 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 from typing import List
 import utils.crud as crud
-from core import schemas, models
+from core import schemas
 from core.database import get_db
-from core.config import settings
 from core.group_auth_helper import is_user_in_group
-from utils.dependencies import get_current_user, get_user_accessible_groups
+from utils.dependencies import get_current_user
 
 router = APIRouter(
     prefix="/api/users",
     tags=["Users"],
 )
 
-@router.post("/", response_model=schemas.User, status_code=status.HTTP_201_CREATED)
-async def create_user(
-    user: schemas.UserCreate,
-    db: AsyncSession = Depends(get_db),
-    current_user: schemas.User = Depends(get_current_user),
-):
-    # Check if the user already exists
-    db_user = await crud.get_user_by_email(db=db, email=user.email)
-    if db_user:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"User with email '{user.email}' already exists",
-        )
-    
-    # Create the user
-    return await crud.create_user(db=db, user=user)
+
 
 @router.get("/me", response_model=schemas.User)
 async def read_current_user(
@@ -59,12 +43,46 @@ async def read_current_user_groups(
     
     return user_groups
 
+@router.post("/", response_model=schemas.User, status_code=status.HTTP_201_CREATED)
+async def create_user(
+    user_data: schemas.UserCreate,
+    db: AsyncSession = Depends(get_db),
+    current_user: schemas.User = Depends(get_current_user),
+):
+    """Create a new user - restricted to admin group only"""
+    # Only allow admin users to create new users
+    is_admin = is_user_in_group(current_user.email, "admin")
+    if not is_admin:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Not authorized to create users - admin access required",
+        )
+    
+    # Check if user already exists
+    existing_user = await crud.get_user_by_email(db=db, email=user_data.email)
+    if existing_user:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="User already exists",
+        )
+    
+    # Create the user
+    db_user = await crud.create_user(db=db, user=user_data, created_by=current_user.email)
+    return db_user
+
 @router.get("/{user_id}", response_model=schemas.User)
 async def read_user(
     user_id: uuid.UUID,
     db: AsyncSession = Depends(get_db),
     current_user: schemas.User = Depends(get_current_user),
 ):
+    # Only allow admin users to read other users
+    is_admin = is_user_in_group(current_user.email, "admin")
+    if not is_admin:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Not authorized to read user information",
+        )
     db_user = await crud.get_user_by_id(db=db, user_id=user_id)
     if db_user is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")

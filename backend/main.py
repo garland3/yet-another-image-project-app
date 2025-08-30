@@ -15,6 +15,7 @@ from core.migrations import run_migrations
 from utils.boto3_client import boto3_client, ensure_bucket_exists
 from middleware.cors_debug import add_cors_middleware, debug_exception_middleware
 from middleware.auth import auth_middleware
+from middleware.security_headers import SecurityHeadersMiddleware
 from routers import projects, images, users, image_classes, comments, project_metadata, api_keys
 
 
@@ -147,6 +148,9 @@ def create_app() -> FastAPI:
     # Add CORS middleware
     cors_origins = os.getenv("CORS_ORIGINS", "http://localhost:3000").split(",")
     add_cors_middleware(app, cors_origins)
+    
+    # Add security headers middleware
+    app.add_middleware(SecurityHeadersMiddleware)
 
     # Add authentication middleware
     app.middleware("http")(auth_middleware)

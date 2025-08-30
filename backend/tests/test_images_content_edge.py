@@ -42,7 +42,11 @@ def test_content_disposition_sanitization(client, monkeypatch):
     r = client.get(f"/api/images/{image_id}/content")
     assert r.status_code == 200
     cd = r.headers.get("content-disposition", "")
-    assert '"' not in cd and "\n" not in cd and "\r" not in cd
+    # With the new secure implementation, quotes are properly used around the filename
+    # and dangerous characters are sanitized out
+    assert "\n" not in cd and "\r" not in cd
+    # Verify quotes are properly used in the header
+    assert 'filename="' in cd
 
 
 def test_content_http_error(client, monkeypatch):

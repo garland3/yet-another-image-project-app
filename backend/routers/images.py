@@ -12,12 +12,11 @@ from core.database import get_db
 from core.config import settings
 from core.group_auth_helper import is_user_in_group
 from utils.dependencies import get_current_user
-from utils.dependencies import get_project_or_403, get_image_or_403
+from utils.dependencies import get_project_or_403
 from utils.boto3_client import upload_file_to_minio, get_presigned_download_url
-from utils.serialization import to_data_instance_schema, normalize_metadata_dict
+from utils.serialization import to_data_instance_schema
+from utils.file_security import get_content_disposition_header
 import json as _json
-from aiocache import cached
-from aiocache.serializers import JsonSerializer
 from PIL import Image
 
 router = APIRouter(
@@ -325,14 +324,11 @@ async def get_image_content(
             response.raise_for_status()
             
             # Create a streaming response with the same content type
-            # Sanitize filename for header
-            safe_filename = db_image.filename.replace('\n', '_').replace('\r', '_').replace('"', '')
-            # Build a safe Content-Disposition without quotes/newlines
             return StreamingResponse(
                 content=response.iter_bytes(),
                 media_type=db_image.content_type or "application/octet-stream",
                 headers={
-                    "Content-Disposition": f"inline; filename={safe_filename}"
+                    "Content-Disposition": get_content_disposition_header(db_image.filename, "inline")
                 }
             )
         except httpx.HTTPError as e:
@@ -410,12 +406,12 @@ async def get_image_thumbnail(
                 content_type = content_type_map.get(img_format, 'image/jpeg')
                 
                 # Return the thumbnail
-                safe_filename = db_image.filename.replace('\n', '_').replace('\r', '_').replace('"', '')
+                thumbnail_filename = f"thumbnail_{db_image.filename}" if db_image.filename else "thumbnail"
                 return StreamingResponse(
                     content=output_buffer,
                     media_type=content_type,
                     headers={
-                        "Content-Disposition": f"inline; filename=thumbnail_{safe_filename}"
+                        "Content-Disposition": get_content_disposition_header(thumbnail_filename, "inline")
                     }
                 )
             except Exception as e:

@@ -5,10 +5,9 @@ Single middleware for auth that extracts user info from headers and sets request
 
 import logging
 import re
-from fastapi import Request, HTTPException
+from fastapi import Request
 from fastapi.responses import JSONResponse
 from core.config import settings
-from types import SimpleNamespace
 
 logger = logging.getLogger(__name__)
 
@@ -72,14 +71,21 @@ async def auth_middleware(request: Request, call_next):
             request.state.is_authenticated = True
         else:
             logger.debug("Running in production mode")
-            if settings.PROXY_SHARED_SECRET:
-                proxy_secret = headers.get(settings.X_PROXY_SECRET_HEADER.lower())
-                if proxy_secret != settings.PROXY_SHARED_SECRET:
-                    logger.warning("Invalid or missing proxy secret")
-                    return JSONResponse(
-                        status_code=401,
-                        content={"detail": "Invalid proxy authentication"},
-                    )
+            # Enforce proxy trust boundary - PROXY_SHARED_SECRET is required in production
+            if not settings.PROXY_SHARED_SECRET:
+                logger.error("PROXY_SHARED_SECRET must be set in production")
+                return JSONResponse(
+                    status_code=500,
+                    content={"detail": "Server configuration error"},
+                )
+            
+            proxy_secret = headers.get(settings.X_PROXY_SECRET_HEADER.lower())
+            if proxy_secret != settings.PROXY_SHARED_SECRET:
+                logger.warning("Invalid or missing proxy secret")
+                return JSONResponse(
+                    status_code=401,
+                    content={"detail": "Invalid proxy authentication"},
+                )
 
             user_header_value = headers.get(settings.X_USER_ID_HEADER.lower())
             user_email = get_user_from_header(user_header_value)
