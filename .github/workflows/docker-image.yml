@@ -84,6 +84,9 @@ jobs:
         POSTGRES_DB: postgres
         POSTGRES_SERVER: localhost
         POSTGRES_PORT: 5432
+        DEBUG: true
+        SKIP_HEADER_CHECK: true
+        MOCK_USER_EMAIL: test@example.com
 
   build:
     needs: test
