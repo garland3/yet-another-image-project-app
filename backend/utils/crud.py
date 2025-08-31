@@ -11,7 +11,14 @@ logger = logging.getLogger(__name__)
 def log_db_operation(operation: str, table: str, record_id: uuid.UUID, user_email: str, additional_info: Optional[Dict] = None):
     """Log database operations with user information"""
     # Sanitize user input to prevent log injection
-    safe_user_email = user_email.replace('\n', '').replace('\r', '') if user_email else 'unknown'
+    safe_user_domain = 'unknown'
+    if user_email and '@' in user_email:
+        # Only log the domain part to avoid logging PII
+        domain = user_email.split('@')[-1]
+        safe_user_domain = domain.replace('\n', '').replace('\r', '')
+    elif user_email:
+        safe_user_domain = 'local'  # For cases without @ symbol
+    
     safe_operation = operation.replace('\n', '').replace('\r', '') if operation else 'unknown'
     safe_table = table.replace('\n', '').replace('\r', '') if table else 'unknown'
     
@@ -19,7 +26,7 @@ def log_db_operation(operation: str, table: str, record_id: uuid.UUID, user_emai
         "operation": safe_operation,
         "table": safe_table,
         "record_id": str(record_id),
-        "user": safe_user_email,
+        "user_domain": safe_user_domain,  # Only log domain, not full email
         "additional_info": additional_info or {}
     }
     logger.info("DB_OPERATION", extra=log_data)

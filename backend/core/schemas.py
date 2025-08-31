@@ -2,6 +2,9 @@ import uuid
 from pydantic import BaseModel, EmailStr, Field, field_validator
 from typing import Optional, List, Dict, Any
 from datetime import datetime
+import logging
+
+logger = logging.getLogger(__name__)
 
 # User schemas
 class UserBase(BaseModel):
@@ -92,7 +95,8 @@ class DataInstance(DataInstanceBase):
                 except json.JSONDecodeError:
                     return {"value": v}
         except (TypeError, ValueError, AttributeError):
-            pass
+            # Handle any parsing errors by logging and returning default
+            logger.warning("Failed to parse JSON value, using default", extra={"value_type": type(v).__name__})
             
         # If all else fails, return an empty dict
         return {}

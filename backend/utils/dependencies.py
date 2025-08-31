@@ -138,9 +138,6 @@ def generate_api_key() -> str:
 
 def hash_api_key(api_key: str) -> str:
     """Hash an API key for storage using secure PBKDF2"""
-    import hashlib
-    import secrets
-    
     # Use PBKDF2 with SHA-256 for secure hashing
     salt = secrets.token_bytes(32)  # 256-bit salt
     key = hashlib.pbkdf2_hmac('sha256', api_key.encode('utf-8'), salt, 100000)
