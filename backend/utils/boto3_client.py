@@ -1,13 +1,16 @@
 import os
 import boto3
+import logging
 from botocore.exceptions import ClientError
 from core.config import settings
 from datetime import timedelta
 import io
 
+logger = logging.getLogger(__name__)
+
 if getattr(settings, 'FAST_TEST_MODE', False):
     boto3_client = None
-    print("FAST_TEST_MODE: Skipping real S3 client initialization.")
+    logger.info("FAST_TEST_MODE: Skipping real S3 client initialization.")
 else:
     # Initialize and test the real S3 client
     try:
@@ -23,9 +26,11 @@ else:
                 endpoint_url = f"http://{endpoint_url}"
 
         # Basic startup info (avoid logging secrets)
-        print(f"S3 endpoint URL: {endpoint_url}")
-        print(f"S3 bucket: {settings.S3_BUCKET}")
-        print(f"S3 region: {S3_REGION}")
+        logger.info("S3 configuration", extra={
+            "endpoint": endpoint_url,
+            "bucket": settings.S3_BUCKET,
+            "region": S3_REGION
+        })
 
         boto3_client = boto3.client(
             's3',
@@ -39,84 +44,66 @@ else:
     except ClientError as e:
         error_code = e.response.get('Error', {}).get('Code')
         error_message = e.response.get('Error', {}).get('Message', str(e))
-        print(f"\n⚠️  S3/MinIO CLIENT INITIALIZATION ERROR:")
-        print(f"Failed to initialize S3/MinIO client.")
-        print(f"Error: {error_code} - {error_message}")
-        print(f"\nCurrent S3 configuration:")
-        print(f"  Endpoint: {endpoint_url}")
-        print(f"  Bucket: {settings.S3_BUCKET}")
+        logger.error("S3/MinIO client initialization failed", extra={
+            "error_code": error_code,
+            "error_message": error_message,
+            "endpoint": endpoint_url,
+            "bucket": settings.S3_BUCKET
+        })
         boto3_client = None
     except Exception as e:
         error_msg = str(e)
-        print(f"\n⚠️  S3/MinIO CLIENT INITIALIZATION ERROR:")
+        logger.error("S3/MinIO client initialization error", extra={
+            "error": error_msg,
+            "error_type": type(e).__name__
+        })
         if "gaierror" in error_msg or "Name or service not known" in error_msg:
-            print("Cannot resolve MinIO/S3 hostname.")
-            print("The MinIO server hostname cannot be found.")
-            print("\nPossible solutions:")
-            print("1. Make sure MinIO container is running: cd backend && ./run.sh")
-            print("2. Check S3_ENDPOINT in .env file")
-            print(f"   Current endpoint: {endpoint_url}")
+            logger.warning("Cannot resolve MinIO/S3 hostname - server may not be running")
         elif "Connection refused" in error_msg:
-            print("MinIO/S3 server is not accepting connections.")
-            print("The server may not be running or not ready yet.")
-            print("\nPossible solutions:")
-            print("1. Start MinIO container: cd backend && ./run.sh")
-            print("2. Wait for MinIO to finish starting up")
-            print("3. Check if MinIO is running on the correct port (default: 9000)")
-        else:
-            print(f"An unexpected error occurred: {error_msg}")
-            print("\nGeneral solutions:")
-            print("1. Make sure MinIO container is running: cd backend && ./run.sh")
-            print("2. Check your S3 configuration in .env file")
-        print(f"Error type: {type(e).__name__}")
+            logger.warning("MinIO/S3 server connection refused - server may not be ready")
         boto3_client = None
 
     # Test bucket access
     try:
         if boto3_client:
             boto3_client.head_bucket(Bucket=settings.S3_BUCKET)
-            print("Successfully connected to S3!")
+            logger.info("Successfully connected to S3")
         else:
-            print("Cannot test S3 connection: boto3_client is not initialized")
+            logger.warning("Cannot test S3 connection: boto3_client is not initialized")
     except ClientError as e:
         error_code = e.response.get('Error', {}).get('Code')
         error_message = e.response.get('Error', {}).get('Message', str(e))
-        print(f"\n⚠️  S3/MinIO CONNECTION TEST FAILED:")
+        logger.error("S3/MinIO connection test failed", extra={
+            "error_code": error_code,
+            "error_message": error_message,
+            "bucket": settings.S3_BUCKET
+        })
         if error_code == '403':
-            print("Access denied to S3/MinIO bucket.")
-            print("Invalid credentials or insufficient permissions.")
-            print("\nPossible solutions:")
-            print("1. Check S3_ACCESS_KEY and S3_SECRET_KEY in .env file")
-            print("2. Verify MinIO credentials match container settings")
+            logger.warning("Access denied to S3/MinIO bucket - check credentials")
         elif error_code == '404':
-            print(f"Bucket '{settings.S3_BUCKET}' not found.")
-            print("The bucket will be created automatically when needed.")
-        else:
-            print(f"S3 connection error: {error_code} - {error_message}")
-            print("\nCheck MinIO/S3 server status and credentials.")
+            logger.info("Bucket not found - will be created automatically when needed", extra={
+                "bucket": settings.S3_BUCKET
+            })
     except Exception as e:
         error_msg = str(e)
-        print(f"\n⚠️  S3/MinIO CONNECTION TEST ERROR:")
+        logger.error("S3/MinIO connection test error", extra={
+            "error": error_msg,
+            "error_type": type(e).__name__
+        })
         if "gaierror" in error_msg or "Name or service not known" in error_msg:
-            print("Cannot reach MinIO/S3 server.")
-            print("Hostname resolution failed.")
+            logger.warning("Cannot reach MinIO/S3 server - hostname resolution failed")
         elif "Connection refused" in error_msg:
-            print("MinIO/S3 server refused connection.")
-            print("Server may not be running or ready yet.")
-        else:
-            print(f"Unexpected connection error: {error_msg}")
-        print(f"\nTip: MinIO container may still be starting up.")
-        print(f"Error type: {type(e).__name__}")
+            logger.warning("MinIO/S3 server refused connection - may still be starting")
 
 
 def ensure_bucket_exists(client, bucket_name: str):
     if not client:
-        print("Boto3 S3 client not initialized.")
+        logger.error("Boto3 S3 client not initialized")
         return False
     try:
         # Check if bucket exists
         client.head_bucket(Bucket=bucket_name)
-        print(f"Bucket '{bucket_name}' already exists.")
+        logger.info("Bucket already exists", extra={"bucket": bucket_name})
         return True
     except ClientError as e:
         error_code = e.response.get('Error', {}).get('Code')
@@ -124,22 +111,33 @@ def ensure_bucket_exists(client, bucket_name: str):
         
         if error_code == '404':
             # Bucket doesn't exist, create it
-            print(f"Bucket '{bucket_name}' not found. Attempting to create it...")
+            logger.info("Bucket not found, attempting to create", extra={"bucket": bucket_name})
             try:
                 client.create_bucket(Bucket=bucket_name)
-                print(f"Bucket '{bucket_name}' created successfully.")
+                logger.info("Bucket created successfully", extra={"bucket": bucket_name})
                 return True
             except ClientError as create_error:
                 create_error_code = create_error.response.get('Error', {}).get('Code')
                 create_error_message = create_error.response.get('Error', {}).get('Message', str(create_error))
-                print(f"Error creating bucket '{bucket_name}': Code={create_error_code}, Message={create_error_message}")
+                logger.error("Error creating bucket", extra={
+                    "bucket": bucket_name,
+                    "error_code": create_error_code,
+                    "error_message": create_error_message
+                })
                 return False
         else:
-            print(f"Error checking bucket '{bucket_name}': Code={error_code}, Message={error_message}")
+            logger.error("Error checking bucket", extra={
+                "bucket": bucket_name,
+                "error_code": error_code,
+                "error_message": error_message
+            })
             return False
     except Exception as e:
-        print(f"An unexpected error occurred with S3 bucket operations: {e}")
-        print(f"Error type: {type(e).__name__}")
+        logger.error("Unexpected error with S3 bucket operations", extra={
+            "bucket": bucket_name,
+            "error": str(e),
+            "error_type": type(e).__name__
+        })
         return False
 
 # async def upload_file_to_minio(
@@ -182,7 +180,7 @@ async def upload_file_to_minio(
     content_type: str = "application/octet-stream"
 ) -> bool:
     if not boto3_client:
-        print("Boto3 S3 client not initialized. Cannot upload.")
+        logger.error("Boto3 S3 client not initialized, cannot upload")
         return False
     try:
         # Ensure at start
@@ -200,18 +198,32 @@ async def upload_file_to_minio(
                 'ContentType': content_type
             }
         )
-        print(f"Successfully uploaded {object_name} to bucket {bucket_name} using upload_fileobj")
+        logger.info("Successfully uploaded file to bucket", extra={
+            "object_name": object_name,
+            "bucket": bucket_name,
+            "content_type": content_type
+        })
         return True
     except ClientError as e:
-        print(f"S3 Error during upload of {object_name}: {e}")
+        logger.error("S3 error during file upload", extra={
+            "object_name": object_name,
+            "bucket": bucket_name,
+            "error": str(e),
+            "error_type": "ClientError"
+        })
         return False
     except Exception as e:
-        print(f"An unexpected error occurred during upload of {object_name}: {e}")
+        logger.error("Unexpected error during file upload", extra={
+            "object_name": object_name,
+            "bucket": bucket_name,
+            "error": str(e),
+            "error_type": type(e).__name__
+        })
         return False
 
 def get_presigned_download_url(bucket_name: str, object_name: str, expires_delta: timedelta = timedelta(hours=1)) -> str | None:
     if not boto3_client:
-        print("Boto3 S3 client not initialized. Cannot generate URL.")
+        logger.error("Boto3 S3 client not initialized, cannot generate URL")
         return None
     try:
         # Generate presigned URL
@@ -225,8 +237,18 @@ def get_presigned_download_url(bucket_name: str, object_name: str, expires_delta
         )
         return url
     except ClientError as e:
-        print(f"S3 Error generating presigned URL for {object_name}: {e}")
+        logger.error("S3 error generating presigned URL", extra={
+            "object_name": object_name,
+            "bucket": bucket_name,
+            "error": str(e),
+            "error_type": "ClientError"
+        })
         return None
     except Exception as e:
-        print(f"An unexpected error occurred generating presigned URL for {object_name}: {e}")
+        logger.error("Unexpected error generating presigned URL", extra={
+            "object_name": object_name,
+            "bucket": bucket_name,
+            "error": str(e),
+            "error_type": type(e).__name__
+        })
         return None
