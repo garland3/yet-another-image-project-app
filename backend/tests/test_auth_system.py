@@ -64,7 +64,8 @@ class TestAuthMiddleware:
         mock_request.headers = {"X-User-Id": "test@example.com"}
         
         with patch.object(settings, 'DEBUG', True):
-            response = await auth_middleware(mock_request, mock_call_next)
+            with patch.object(settings, 'MOCK_USER_EMAIL', 'test@example.com'):
+                response = await auth_middleware(mock_request, mock_call_next)
         
         assert mock_request.state.user_email == "test@example.com"
         assert mock_request.state.is_authenticated is True
