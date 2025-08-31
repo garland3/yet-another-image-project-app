@@ -29,6 +29,7 @@ if [ -f "backend/.venv/bin/activate" ]; then
     PYTEST_PATH=$(which pytest)
 else
     # Check if pytest is available in system PATH
+    pip install pytest pytest-asyncio  pytest-xdist    
     PYTEST_PATH=$(command -v pytest 2>/dev/null || echo "")
 fi
 
