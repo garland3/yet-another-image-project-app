@@ -87,7 +87,7 @@ function MetadataManager({
     e.preventDefault();
     
     try {
-      const metadataObj = JSON.parse(bulkMetadata);
+      // const metadataObj = JSON.parse(bulkMetadata); // Commented out - not currently used
       
       setLoading(true);
       

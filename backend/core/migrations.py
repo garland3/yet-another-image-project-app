@@ -1,5 +1,4 @@
 import asyncio
-import uuid
 from sqlalchemy import text
 from .database import engine, AsyncSessionLocal
 from .models import Base

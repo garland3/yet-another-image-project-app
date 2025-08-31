@@ -186,8 +186,12 @@ async def upload_file_to_minio(
         # Ensure at start
         try:
             file_data.seek(0)
-        except Exception:
-            pass
+        except Exception as e:
+            # Some file-like objects don't support seek, log and continue
+            logger.warning("File seek operation failed, continuing with current position", extra={
+                "error": str(e),
+                "error_type": type(e).__name__
+            })
         
         # Stream upload to S3 without buffering whole file in memory
         boto3_client.upload_fileobj(

@@ -203,19 +203,39 @@ def setup_static_files(app: FastAPI):
     # Mount individual files using separate handlers
     @app.get("/favicon.ico")
     async def get_favicon():
-        return FileResponse(os.path.join(front_end_build_path, "favicon.ico"))
+        favicon_path = os.path.join(front_end_build_path, "favicon.ico")
+        if os.path.exists(favicon_path):
+            return FileResponse(favicon_path)
+        else:
+            raise HTTPException(status_code=404, detail="Favicon not found")
 
     @app.get("/logo192.png")
     async def get_logo192():
-        return FileResponse(os.path.join(front_end_build_path, "logo192.png"))
+        logo_path = os.path.join(front_end_build_path, "logo192.png")
+        if os.path.exists(logo_path):
+            return FileResponse(logo_path)
+        else:
+            raise HTTPException(status_code=404, detail="Logo not found")
 
     @app.get("/manifest.json")
     async def get_manifest():
-        return FileResponse(os.path.join(front_end_build_path, "manifest.json"))
+        manifest_path = os.path.join(front_end_build_path, "manifest.json")
+        if os.path.exists(manifest_path):
+            return FileResponse(manifest_path)
+        else:
+            raise HTTPException(status_code=404, detail="Manifest not found")
 
     @app.get("/")
     async def get_index():
-        return FileResponse(os.path.join(front_end_build_path, "index.html"))
+        index_path = os.path.join(front_end_build_path, "index.html")
+        if os.path.exists(index_path):
+            return FileResponse(index_path)
+        else:
+            # Frontend not built - return a simple message instead of crashing
+            return JSONResponse(
+                content={"message": "Backend API is running. Frontend not built."},
+                status_code=200
+            )
 
     # Catch-all route for React Router - this must be last
     @app.get("/{full_path:path}")
@@ -229,7 +249,12 @@ def setup_static_files(app: FastAPI):
             raise HTTPException(status_code=404, detail="API endpoint not found")
         
         # Serve the React app's index.html for all other routes
-        return FileResponse(os.path.join(front_end_build_path, "index.html"))
+        index_path = os.path.join(front_end_build_path, "index.html")
+        if os.path.exists(index_path):
+            return FileResponse(index_path)
+        else:
+            # Frontend not built - return 404 for non-API routes
+            raise HTTPException(status_code=404, detail="Frontend not available")
 
 
 # Create the app instance

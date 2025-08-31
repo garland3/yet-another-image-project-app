@@ -109,8 +109,12 @@ async def auth_middleware(request: Request, call_next):
                     # Fallback: null it out if deletion fails for any reason
                     try:
                         setattr(request.state, "user_groups", None)
-                    except Exception:
-                        pass
+                    except Exception as e:
+                        # Log failure but continue - this shouldn't break auth flow
+                        logger.warning("Failed to clear user_groups state attribute", extra={
+                            "error": str(e),
+                            "error_type": type(e).__name__
+                        })
 
             request.state.user_email = user_email
             request.state.is_authenticated = True
@@ -125,21 +129,6 @@ async def auth_middleware(request: Request, call_next):
         return JSONResponse(
             status_code=500, content={"detail": "Internal authentication error"}
         )
-
-# code shoudl just use the request.state
-
-# def get_authenticated_user_email(request: Request) -> str | None:
-#     """
-#     Get the authenticated user email from request state.
-    
-#     Args:
-#         request: FastAPI request object
-        
-#     Returns:
-#         User email if authenticated, None otherwise
-#     """
-#     return getattr(request.state, 'user_email', None)
-
 
 
 # Unauthenticated users should never make it to the backend and be rejected by the middleware.

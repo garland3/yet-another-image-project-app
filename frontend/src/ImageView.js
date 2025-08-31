@@ -132,7 +132,7 @@ function ImageView() {
   }, [imageId, projectId, loadImageData, loadProjectImages, loadClasses]);
 
   // Navigate to previous image with transition
-  const navigateToPreviousImage = () => {
+  const navigateToPreviousImage = useCallback(() => {
     if (currentImageIndex > 0) {
       setIsTransitioning(true);
       setTimeout(() => {
@@ -140,10 +140,10 @@ function ImageView() {
         navigate(`/view/${prevImage.id}?project=${projectId}`);
       }, 300);
     }
-  };
+  }, [currentImageIndex, projectImages, navigate, projectId]);
 
   // Navigate to next image with transition
-  const navigateToNextImage = () => {
+  const navigateToNextImage = useCallback(() => {
     if (currentImageIndex < projectImages.length - 1) {
       setIsTransitioning(true);
       setTimeout(() => {
@@ -151,7 +151,7 @@ function ImageView() {
         navigate(`/view/${nextImage.id}?project=${projectId}`);
       }, 300);
     }
-  };
+  }, [currentImageIndex, projectImages, navigate, projectId]);
 
   // Reset transition state when image changes
   useEffect(() => {
@@ -173,7 +173,7 @@ function ImageView() {
     return () => {
       document.removeEventListener('keydown', handleKeyDown);
     };
-  }, [currentImageIndex, projectImages.length]);
+  }, [currentImageIndex, projectImages.length, navigateToNextImage, navigateToPreviousImage]);
 
   return (
     <div className="App" style={{ maxWidth: '100%', padding: '10px' }}>

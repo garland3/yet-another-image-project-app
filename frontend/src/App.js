@@ -1,5 +1,5 @@
 import React, { useState, useEffect, lazy, Suspense, memo, useRef, useCallback } from 'react';
-import { Routes, Route, useNavigate, Link } from 'react-router-dom';
+import { Route, Routes, Link } from 'react-router-dom';
 import './App.css';
 import Toast from './components/Toast';
 
@@ -183,17 +183,17 @@ const ProjectItem = memo(function ProjectItem({ project }) {
 });
 
 function App() {
-  const navigate = useNavigate();
+  // const navigate = useNavigate(); // Commented out - not currently used
   const [projects, setProjects] = useState([]);
   const [loading, setLoading] = useState(true);
   const [toast, setToast] = useState(null);
   const [showModal, setShowModal] = useState(false);
   const [currentUser, setCurrentUser] = useState(null);
-  const [newProject, setNewProject] = useState({
-    name: '',
-    description: '',
-    meta_group_id: ''
-  });
+  // const [newProject, setNewProject] = useState({  // Commented out - not currently used
+  //   name: '',
+  //   description: '',
+  //   meta_group_id: ''
+  // });
   
   // Function to show a toast notification
   const showToast = (message, type = 'error') => {
