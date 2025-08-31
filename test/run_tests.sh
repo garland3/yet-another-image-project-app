@@ -40,6 +40,7 @@ if [ -z "$PYTEST_PATH" ]; then
         echo "   cd backend && source .venv/bin/activate && pip install pytest pytest-asyncio"
     else
         echo "   pip install pytest pytest-asyncio"
+        pip install pytest pytest-asyncio
     fi
     exit 1
 fi
