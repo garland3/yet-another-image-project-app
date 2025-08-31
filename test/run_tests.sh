@@ -25,7 +25,7 @@ if [ -f "backend/.venv/bin/activate" ]; then
     echo "🔧 Activating virtual environment..."
     source backend/.venv/bin/activate
     echo "📦 Installing pytest-xdist..."
-    pip install pytest-xdist
+    pip install pytest pytest-asyncio  pytest-xdist    
     PYTEST_PATH=$(which pytest)
 else
     # Check if pytest is available in system PATH
