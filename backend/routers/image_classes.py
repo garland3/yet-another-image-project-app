@@ -3,9 +3,8 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 from typing import List
 import utils.crud as crud
-from core import schemas, models
+from core import schemas
 from core.database import get_db
-from core.config import settings
 from core.group_auth_helper import is_user_in_group
 from utils.dependencies import get_current_user, get_project_or_403, get_image_or_403
 

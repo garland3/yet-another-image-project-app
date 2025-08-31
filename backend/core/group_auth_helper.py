@@ -41,19 +41,28 @@ def is_user_in_group(user_email: str, group_id: str) -> bool:
     if cache_key in _group_membership_cache:
         is_member, cached_time = _group_membership_cache[cache_key]
         if current_time - cached_time < _CACHE_TTL:
-            logger.debug(f"Cache hit: {user_email} in {group_id} = {is_member}")
+            # Sanitize for logging
+            safe_user_email = user_email.replace('\n', '').replace('\r', '')
+            safe_group_id = group_id.replace('\n', '').replace('\r', '')
+            logger.debug("Cache hit", extra={"user": safe_user_email, "group": safe_group_id, "result": is_member})
             return is_member
         else:
             # Cache expired, remove entry
             del _group_membership_cache[cache_key]
-            logger.debug(f"Cache expired for: {user_email} in {group_id}")
+            # Sanitize for logging
+            safe_user_email = user_email.replace('\n', '').replace('\r', '')
+            safe_group_id = group_id.replace('\n', '').replace('\r', '')
+            logger.debug("Cache expired", extra={"user": safe_user_email, "group": safe_group_id})
     
     # Call core auth function
     is_member = _core_is_user_in_group(user_email, group_id)
     
     # Cache the result
     _group_membership_cache[cache_key] = (is_member, current_time)
-    logger.debug(f"Cached result: {user_email} in {group_id} = {is_member}")
+    # Sanitize for logging
+    safe_user_email = user_email.replace('\n', '').replace('\r', '')
+    safe_group_id = group_id.replace('\n', '').replace('\r', '')
+    logger.debug("Cached result", extra={"user": safe_user_email, "group": safe_group_id, "result": is_member})
     
     return is_member
 

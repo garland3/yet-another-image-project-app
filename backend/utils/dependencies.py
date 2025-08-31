@@ -1,4 +1,4 @@
-from fastapi import Depends, HTTPException, status, Header, Request
+from fastapi import Depends, HTTPException, status, Request
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from typing import Optional, List
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -9,7 +9,6 @@ from core.config import settings
 from core.schemas import User, UserCreate
 from core.database import get_db
 from core.group_auth_helper import is_user_in_group
-# Direct access to request.state - no need for wrapper functions
 import utils.crud as crud
 from core import models
 
@@ -138,8 +137,37 @@ def generate_api_key() -> str:
     return secrets.token_urlsafe(32)
 
 def hash_api_key(api_key: str) -> str:
-    """Hash an API key for storage"""
-    return hashlib.sha256(api_key.encode()).hexdigest()
+    """Hash an API key for storage using secure PBKDF2"""
+    import hashlib
+    import secrets
+    
+    # Use PBKDF2 with SHA-256 for secure hashing
+    salt = secrets.token_bytes(32)  # 256-bit salt
+    key = hashlib.pbkdf2_hmac('sha256', api_key.encode('utf-8'), salt, 100000)
+    
+    # Return salt + hash encoded as hex
+    return salt.hex() + key.hex()
+
+def verify_api_key(api_key: str, stored_hash: str) -> bool:
+    """Verify an API key against its stored hash"""
+    import hashlib
+    
+    try:
+        # Extract salt and hash from stored_hash
+        salt_hex = stored_hash[:64]  # First 64 chars are salt (32 bytes)
+        hash_hex = stored_hash[64:]  # Remaining chars are hash
+        
+        salt = bytes.fromhex(salt_hex)
+        stored_key = bytes.fromhex(hash_hex)
+        
+        # Hash the provided key with the same salt
+        key = hashlib.pbkdf2_hmac('sha256', api_key.encode('utf-8'), salt, 100000)
+        
+        # Compare hashes securely
+        import secrets
+        return secrets.compare_digest(key, stored_key)
+    except (ValueError, TypeError):
+        return False
 
 async def get_user_from_api_key(
     request: Request,
@@ -150,31 +178,28 @@ async def get_user_from_api_key(
     if not credentials:
         return None
     
-    # Hash the provided API key
-    key_hash = hash_api_key(credentials.credentials)
+    # Get all active API keys and verify against each one
+    # Note: This is less efficient but necessary with salted hashes
+    # In production, consider adding an index or prefix to optimize
+    all_api_keys = await crud.get_all_active_api_keys(db)
     
-    # Look up the API key in the database
-    api_key = await crud.get_api_key_by_hash(db, key_hash)
-    if not api_key or not api_key.is_active:
-        return None
+    for api_key_record in all_api_keys:
+        if verify_api_key(credentials.credentials, api_key_record.key_hash):
+            # Update last used timestamp
+            await crud.update_api_key_last_used(db, api_key_record.id)
+            
+            # Return the user associated with this API key
+            return User(
+                id=api_key_record.user.id,
+                email=api_key_record.user.email,
+                username=api_key_record.user.username,
+                is_active=api_key_record.user.is_active,
+                created_at=api_key_record.user.created_at,
+                updated_at=api_key_record.user.updated_at,
+                groups=[]  # Groups handled by auth system
+            )
     
-    # Update last used timestamp
-    await crud.update_api_key_last_used(db, api_key.id)
-    
-    # For API key users, groups will be looked up server-side by the auth system
-    # We don't need to parse headers for API key authentication
-    user_groups = []  # Will be populated by auth system lookup
-
-    # Return the user associated with this API key
-    return User(
-        id=api_key.user.id,
-        email=api_key.user.email,
-        username=api_key.user.username,
-        is_active=api_key.user.is_active,
-        created_at=api_key.user.created_at,
-        updated_at=api_key.user.updated_at,
-        groups=user_groups
-    )
+    return None
 
 async def get_current_user(
     request: Request,

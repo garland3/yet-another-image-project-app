@@ -7,7 +7,6 @@ from fastapi.routing import APIRouter
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import JSONResponse, FileResponse
 from pydantic import ValidationError
-import traceback
 
 from core.config import settings
 from core.database import create_db_and_tables
@@ -15,7 +14,6 @@ from core.migrations import run_migrations
 from utils.boto3_client import boto3_client, ensure_bucket_exists
 from middleware.cors_debug import add_cors_middleware, debug_exception_middleware
 from middleware.auth import auth_middleware
-from middleware.security_headers import SecurityHeadersMiddleware
 from routers import projects, images, users, image_classes, comments, project_metadata, api_keys
 
 
@@ -23,21 +21,6 @@ from routers import projects, images, users, image_classes, comments, project_me
 FastAPI application with modular structure.
 Separates app creation from runtime configuration.
 """
-
-import os
-import json
-import logging
-from contextlib import asynccontextmanager
-from fastapi import FastAPI, Request, status, HTTPException
-from fastapi.routing import APIRouter
-from fastapi.staticfiles import StaticFiles
-from fastapi.responses import JSONResponse, FileResponse
-from pydantic import ValidationError
-import traceback
-
-from core.config import settings
-from core.database import create_db_and_tables
-from core.migrations import run_migrations
 from utils.boto3_client import boto3_client, ensure_bucket_exists
 from middleware.cors_debug import add_cors_middleware, debug_exception_middleware
 from routers import projects, images, users, image_classes, comments, project_metadata, api_keys

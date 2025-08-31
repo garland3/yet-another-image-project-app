@@ -55,6 +55,9 @@ COPY ./frontend/public ./frontend/public
 COPY ./frontend/src ./frontend/src
 COPY ./frontend/config-overrides.js ./frontend/.env.local ./frontend/
 
+# copy the test folder over as well. 
+COPY test ./test
+
 # Install frontend dependencies and build
 WORKDIR /app/frontend
 RUN npm install

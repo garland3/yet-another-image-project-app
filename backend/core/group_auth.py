@@ -28,7 +28,10 @@ def is_user_in_group(user_email: str, group_id: str) -> bool:
     
     # In debug/test mode, always allow access
     if settings.DEBUG or settings.SKIP_HEADER_CHECK:
-        logger.debug(f"DEBUG MODE: Allowing {user_email} access to group {group_id}")
+        # Sanitize user input for logs to prevent injection
+        safe_user_email = user_email.replace('\n', '').replace('\r', '') if user_email else 'unknown'
+        safe_group_id = group_id.replace('\n', '').replace('\r', '') if group_id else 'unknown'
+        logger.debug("DEBUG MODE: Allowing user access", extra={"user": safe_user_email, "group": safe_group_id})
         return True
     
     # Normalize inputs
@@ -38,7 +41,10 @@ def is_user_in_group(user_email: str, group_id: str) -> bool:
     # Call the actual group membership check
     is_member = _check_group_membership(user_email, group_id)
     
-    logger.info(f"Group membership check: {user_email} in {group_id} = {is_member}")
+    # Sanitize for logging
+    safe_user_email = user_email.replace('\n', '').replace('\r', '')
+    safe_group_id = group_id.replace('\n', '').replace('\r', '')
+    logger.info("Group membership check", extra={"user": safe_user_email, "group": safe_group_id, "result": is_member})
     return is_member
 
 

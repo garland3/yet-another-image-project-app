@@ -3,21 +3,26 @@ from sqlalchemy import select, update, delete, and_
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 from core import models, schemas
-from typing import List, Optional, Dict, Any, Union
+from typing import List, Optional, Dict, Any
 import logging
 
 logger = logging.getLogger(__name__)
 
 def log_db_operation(operation: str, table: str, record_id: uuid.UUID, user_email: str, additional_info: Optional[Dict] = None):
     """Log database operations with user information"""
+    # Sanitize user input to prevent log injection
+    safe_user_email = user_email.replace('\n', '').replace('\r', '') if user_email else 'unknown'
+    safe_operation = operation.replace('\n', '').replace('\r', '') if operation else 'unknown'
+    safe_table = table.replace('\n', '').replace('\r', '') if table else 'unknown'
+    
     log_data = {
-        "operation": operation,
-        "table": table,
+        "operation": safe_operation,
+        "table": safe_table,
         "record_id": str(record_id),
-        "user": user_email,
+        "user": safe_user_email,
         "additional_info": additional_info or {}
     }
-    logger.info(f"DB_OPERATION: {log_data}")
+    logger.info("DB_OPERATION", extra=log_data)
 
 # User CRUD operations
 async def get_user_by_email(db: AsyncSession, email: str) -> Optional[models.User]:
@@ -418,6 +423,15 @@ async def get_api_keys_for_user(db: AsyncSession, user_id: uuid.UUID) -> List[mo
         select(models.ApiKey)
         .where(models.ApiKey.user_id == user_id)
         .order_by(models.ApiKey.created_at.desc())
+    )
+    return result.scalars().all()
+
+async def get_all_active_api_keys(db: AsyncSession) -> List[models.ApiKey]:
+    """Get all active API keys with user relationships loaded"""
+    result = await db.execute(
+        select(models.ApiKey)
+        .options(selectinload(models.ApiKey.user))
+        .where(models.ApiKey.is_active == True)
     )
     return result.scalars().all()
 

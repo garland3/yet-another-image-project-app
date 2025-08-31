@@ -3,9 +3,8 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 from typing import List
 import utils.crud as crud
-from core import schemas, models
+from core import schemas
 from core.database import get_db
-from core.config import settings
 from utils.dependencies import get_current_user, get_user_context, UserContext, get_image_or_403
 
 router = APIRouter(
