@@ -14,6 +14,7 @@ from core.migrations import run_migrations
 from utils.boto3_client import boto3_client, ensure_bucket_exists
 from middleware.cors_debug import add_cors_middleware, debug_exception_middleware
 from middleware.auth import auth_middleware
+from middleware.security_headers import SecurityHeadersMiddleware
 from routers import projects, images, users, image_classes, comments, project_metadata, api_keys
 
 

@@ -19,7 +19,7 @@ def test_generate_and_hash_api_key():
     assert key1 != key2
     assert len(key1) >= 43  # token_urlsafe ~43 chars for 32 bytes
     h = deps.hash_api_key(key1)
-    assert len(h) == 64
+    assert len(h) == 128  # PBKDF2: 64 chars salt + 64 chars hash
     assert h != key1
 
 
