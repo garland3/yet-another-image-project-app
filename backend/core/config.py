@@ -43,6 +43,9 @@ class Settings(BaseSettings):
     SECURITY_REFERRER_POLICY_VALUE: str = "no-referrer"
     SECURITY_CSP_ENABLED: bool = True
     SECURITY_CSP_VALUE: Optional[str] = "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'; connect-src 'self'; frame-ancestors 'none';"
+    
+    # Cache configuration
+    CACHE_SIZE_MB: int = 1000
 
     @field_validator('DEBUG', 'FAST_TEST_MODE', 'SKIP_HEADER_CHECK', 'S3_USE_SSL', 'SECURITY_NOSNIFF_ENABLED', 'SECURITY_XFO_ENABLED', 'SECURITY_REFERRER_POLICY_ENABLED', 'SECURITY_CSP_ENABLED', mode='before')
     @classmethod

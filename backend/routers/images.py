@@ -13,9 +13,10 @@ from core.config import settings
 from core.group_auth_helper import is_user_in_group
 from utils.dependencies import get_current_user
 from utils.dependencies import get_project_or_403
-from utils.boto3_client import upload_file_to_minio, get_presigned_download_url
+from utils.boto3_client import upload_file_to_s3, get_presigned_download_url
 from utils.serialization import to_data_instance_schema
 from utils.file_security import get_content_disposition_header
+from utils.cache_manager import get_cache
 import json as _json
 from PIL import Image
 
@@ -32,6 +33,11 @@ async def upload_image_to_project(
     db: AsyncSession = Depends(get_db),
     current_user: schemas.User = Depends(get_current_user),
 ):
+    """
+    Uploads an image file to a specified project.
+    It handles file validation, metadata parsing, and storage.
+    The image is associated with the project and the uploading user.
+    """
     db_project = await get_project_or_403(project_id, db, current_user)
     image_id = uuid.uuid4()
     object_storage_key = f"{db_project.id}/{image_id}/{file.filename}"
@@ -54,7 +60,7 @@ async def upload_image_to_project(
     except Exception:
         # If we cannot get size ahead of time, proceed to stream; S3 client will handle
         file_size = None
-    success = await upload_file_to_minio(
+    success = await upload_file_to_s3(
         bucket_name=settings.S3_BUCKET,
         object_name=object_storage_key,
         file_data=file.file,
@@ -74,11 +80,14 @@ async def upload_image_to_project(
     )
     db_data_instance = await crud.create_data_instance(db=db, data_instance=data_instance_create)
     
+    # Invalidate project images cache
+    cache = get_cache()
+    cache.clear_pattern(f"project_images:{project_id}")
+    
     # Use utility function for consistent metadata serialization
     return to_data_instance_schema(db_data_instance)
 
 @router.get("/projects/{project_id}/images", response_model=List[schemas.DataInstance])
-#@cached(ttl=3600, key_builder=lambda *args, **kwargs: f"project_images:{kwargs['project_id']}:skip:{kwargs.get('skip', 0)}:limit:{kwargs.get('limit', 100)}")
 async def list_images_in_project(
     project_id: uuid.UUID,
     skip: int = 0,
@@ -86,6 +95,19 @@ async def list_images_in_project(
     db: AsyncSession = Depends(get_db),
     current_user: schemas.User = Depends(get_current_user),
 ):
+    """
+    Retrieves a list of images for a given project.
+    It checks the cache first for performance and then fetches from the database.
+    Handles project existence and user permissions.
+    """
+    # Check cache first
+    cache = get_cache()
+    cache_key = f"project_images:{project_id}:skip:{skip}:limit:{limit}"
+    cached_images = cache.get(cache_key)
+    
+    if cached_images is not None:
+        return cached_images
+    
     # First check if the project exists and user has access
     try:
         await get_project_or_403(project_id, db, current_user)
@@ -103,62 +125,23 @@ async def list_images_in_project(
     if not images:
         return []
         
-    # Process images
+    # Process images using utility function for consistent serialization
     response_images = []
     for img in images:
-        # Create a dictionary from the SQLAlchemy model
-        img_dict = {}
-        for c in img.__table__.columns:
-            if c.name == "metadata_":
-                # Special handling for metadata
-                if img.metadata_ is not None:
-                    try:
-                        # Try to get the raw value from the SQLAlchemy JSON type
-                        if hasattr(img.metadata_, "_asdict"):
-                            img_dict["metadata_"] = img.metadata_._asdict()
-                        elif hasattr(img.metadata_, "items"):
-                            img_dict["metadata_"] = dict(img.metadata_.items())
-                        elif hasattr(img.metadata_, "__class__") and img.metadata_.__class__.__name__ == "MetaData":
-                            # Handle MetaData object by converting it to an empty dict
-                            img_dict["metadata_"] = {}
-                        # Check if it's a string that can be parsed as JSON
-                        elif isinstance(img.metadata_, str):
-                            try:
-                                import json as _j
-                                img_dict["metadata_"] = _j.loads(img.metadata_)
-                            except _json.JSONDecodeError:
-                                img_dict["metadata_"] = {"value": img.metadata_}
-                        else:
-                            # If it's already a dict or can be converted to one
-                            try:
-                                img_dict["metadata_"] = dict(img.metadata_) if img.metadata_ else None
-                            except (TypeError, ValueError):
-                                # If conversion to dict fails, use an empty dict
-                                img_dict["metadata_"] = {}
-                    except (TypeError, ValueError, AttributeError) as e:
-                        print(f"Error converting metadata to dict: {e}")
-                        img_dict["metadata_"] = {}
-                else:
-                    img_dict["metadata_"] = None
-            else:
-                # Normal column handling
-                img_dict[c.name] = getattr(img, c.name)
-        
         try:
-            # Validate with Pydantic
-            img_schema = schemas.DataInstance.model_validate(img_dict)
-            response_images.append(img_schema)
+            response_images.append(to_data_instance_schema(img))
         except Exception as e:
-            print(f"Error validating DataInstance: {e}")
-            print(f"Input data: {img_dict}")
+            print(f"Error serializing image {img.id}: {e}")
             # Skip this image but continue processing others
             continue
+    
+    # Cache the result (30 minutes)
+    cache.set(cache_key, response_images, expire=30*60)
     
     return response_images
 
 # Add trailing slash version to handle frontend requests
 @router.get("/projects/{project_id}/images/", response_model=List[schemas.DataInstance])
-# #@cached(ttl=3600, key_builder=lambda *args, **kwargs: f"project_images:{kwargs['project_id']}:skip:{kwargs.get('skip', 0)}:limit:{kwargs.get('limit', 100)}")
 async def list_images_in_project_with_slash(
     project_id: uuid.UUID,
     skip: int = 0,
@@ -166,84 +149,34 @@ async def list_images_in_project_with_slash(
     db: AsyncSession = Depends(get_db),
     current_user: schemas.User = Depends(get_current_user),
 ):
-    """Same as list_images_in_project but with trailing slash to handle frontend requests."""
-    # First check if the project exists and user has access
-    try:
-        await get_project_or_403(project_id, db, current_user)
-    except HTTPException as e:
-        if e.status_code == status.HTTP_404_NOT_FOUND:
-            # If project doesn't exist, return empty list instead of 404
-            return []
-        # Re-raise other exceptions (like permission issues)
-        raise
-        
-    # Get images for the project
-    images = await crud.get_data_instances_for_project(db=db, project_id=project_id, skip=skip, limit=limit)
-    
-    # If no images found, return empty list
-    if not images:
-        return []
-        
-    # Process images
-    response_images = []
-    for img in images:
-        # Create a dictionary from the SQLAlchemy model
-        img_dict = {}
-        for c in img.__table__.columns:
-            if c.name == "metadata_":
-                # Special handling for metadata
-                if img.metadata_ is not None:
-                    try:
-                        # Try to get the raw value from the SQLAlchemy JSON type
-                        if hasattr(img.metadata_, "_asdict"):
-                            img_dict["metadata_"] = img.metadata_._asdict()
-                        elif hasattr(img.metadata_, "items"):
-                            img_dict["metadata_"] = dict(img.metadata_.items())
-                        elif hasattr(img.metadata_, "__class__") and img.metadata_.__class__.__name__ == "MetaData":
-                            # Handle MetaData object by converting it to an empty dict
-                            img_dict["metadata_"] = {}
-                        # Check if it's a string that can be parsed as JSON
-                        elif isinstance(img.metadata_, str):
-                            try:
-                                import json as _j
-                                img_dict["metadata_"] = _j.loads(img.metadata_)
-                            except _json.JSONDecodeError:
-                                img_dict["metadata_"] = {"value": img.metadata_}
-                        else:
-                            # If it's already a dict or can be converted to one
-                            try:
-                                img_dict["metadata_"] = dict(img.metadata_) if img.metadata_ else None
-                            except (TypeError, ValueError):
-                                # If conversion to dict fails, use an empty dict
-                                img_dict["metadata_"] = {}
-                    except (TypeError, ValueError, AttributeError) as e:
-                        print(f"Error converting metadata to dict: {e}")
-                        img_dict["metadata_"] = {}
-                else:
-                    img_dict["metadata_"] = None
-            else:
-                # Normal column handling
-                img_dict[c.name] = getattr(img, c.name)
-        
-        try:
-            # Validate with Pydantic
-            img_schema = schemas.DataInstance.model_validate(img_dict)
-            response_images.append(img_schema)
-        except Exception as e:
-            print(f"Error validating DataInstance: {e}")
-            print(f"Input data: {img_dict}")
-            # Skip this image but continue processing others
-            continue
-    
-    return response_images
+    """
+    Provides an alternative endpoint for listing project images.
+    This route handles requests with a trailing slash, redirecting to the main function.
+    It ensures compatibility with various frontend routing configurations.
+    """
+    # Just call the main function to avoid code duplication
+    return await list_images_in_project(project_id, skip, limit, db, current_user)
+
 
 @router.get("/images/{image_id}", response_model=schemas.DataInstance)
-#@cached(ttl=3600, key_builder=lambda *args, **kwargs: f"image:{kwargs['image_id']}")
 async def get_image_metadata(
     image_id: uuid.UUID,
     db: AsyncSession = Depends(get_db),
     current_user: schemas.User = Depends(get_current_user),
 ):
+    """
+    Fetches metadata for a specific image using its ID.
+    It checks the cache for existing metadata before querying the database.
+    Access is restricted based on user group membership.
+    """
+    # Check cache first
+    cache = get_cache()
+    cache_key = f"image:{image_id}:metadata"
+    cached_metadata = cache.get(cache_key)
+    
+    if cached_metadata is not None:
+        return cached_metadata
+    
     db_image = await crud.get_data_instance(db=db, image_id=image_id)
     if db_image is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Image not found")
@@ -255,7 +188,12 @@ async def get_image_metadata(
         )
     
     # Use utility function for consistent metadata serialization
-    return to_data_instance_schema(db_image)
+    result = to_data_instance_schema(db_image)
+    
+    # Cache the result (1 hour)
+    cache.set(cache_key, result, expire=60*60)
+    
+    return result
 
 import httpx
 from fastapi.responses import StreamingResponse
@@ -267,6 +205,11 @@ async def get_image_download_url(
     db: AsyncSession = Depends(get_db),
     current_user: schemas.User = Depends(get_current_user),
 ):
+    """
+    Generates a presigned URL for downloading a specific image.
+    It retrieves the image details and checks user permissions.
+    The URL allows direct download from the object storage.
+    """
     db_image = await crud.get_data_instance(db=db, image_id=image_id)
     if db_image is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Image not found")
@@ -296,7 +239,11 @@ async def get_image_content(
     db: AsyncSession = Depends(get_db),
     current_user: schemas.User = Depends(get_current_user),
 ):
-    """Proxy endpoint that streams image content from Minio to the client"""
+    """
+    Streams the content of an image from object storage.
+    This endpoint acts as a proxy, ensuring proper access control.
+    It returns the image data with appropriate headers for inline display.
+    """
     db_image = await crud.get_data_instance(db=db, image_id=image_id)
     if db_image is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Image not found")
@@ -317,7 +264,7 @@ async def get_image_content(
     if not internal_url:
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Could not generate download URL")
     
-    # Use httpx to fetch the image from Minio
+    # Use httpx to fetch the image from s3
     async with httpx.AsyncClient() as client:
         try:
             response = await client.get(internal_url)
@@ -351,9 +298,29 @@ async def get_image_thumbnail(
     db: AsyncSession = Depends(get_db),
     current_user: schemas.User = Depends(get_current_user),
 ):
-    """Generate and return a thumbnail of the image"""
+    """
+    Generates and returns a thumbnail for a given image.
+    It resizes the image to specified dimensions while maintaining aspect ratio.
+    The thumbnail is cached for subsequent requests.
+    """
     if width <= 0 or height <= 0:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Width and height must be positive integers")
+    
+    # Check cache first
+    cache = get_cache()
+    cache_key = f"thumbnail:{image_id}:w:{width}:h:{height}"
+    cached_thumbnail = cache.get(cache_key)
+    
+    if cached_thumbnail:
+        thumbnail_data, content_type, filename = cached_thumbnail
+        return StreamingResponse(
+            content=io.BytesIO(thumbnail_data),
+            media_type=content_type,
+            headers={
+                "Content-Disposition": get_content_disposition_header(filename, "inline")
+            }
+        )
+    
     db_image = await crud.get_data_instance(db=db, image_id=image_id)
     if db_image is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Image not found")
@@ -405,8 +372,13 @@ async def get_image_thumbnail(
                 }
                 content_type = content_type_map.get(img_format, 'image/jpeg')
                 
-                # Return the thumbnail
+                # Cache the thumbnail (24 hours)
                 thumbnail_filename = f"thumbnail_{db_image.filename}" if db_image.filename else "thumbnail"
+                thumbnail_data = output_buffer.getvalue()
+                cache.set(cache_key, (thumbnail_data, content_type, thumbnail_filename), expire=24*3600)
+                
+                # Return the thumbnail
+                output_buffer.seek(0)
                 return StreamingResponse(
                     content=output_buffer,
                     media_type=content_type,
@@ -436,7 +408,11 @@ async def update_image_metadata(
     db: AsyncSession = Depends(get_db),
     current_user: schemas.User = Depends(get_current_user),
 ):
-    """Update metadata for a specific image"""
+    """
+    Updates the metadata for a specific image.
+    It allows adding or modifying a key-value pair in the image's metadata.
+    The changes are persisted to the database and caches are invalidated.
+    """
     db_image = await crud.get_data_instance(db=db, image_id=image_id)
     if db_image is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Image not found")
@@ -460,6 +436,12 @@ async def update_image_metadata(
         .values(metadata_=current_metadata)
     )
     await db.commit()
+    
+    # Invalidate caches
+    cache = get_cache()
+    cache.delete(f"image:{image_id}:metadata")
+    cache.clear_pattern(f"project_images:{db_image.project_id}")
+    cache.clear_pattern(f"thumbnail:{image_id}")
     
     # Return the updated image; build response dict ensuring updated metadata is present
     await db.refresh(db_image)
@@ -488,7 +470,11 @@ async def delete_image_metadata(
     db: AsyncSession = Depends(get_db),
     current_user: schemas.User = Depends(get_current_user),
 ):
-    """Delete metadata for a specific image"""
+    """
+    Deletes a specific metadata key-value pair from an image.
+    It first retrieves the image, checks permissions, and then removes the metadata.
+    The database is updated, and relevant caches are cleared.
+    """
     db_image = await crud.get_data_instance(db=db, image_id=image_id)
     if db_image is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Image not found")
@@ -513,6 +499,12 @@ async def delete_image_metadata(
         .values(metadata_=current_metadata)
     )
     await db.commit()
+    
+    # Invalidate caches
+    cache = get_cache()
+    cache.delete(f"image:{image_id}:metadata")
+    cache.clear_pattern(f"project_images:{db_image.project_id}")
+    cache.clear_pattern(f"thumbnail:{image_id}")
     
     # Return the updated image; build response dict ensuring updated metadata is present
     await db.refresh(db_image)

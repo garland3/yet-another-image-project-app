@@ -19,6 +19,11 @@ router = APIRouter(
 async def read_current_user(
     current_user: schemas.User = Depends(get_current_user),
 ):
+    """
+    Get the current user's information.
+    This endpoint is protected and only accessible by the authenticated user.
+    It returns the user object associated with the current session.
+    """
     return current_user
 
 @router.get("/me/groups", response_model=List[str])
@@ -27,8 +32,9 @@ async def read_current_user_groups(
     db: AsyncSession = Depends(get_db),
 ):
     """
-    Get all groups that the current user has access to.
-    This includes groups they have access to through projects.
+    Retrieve all groups accessible by the current user.
+    This includes groups granted through project memberships.
+    Returns a list of group identifiers.
     """
     # Get all projects from the database
     all_projects = await crud.get_all_projects(db)
@@ -49,7 +55,11 @@ async def create_user(
     db: AsyncSession = Depends(get_db),
     current_user: schemas.User = Depends(get_current_user),
 ):
-    """Create a new user - restricted to admin group only"""
+    """
+    Create a new user account.
+    This operation is restricted to users with administrative privileges.
+    Requires user data and returns the created user object.
+    """
     # Only allow admin users to create new users
     is_admin = is_user_in_group(current_user.email, "admin")
     if not is_admin:
@@ -83,6 +93,11 @@ async def read_user(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Not authorized to read user information",
         )
+    """
+    Retrieve a specific user's information by their ID.
+    This endpoint is restricted to administrators for security purposes.
+    Returns the user object if found, otherwise a 404 error.
+    """
     db_user = await crud.get_user_by_id(db=db, user_id=user_id)
     if db_user is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
@@ -95,6 +110,11 @@ async def update_user(
     db: AsyncSession = Depends(get_db),
     current_user: schemas.User = Depends(get_current_user),
 ):
+    """
+    Update an existing user's information.
+    Allows users to update their own profile or administrators to update any user.
+    Requires user ID and updated user data.
+    """
     # Only allow users to update their own profile or admin users
     is_admin = is_user_in_group(current_user.email, "admin")
     if str(user_id) != str(current_user.id) and not is_admin:

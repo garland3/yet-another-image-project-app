@@ -172,7 +172,8 @@ def ensure_bucket_exists(client, bucket_name: str):
 #         print(f"An unexpected error occurred during upload of {object_name}: {e}")
 #         return False
 
-async def upload_file_to_minio(
+# old upload_file_to_minio
+async def upload_file_to_s3(
     bucket_name: str,
     object_name: str,
     file_data: io.IOBase,
