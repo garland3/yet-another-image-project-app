@@ -2,6 +2,7 @@
 .git
 .gitignore
 .gitattributes
+_cache
 
 # Documentation
 README.md

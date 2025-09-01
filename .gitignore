@@ -1,5 +1,7 @@
 *.db
 .env
+
+_cache
 ui2
 build
 dist

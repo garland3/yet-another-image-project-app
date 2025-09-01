@@ -6,6 +6,7 @@ import Toast from './components/Toast';
 // Lazy load components
 const Project = lazy(() => import('./Project'));
 const ImageView = lazy(() => import('./ImageView'));
+const ApiKeys = lazy(() => import('./ApiKeys'));
 
 // Debug counter to track renders
 let renderCount = 0;
@@ -304,12 +305,17 @@ function App() {
               </div>
             )}
           </div>
-          <button 
-            className="btn btn-primary btn-large" 
-            onClick={() => setShowModal(true)}
-          >
-            New Project
-          </button>
+          <div className="header-actions">
+            <Link to="/api-keys" className="btn btn-secondary">
+              API Keys
+            </Link>
+            <button 
+              className="btn btn-primary btn-large" 
+              onClick={() => setShowModal(true)}
+            >
+              New Project
+            </button>
+          </div>
         </div>
       </header>
 
@@ -412,6 +418,14 @@ function App() {
         element={
           <Suspense fallback={<div className="loading-container">Loading image...</div>}>
             <ImageView />
+          </Suspense>
+        } 
+      />
+      <Route 
+        path="/api-keys" 
+        element={
+          <Suspense fallback={<div className="loading-container">Loading API keys...</div>}>
+            <ApiKeys />
           </Suspense>
         } 
       />
