@@ -43,9 +43,22 @@ async def list_api_keys(
     db: AsyncSession = Depends(get_db),
     current_user: schemas.User = Depends(get_current_user),
 ):
-    """List all API keys for the current user"""
+    """List all API keys for the current user (keys are masked for security)"""
     api_keys = await crud.get_api_keys_for_user(db=db, user_id=current_user.id)
-    return [schemas.ApiKey.model_validate(key) for key in api_keys]
+    # Convert to dict and mask the key values for security
+    result = []
+    for key in api_keys:
+        key_dict = {
+            "id": key.id,
+            "name": key.name,
+            "user_id": key.user_id,
+            "is_active": key.is_active,
+            "last_used_at": key.last_used_at,
+            "created_at": key.created_at,
+            "updated_at": key.updated_at,
+        }
+        result.append(schemas.ApiKey.model_validate(key_dict))
+    return result
 
 @router.delete("/api-keys/{api_key_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def deactivate_api_key(

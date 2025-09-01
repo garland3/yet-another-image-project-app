@@ -1,63 +1,82 @@
-# 🖼️ Image Project Manager
+# Image Project Manager
 
-**Powerful image management, classification, and collaboration platform**
+Image management, classification, and collaboration platform for organizing and labeling visual content.
 
-![Projects Overview](1readme_imgs/projects.png)
+## Requirements
 
-## 🚀 What is Image Project Manager?
+- Node.js 22+
+- Python 3.11+
+- Docker (for PostgreSQL and MinIO)
 
-Image Project Manager is a comprehensive solution for organizing, labeling, and collaborating on image-based projects. Whether you're working on machine learning datasets, managing product photography, or organizing digital assets, our platform provides the tools you need to efficiently manage your visual content.
+## Quick Start
 
-![Project Dashboard](1readme_imgs/project-dashboard.png)
-
-## ✨ Key Features
-
-- **Project Organization**: Create and manage multiple image projects
-- **Image Classification**: Define custom classes and label your images
-- **Collaboration**: Add comments and collaborate with team members
-- **Metadata Management**: Store and organize key-value metadata for projects and images
-- **User Management**: Control access and permissions for your team
-
-![Individual Image View](1readme_imgs/individual_img-view.png)
-
-## 🔧 Getting Started in Minutes
-
-### Quick Start with Docker
+### Production (Docker)
 
 ```bash
-# Clone the repository
-git clone https://github.com/yourusername/image-project-manager.git
-cd image-project-manager
-
-# Start with Docker Compose
-docker-compose up -d --build
-
-# Access the application at http://localhost:8000
+docker build -t image-project-manager .
+docker run -p 8000:8000 image-project-manager
 ```
 
-### Development Setup
+Access at http://localhost:8000
+
+### Development
 
 ```bash
-# Run the start script
+# Install dependencies and start services
 ./start.sh
 
-# Access the application at http://localhost:8000
+# Or start components separately:
+# ./install.sh
+# cd backend && ./run.sh    # Terminal 1 - Backend + DB
+# cd frontend && ./run.sh   # Terminal 2 - Frontend
 ```
 
-## 🤝 Join Our Community
+Backend: http://localhost:8000
+Frontend: http://localhost:3000
 
-We're actively seeking contributors to help make Image Project Manager even better! Whether you're a developer, designer, or user with ideas, your input is valuable.
+## Features
 
-**Ways to contribute:**
-- Report bugs and suggest features
-- Improve documentation
-- Submit pull requests
-- Share your use cases
+- Project organization and management
+- Image classification with custom labels
+- Team collaboration with comments
+- Metadata storage for projects and images
+- User access control
 
-## 📚 Learn More
+## Configuration
 
-For detailed technical information, check out our [Technical Documentation](technical-readme.md).
+Copy `.env.example` to `.env` and configure:
+- Database credentials
+- S3/MinIO storage settings
+- Authentication settings
 
-## 📝 License
+## Scripts
 
-This project is licensed under the MIT License - see the LICENSE file for details.
+- `./install.sh` - Install all dependencies
+- `./start.sh` - Start development environment
+- `backend/run.sh` - Start backend with PostgreSQL/MinIO
+- `frontend/run.sh` - Start React development server
+
+## Kubernetes Deployment Test
+
+Test deployment on minikube:
+
+```bash
+# Start minikube
+minikube start
+
+# Build and load image
+docker build -t image-project-manager:latest .
+minikube image load image-project-manager:latest
+
+# Deploy to cluster
+kubectl apply -f deployment-test/
+
+# Access application
+minikube service image-project-manager --url
+```
+
+See `deployment-test/` folder for Kubernetes manifests.
+
+## License
+
+MIT

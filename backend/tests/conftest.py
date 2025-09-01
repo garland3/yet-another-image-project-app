@@ -64,7 +64,7 @@ def client():
     # Patch S3 helpers to avoid external calls during tests
     # Important: Patch where they are used (routers.images.*), not the module defining them
     from unittest.mock import patch
-    with patch('routers.images.upload_file_to_minio', return_value=True), \
+    with patch('routers.images.upload_file_to_s3', return_value=True), \
          patch('routers.images.get_presigned_download_url', return_value='http://example/presigned'):
         with TestClient(app) as c:
             yield c
