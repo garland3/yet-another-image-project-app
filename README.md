@@ -56,6 +56,27 @@ Copy `.env.example` to `.env` and configure:
 - `backend/run.sh` - Start backend with PostgreSQL/MinIO
 - `frontend/run.sh` - Start React development server
 
+## Kubernetes Deployment Test
+
+Test deployment on minikube:
+
+```bash
+# Start minikube
+minikube start
+
+# Build and load image
+docker build -t image-project-manager:latest .
+minikube image load image-project-manager:latest
+
+# Deploy to cluster
+kubectl apply -f deployment-test/
+
+# Access application
+minikube service image-project-manager --url
+```
+
+See `deployment-test/` folder for Kubernetes manifests.
+
 ## License
 
 MIT
