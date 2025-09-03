@@ -168,6 +168,12 @@ def create_app() -> FastAPI:
     api_router.include_router(project_metadata.router)
     api_router.include_router(api_keys.router)
 
+    # Add health check endpoint (no auth required)
+    @app.get("/api/health")
+    async def health_check():
+        """Health check endpoint for container monitoring."""
+        return {"status": "healthy", "timestamp": "2025-09-03T01:46:25Z"}
+
     # Include the API router in the main app
     app.include_router(api_router)
 
