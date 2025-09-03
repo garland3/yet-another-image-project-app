@@ -300,7 +300,7 @@ function MetadataManager({
         
         <div className="metadata-form-section">
           <div className="section-header">
-            <h3>Json Update Metadata</h3>
+            <h3>JSON Update Metadata</h3>
             <button 
               className="btn btn-secondary btn-small toggle-btn"
               onClick={() => setBulkMetadataCollapsed(!bulkMetadataCollapsed)}
