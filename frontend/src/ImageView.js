@@ -6,6 +6,7 @@ import './App.css';
 import ImageDisplay from './components/ImageDisplay';
 import ImageMetadata from './components/ImageMetadata';
 import ImageClassifications from './components/ImageClassifications';
+import CompactImageClassifications from './components/CompactImageClassifications';
 import ImageComments from './components/ImageComments';
 
 function ImageView() {
@@ -225,18 +226,19 @@ function ImageView() {
             </button>
           </div>
           
-          <ImageDisplay 
-            imageId={imageId} 
-            image={image} 
-            isTransitioning={isTransitioning} 
-          />
-          
-          <ImageClassifications 
+          {/* Compact classification buttons above image */}
+          <CompactImageClassifications 
             imageId={imageId} 
             classes={classes} 
             loading={loading} 
             setLoading={setLoading} 
             setError={setError} 
+          />
+          
+          <ImageDisplay 
+            imageId={imageId} 
+            image={image} 
+            isTransitioning={isTransitioning} 
           />
           
           <ImageComments 
@@ -250,6 +252,15 @@ function ImageView() {
             imageId={imageId} 
             image={image} 
             setImage={setImage} 
+            loading={loading} 
+            setLoading={setLoading} 
+            setError={setError} 
+          />
+          
+          {/* Original classifications component for reference/additional details */}
+          <ImageClassifications 
+            imageId={imageId} 
+            classes={classes} 
             loading={loading} 
             setLoading={setLoading} 
             setError={setError} 
