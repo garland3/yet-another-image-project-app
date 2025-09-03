@@ -127,7 +127,7 @@ class TestSettings:
             assert settings.POSTGRES_PASSWORD == "postgres"
             assert settings.POSTGRES_DB == "postgres"
             assert settings.POSTGRES_SERVER == "localhost"
-            assert settings.DATABASE_URL == "sqlite:///./test.db"
+            assert settings.DATABASE_URL == "sqlite+aiosqlite:///./test.db"
 
     @patch.dict(os.environ, {
         "POSTGRES_USER": "testuser",
