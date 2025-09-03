@@ -158,7 +158,7 @@ function ImageDisplay({ imageId, image, isTransitioning }) {
             className="view-image"
             style={{ transform: `scale(${zoomLevel})` }}
             onError={(e) => {
-              console.error(`Failed to load image with ID: ${imageId}`, e);
+              console.error('Failed to load image with ID: %s', imageId, e);
               // Try the thumbnail endpoint as fallback
               if (!e.target.src.includes('thumbnail')) {
                 e.target.src = `/api/images/${imageId}/thumbnail?width=800&height=600`;

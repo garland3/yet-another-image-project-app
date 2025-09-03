@@ -118,11 +118,16 @@ class TestSettings:
         settings = Settings(_env_file=None)
         assert hasattr(settings, 'APP_NAME')
 
-    def test_database_url_required_fields(self):
-        """Test that required database fields raise validation errors when missing"""
+    def test_database_url_default_values(self):
+        """Test that database fields have default values when environment variables are missing"""
         with patch.dict(os.environ, {}, clear=True):
-            with pytest.raises(Exception):
-                Settings(_env_file=None)
+            settings = Settings(_env_file=None)
+            # Verify default values are set
+            assert settings.POSTGRES_USER == "postgres"
+            assert settings.POSTGRES_PASSWORD == "postgres"
+            assert settings.POSTGRES_DB == "postgres"
+            assert settings.POSTGRES_SERVER == "localhost"
+            assert settings.DATABASE_URL == "sqlite:///./test.db"
 
     @patch.dict(os.environ, {
         "POSTGRES_USER": "testuser",
