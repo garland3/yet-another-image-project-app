@@ -16,11 +16,18 @@ def _make_png_bytes(size=(10, 10), color=(255, 0, 0)):
 
 @pytest.fixture(autouse=True)
 def clear_cache():
-    """Clear cache before each test."""
+    """Clear cache before each test and reset global cache instance."""
+    # Reset global cache instance to ensure fresh state
+    import utils.cache_manager as cm
+    cm._cache_manager = None
+    
     cache = get_cache()
     cache.clear()
     yield
     cache.clear()
+    
+    # Reset again after test
+    cm._cache_manager = None
 
 
 class TestImageListCaching:
@@ -101,9 +108,18 @@ class TestImageListCaching:
         cache_key_2 = f"project_images:{pid}:skip:2:limit:2"
         cache_key_3 = f"project_images:{pid}:skip:0:limit:100"
         
-        assert cache.get(cache_key_1) is not None
-        assert cache.get(cache_key_2) is not None
-        assert cache.get(cache_key_3) is not None
+        # Debug info in case of failure
+        cached_1 = cache.get(cache_key_1)
+        cached_2 = cache.get(cache_key_2)
+        cached_3 = cache.get(cache_key_3)
+        
+        if cached_1 is None:
+            print(f"Cache key 1 not found: {cache_key_1}")
+            print(f"Cache stats: {cache.stats()}")
+        
+        assert cached_1 is not None, f"Cache key 1 should exist: {cache_key_1}"
+        assert cached_2 is not None, f"Cache key 2 should exist: {cache_key_2}"
+        assert cached_3 is not None, f"Cache key 3 should exist: {cache_key_3}"
         
         # Verify they're different
         assert len(cache.get(cache_key_1)) == 2

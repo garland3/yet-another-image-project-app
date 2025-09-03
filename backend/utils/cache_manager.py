@@ -8,7 +8,14 @@ class CacheManager:
     """Simple wrapper around diskcache with project-specific configuration."""
     
     def __init__(self):
-        cache_dir = Path(__file__).parent.parent / '_cache'
+        import tempfile
+        
+        # In testing/CI environments, prefer temp directory for cache
+        if os.getenv('CI') or os.getenv('PYTEST_CURRENT_TEST'):
+            cache_dir = Path(tempfile.mkdtemp(prefix='test_cache_'))
+        else:
+            cache_dir = Path(__file__).parent.parent / '_cache'
+            
         cache_dir.mkdir(exist_ok=True)
         
         # Convert MB to bytes for size limit
@@ -94,12 +101,18 @@ class CacheManager:
                 'count': len(self._memory_cache)
             }
 
-# Global cache manager instance
+import threading
+
+# Global cache manager instance with thread lock
 _cache_manager: Optional[CacheManager] = None
+_cache_lock = threading.Lock()
 
 def get_cache() -> CacheManager:
-    """Get or create the global cache manager instance."""
+    """Get or create the global cache manager instance (thread-safe)."""
     global _cache_manager
     if _cache_manager is None:
-        _cache_manager = CacheManager()
+        with _cache_lock:
+            # Double-check locking pattern
+            if _cache_manager is None:
+                _cache_manager = CacheManager()
     return _cache_manager
