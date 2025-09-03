@@ -1,6 +1,7 @@
 import os
 import json
 import logging
+from datetime import datetime
 from contextlib import asynccontextmanager
 from fastapi import FastAPI, Request, status, HTTPException
 from fastapi.routing import APIRouter
@@ -172,7 +173,7 @@ def create_app() -> FastAPI:
     @app.get("/api/health")
     async def health_check():
         """Health check endpoint for container monitoring."""
-        return {"status": "healthy", "timestamp": "2025-09-03T01:46:25Z"}
+        return {"status": "healthy", "timestamp": datetime.utcnow().isoformat() + 'Z'}
 
     # Include the API router in the main app
     app.include_router(api_router)
