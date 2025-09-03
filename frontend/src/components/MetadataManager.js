@@ -253,9 +253,14 @@ function MetadataManager({
         </div>
         
         <div className="metadata-form-section">
-          <div className="section-header" onClick={() => setAddMetadataCollapsed(!addMetadataCollapsed)}>
+          <div className="section-header">
             <h3>Add Metadata</h3>
-            <span className="toggle-icon">{addMetadataCollapsed ? 'v' : '^'}</span>
+            <button 
+              className="btn btn-secondary btn-small toggle-btn"
+              onClick={() => setAddMetadataCollapsed(!addMetadataCollapsed)}
+            >
+              {addMetadataCollapsed ? 'Show' : 'Hide'}
+            </button>
           </div>
           
           {!addMetadataCollapsed && (
@@ -293,12 +298,15 @@ function MetadataManager({
           )}
         </div>
         
-        <hr />
-        
         <div className="metadata-form-section">
-          <div className="section-header" onClick={() => setBulkMetadataCollapsed(!bulkMetadataCollapsed)}>
-            <h3>Bulk Update Metadata</h3>
-            <span className="toggle-icon">{bulkMetadataCollapsed ? 'v' : '^'}</span>
+          <div className="section-header">
+            <h3>Json Update Metadata</h3>
+            <button 
+              className="btn btn-secondary btn-small toggle-btn"
+              onClick={() => setBulkMetadataCollapsed(!bulkMetadataCollapsed)}
+            >
+              {bulkMetadataCollapsed ? 'Show' : 'Hide'}
+            </button>
           </div>
           
           {!bulkMetadataCollapsed && (

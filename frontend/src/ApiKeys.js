@@ -211,7 +211,7 @@ function ApiKeys() {
         </div>
         <div className="modal-body">
           <div className="alert alert-warning">
-            <strong>⚠️ Important:</strong> This is the only time you will see this API key. 
+            <strong>Important:</strong> This is the only time you will see this API key. 
             Please copy it now and store it in a secure location.
           </div>
           <div className="form-group">
