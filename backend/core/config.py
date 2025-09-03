@@ -22,7 +22,7 @@ class Settings(BaseSettings):
     POSTGRES_DB: str = "postgres"
     POSTGRES_SERVER: str = "localhost"
     POSTGRES_PORT: int = 5433
-    DATABASE_URL: str = "sqlite:///./test.db"
+    DATABASE_URL: str = "sqlite+aiosqlite:///./test.db"
 
     # S3/MinIO settings - defaults for local development
     # Back-compat: we also honor MINIO_* env vars; see post-init below.

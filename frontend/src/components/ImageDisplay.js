@@ -23,7 +23,7 @@ function ImageDisplay({ imageId, image, isTransitioning }) {
     if (!image) return;
     
     try {
-      console.log(`Starting download for image ${imageId}...`);
+      console.log('Starting download for image %s...', imageId);
       
       // Try multiple endpoints to find the working one
       const endpoints = [
@@ -36,16 +36,16 @@ function ImageDisplay({ imageId, image, isTransitioning }) {
       
       for (const endpoint of endpoints) {
         try {
-          console.log(`Trying endpoint: ${endpoint}`);
+          console.log('Trying endpoint: %s', endpoint);
           const response = await fetch(endpoint);
           
           if (!response.ok) {
-            console.log(`Endpoint ${endpoint} failed: ${response.status} ${response.statusText}`);
+            console.log('Endpoint %s failed: %s %s', endpoint, response.status, response.statusText);
             continue;
           }
           
           const contentType = response.headers.get('content-type');
-          console.log(`Endpoint ${endpoint} - Content-Type: ${contentType}`);
+          console.log('Endpoint %s - Content-Type: %s', endpoint, contentType);
           
           if (contentType && contentType.includes('application/json')) {
             // This might be a redirect URL response
@@ -54,7 +54,7 @@ function ImageDisplay({ imageId, image, isTransitioning }) {
             
             if (jsonData.url) {
               // Try to fetch from the provided URL
-              console.log(`Fetching from provided URL: ${jsonData.url}`);
+              console.log('Fetching from provided URL: %s', jsonData.url);
               const imageResponse = await fetch(jsonData.url);
               
               if (imageResponse.ok) {
@@ -70,10 +70,10 @@ function ImageDisplay({ imageId, image, isTransitioning }) {
             imageBlob = await response.blob();
             break;
           } else {
-            console.log(`Unexpected content type: ${contentType}`);
+            console.log('Unexpected content type: %s', contentType);
           }
         } catch (endpointError) {
-          console.error(`Error with endpoint ${endpoint}:`, endpointError);
+          console.error('Error with endpoint %s:', endpoint, endpointError);
           continue;
         }
       }
@@ -112,7 +112,7 @@ function ImageDisplay({ imageId, image, isTransitioning }) {
       // Clean up the blob URL
       window.URL.revokeObjectURL(blobUrl);
       
-      console.log(`Download completed successfully: ${filename}`);
+      console.log('Download completed successfully: %s', filename);
       
     } catch (error) {
       console.error('Error downloading image:', error);

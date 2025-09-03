@@ -4,8 +4,14 @@ from typing import AsyncGenerator
 import sys
 from .config import settings
 
+# Use aiosqlite for SQLite URLs to support async operations
+database_url = settings.DATABASE_URL
+if database_url.startswith('sqlite:'):
+    # Convert sqlite:// to sqlite+aiosqlite:// for async support
+    database_url = database_url.replace('sqlite:', 'sqlite+aiosqlite:', 1)
+
 engine = create_async_engine(
-    settings.DATABASE_URL,
+    database_url,
     echo=False,
     future=True
 )

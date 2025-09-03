@@ -120,7 +120,7 @@ jobs:
       run: |
         # Start the container
         docker run -d --name test-container \
-          -e DATABASE_URL="sqlite:///./test.db" \
+          -e DATABASE_URL="sqlite+aiosqlite:///./test.db" \
           -e FAST_TEST_MODE=true \
           -e DEBUG=true \
           -e SKIP_HEADER_CHECK=true \
@@ -157,7 +157,7 @@ jobs:
     - name: Run tests in container
       run: |
         docker run --rm \
-          -e DATABASE_URL="sqlite:///./test.db" \
+          -e DATABASE_URL="sqlite+aiosqlite:///./test.db" \
           -e FAST_TEST_MODE=true \
           -e DEBUG=true \
           -e SKIP_HEADER_CHECK=true \
