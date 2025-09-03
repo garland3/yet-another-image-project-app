@@ -1,31 +1,76 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 
+// Fallback SVG for failed image loads
+const FALLBACK_IMAGE_SVG = 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNDAwIiBoZWlnaHQ9IjQwMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iNDAwIiBoZWlnaHQ9IjQwMCIgZmlsbD0iI2YzZjRmNiIgc3Ryb2tlPSIjZTVlN2ViIiBzdHJva2Utd2lkdGg9IjIiLz48dGV4dCB4PSI1MCUiIHk9IjQ1JSIgZm9udC1mYW1pbHk9IkFyaWFsLCBzYW5zLXNlcmlmIiBmb250LXNpemU9IjE2IiBmb250LXdlaWdodD0iNTAwIiB0ZXh0LWFuY2hvcj0ibWlkZGxlIiBkeT0iLjNlbSIgZmlsbD0iIzlmYTZiMiI+SW1hZ2UgVW5hdmFpbGFibGU8L3RleHQ+PHRleHQgeD0iNTAlIiB5PSI1NSUiIGZvbnQtZmFtaWx5PSJBcmlhbCwgc2Fucy1zZXJpZiIgZm9udC1zaXplPSIyNCIgdGV4dC1hbmNob3I9Im1pZGRsZSIgZHk9Ii4zZW0iIGZpbGw9IiNkMWQ1ZGIiPvCfk7c8L3RleHQ+PC9zdmc+';
+
 function ImageGallery({ projectId, images, loading }) {
   const navigate = useNavigate();
   const [imageLoadStatus, setImageLoadStatus] = useState({});
   const [currentPage, setCurrentPage] = useState(1);
-  const [debugExpanded, setDebugExpanded] = useState(false); // Debug section collapsed by default
-  const imagesPerPage = 50; // Limit to 50 thumbnails per page
+  const [debugExpanded, setDebugExpanded] = useState(false);
+  const [viewMode, setViewMode] = useState('medium'); // small, medium, large
+  const [sortBy, setSortBy] = useState('date'); // date, name, size
+  const [searchTerm, setSearchTerm] = useState('');
+  const [selectedImages, setSelectedImages] = useState(new Set());
+  
+  const imagesPerPage = viewMode === 'small' ? 100 : viewMode === 'medium' ? 50 : 25;
+  
+  // Filter and sort images
+  const filteredImages = images
+    .filter(image => {
+      if (!searchTerm) return true;
+      const filename = (image.filename || '').toLowerCase();
+      return filename.includes(searchTerm.toLowerCase());
+    })
+    .sort((a, b) => {
+      switch (sortBy) {
+        case 'name':
+          return (a.filename || '').localeCompare(b.filename || '');
+        case 'size':
+          return (b.size_bytes || 0) - (a.size_bytes || 0);
+        case 'date':
+        default:
+          return new Date(b.created_at || 0) - new Date(a.created_at || 0);
+      }
+    });
   
   // Calculate total pages
-  const totalPages = Math.ceil(images.length / imagesPerPage);
+  const totalPages = Math.ceil(filteredImages.length / imagesPerPage);
   
   // Get current images for the page
   const indexOfLastImage = currentPage * imagesPerPage;
   const indexOfFirstImage = indexOfLastImage - imagesPerPage;
-  const currentImages = images.slice(indexOfFirstImage, indexOfLastImage);
+  const currentImages = filteredImages.slice(indexOfFirstImage, indexOfLastImage);
   
-  // Reset to first page when images array changes
+  // Reset to first page when images or filters change
   useEffect(() => {
     setCurrentPage(1);
-  }, [images.length]);
+  }, [images.length, searchTerm, sortBy]);
   
   // Page change handler
   const handlePageChange = (pageNumber) => {
     setCurrentPage(pageNumber);
-    // Scroll to top of gallery
-    document.getElementById('images-container')?.scrollIntoView({ behavior: 'smooth' });
+    document.querySelector('.gallery-grid')?.scrollIntoView({ behavior: 'smooth' });
+  };
+  
+  // Image selection handlers
+  const toggleImageSelection = (imageId) => {
+    const newSelected = new Set(selectedImages);
+    if (newSelected.has(imageId)) {
+      newSelected.delete(imageId);
+    } else {
+      newSelected.add(imageId);
+    }
+    setSelectedImages(newSelected);
+  };
+  
+  const selectAllImages = () => {
+    setSelectedImages(new Set(currentImages.map(img => img.id)));
+  };
+  
+  const clearSelection = () => {
+    setSelectedImages(new Set());
   };
 
   // Helper function to format file size
@@ -38,93 +83,206 @@ function ImageGallery({ projectId, images, loading }) {
   };
 
   return (
-    <div className="card">
-      <div className="card-header">
-        <h2>Images</h2>
-      </div>
-      <div id="images-container" className="card-content">
-        {loading && <p>Loading images...</p>}
+    <div className="modern-gallery">
+      {/* Gallery Header with Controls */}
+      <div className="gallery-header">
+        <div className="gallery-title-section">
+          <h1 className="gallery-title">Images</h1>
+          <div className="gallery-stats">
+            <span className="image-count">
+              {filteredImages.length} {filteredImages.length === 1 ? 'image' : 'images'}
+              {searchTerm && ` found for "${searchTerm}"`}
+            </span>
+            {selectedImages.size > 0 && (
+              <span className="selection-count">
+                {selectedImages.size} selected
+              </span>
+            )}
+          </div>
+        </div>
         
-        {!loading && images.length === 0 && (
-          <p>No images found. Upload an image to get started.</p>
+        <div className="gallery-controls">
+          <div className="search-control">
+            <input
+              type="text"
+              placeholder="Search images..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="search-input"
+            />
+          </div>
+          
+          <div className="view-controls">
+            <select 
+              value={sortBy} 
+              onChange={(e) => setSortBy(e.target.value)}
+              className="sort-select"
+            >
+              <option value="date">Sort by Date</option>
+              <option value="name">Sort by Name</option>
+              <option value="size">Sort by Size</option>
+            </select>
+            
+            <div className="view-mode-buttons">
+              <button 
+                className={`view-mode-btn ${viewMode === 'small' ? 'active' : ''}`}
+                onClick={() => setViewMode('small')}
+                title="Small thumbnails"
+              >
+                S
+              </button>
+              <button 
+                className={`view-mode-btn ${viewMode === 'medium' ? 'active' : ''}`}
+                onClick={() => setViewMode('medium')}
+                title="Medium thumbnails"
+              >
+                M
+              </button>
+              <button 
+                className={`view-mode-btn ${viewMode === 'large' ? 'active' : ''}`}
+                onClick={() => setViewMode('large')}
+                title="Large thumbnails"
+              >
+                L
+              </button>
+            </div>
+          </div>
+          
+          {selectedImages.size > 0 && (
+            <div className="selection-controls">
+              <button onClick={clearSelection} className="btn btn-secondary btn-small">
+                Clear Selection
+              </button>
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Gallery Content */}
+      <div className="gallery-content">
+        {loading && (
+          <div className="gallery-loading">
+            <div className="spinner"></div>
+            <p>Loading images...</p>
+          </div>
         )}
         
-        {!loading && images.length > 0 && (
+        {!loading && images.length === 0 && (
+          <div className="gallery-empty">
+            <div className="empty-icon">+</div>
+            <h3>No images yet</h3>
+            <p>Upload your first image to get started</p>
+          </div>
+        )}
+        
+        {!loading && filteredImages.length === 0 && images.length > 0 && (
+          <div className="gallery-empty">
+            <div className="empty-icon">?</div>
+            <h3>No images found</h3>
+            <p>Try adjusting your search terms</p>
+            <button 
+              onClick={() => setSearchTerm('')} 
+              className="btn btn-primary btn-small"
+            >
+              Clear Search
+            </button>
+          </div>
+        )}
+        
+        {!loading && currentImages.length > 0 && (
           <>
-            <div className="pagination-info">
-              <p>Showing {indexOfFirstImage + 1}-{Math.min(indexOfLastImage, images.length)} of {images.length} images</p>
+            <div className="gallery-pagination-info">
+              <span>
+                Showing {indexOfFirstImage + 1}-{Math.min(indexOfLastImage, filteredImages.length)} of {filteredImages.length} images
+              </span>
+              {selectedImages.size === 0 && (
+                <button onClick={selectAllImages} className="btn btn-secondary btn-small">
+                  Select All on Page
+                </button>
+              )}
             </div>
             
-            <div className="image-gallery">
+            <div className={`gallery-grid view-${viewMode}`}>
               {currentImages.map(image => (
-              <div 
-                key={image.id} 
-                className="image-card"
-                onClick={() => navigate(`/view/${image.id}?project=${projectId}`)}
-              >
-                <img 
-                  src={`/api/images/${image.id}/thumbnail?width=200&height=200`} 
-                  alt={image.filename || 'Image'} 
-                  onLoad={() => {
-                    console.log(`Thumbnail for image ${image.id} loaded successfully`);
-                    setImageLoadStatus(prev => ({
-                      ...prev,
-                      [image.id]: { status: 'loaded', timestamp: new Date().toISOString() }
-                    }));
-                  }}
-                  onError={(e) => {
-                    console.error(`Error loading thumbnail for image ${image.id}:`, e);
-                    // Try to fetch the image URL to see if we get a more detailed error
-                    fetch(`/api/images/${image.id}/download`)
-                      .then(response => {
-                        console.log(`Download URL response for ${image.id}:`, response.status, response.statusText);
-                        return response.json();
-                      })
-                      .then(data => {
-                        console.log(`Download URL data for ${image.id}:`, data);
-                        // Try to fetch the content URL directly
-                        return fetch(`/api/images/${image.id}/thumbnail?width=200&height=200`);
-                      })
-                      .then(response => {
-                        console.log(`Thumbnail URL response for ${image.id}:`, response.status, response.statusText);
-                      })
-                      .catch(err => {
-                        console.error(`Error checking image URLs for ${image.id}:`, err);
-                      });
-                    
-                    setImageLoadStatus(prev => ({
-                      ...prev,
-                      [image.id]: { status: 'error', timestamp: new Date().toISOString(), error: e.message }
-                    }));
-                    
-                    e.target.onerror = null;
-                    e.target.src = 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjAwIiBoZWlnaHQ9IjIwMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iMjAwIiBoZWlnaHQ9IjIwMCIgZmlsbD0iI2VlZSIvPjx0ZXh0IHg9IjUwJSIgeT0iNTAlIiBmb250LWZhbWlseT0iQXJpYWwsIHNhbnMtc2VyaWYiIGZvbnQtc2l6ZT0iMTQiIHRleHQtYW5jaG9yPSJtaWRkbGUiIGR5PSIuM2VtIiBmaWxsPSIjYWFhIj5JbWFnZSBsb2FkIGVycm9yPC90ZXh0Pjwvc3ZnPg==';
-                  }}
-                />
-                <div className="image-info">
-                  <p>{image.filename || 'Unnamed image'}</p>
-                  <small>{formatFileSize(image.size_bytes)}</small>
+                <div 
+                  key={image.id} 
+                  className={`gallery-item ${selectedImages.has(image.id) ? 'selected' : ''}`}
+                >
+                  <div className="gallery-item-checkbox">
+                    <input
+                      type="checkbox"
+                      checked={selectedImages.has(image.id)}
+                      onChange={() => toggleImageSelection(image.id)}
+                      onClick={(e) => e.stopPropagation()}
+                    />
+                  </div>
+                  
+                  <div 
+                    className="gallery-item-image"
+                    onClick={() => navigate(`/view/${image.id}?project=${projectId}`)}
+                  >
+                    <img 
+                      src={`/api/images/${image.id}/thumbnail?width=400&height=400`} 
+                      alt={image.filename || 'Image'} 
+                      loading="lazy"
+                      onLoad={() => {
+                        setImageLoadStatus(prev => ({
+                          ...prev,
+                          [image.id]: { status: 'loaded', timestamp: new Date().toISOString() }
+                        }));
+                      }}
+                      onError={(e) => {
+                        setImageLoadStatus(prev => ({
+                          ...prev,
+                          [image.id]: { status: 'error', timestamp: new Date().toISOString(), error: e.message }
+                        }));
+                        e.target.onerror = null;
+                        e.target.src = FALLBACK_IMAGE_SVG;
+                      }}
+                    />
+                    <div className="gallery-item-overlay">
+                      <div className="overlay-actions">
+                        <button 
+                          className="overlay-btn"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            navigate(`/view/${image.id}?project=${projectId}`);
+                          }}
+                        >
+                          View
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                  
+                  <div className="gallery-item-info">
+                    <div className="item-filename">
+                      {image.filename || 'Unnamed image'}
+                    </div>
+                    <div className="item-meta">
+                      <span className="item-size">{formatFileSize(image.size_bytes)}</span>
+                    </div>
+                  </div>
                 </div>
-              </div>
               ))}
             </div>
             
             {totalPages > 1 && (
-              <div className="pagination-controls">
+              <div className="gallery-pagination">
                 <button 
                   onClick={() => handlePageChange(1)} 
                   disabled={currentPage === 1}
-                  className="pagination-button"
+                  className="pagination-btn"
                 >
-                  First
+                  ‹‹
                 </button>
                 
                 <button 
                   onClick={() => handlePageChange(currentPage - 1)} 
                   disabled={currentPage === 1}
-                  className="pagination-button"
+                  className="pagination-btn"
                 >
-                  Previous
+                  ‹
                 </button>
                 
                 <span className="pagination-info">
@@ -134,231 +292,85 @@ function ImageGallery({ projectId, images, loading }) {
                 <button 
                   onClick={() => handlePageChange(currentPage + 1)} 
                   disabled={currentPage === totalPages}
-                  className="pagination-button"
+                  className="pagination-btn"
                 >
-                  Next
+                  ›
                 </button>
                 
                 <button 
                   onClick={() => handlePageChange(totalPages)} 
                   disabled={currentPage === totalPages}
-                  className="pagination-button"
+                  className="pagination-btn"
                 >
-                  Last
+                  ››
                 </button>
               </div>
             )}
           </>
         )}
-
-        {/* Debug information section */}
-        <div style={{ marginBottom: '20px', padding: '10px', border: '1px solid #ddd', borderRadius: '4px', backgroundColor: '#f9f9f9' }}>
-          <div 
-            style={{ 
-              display: 'flex', 
-              justifyContent: 'space-between', 
-              alignItems: 'center', 
-              cursor: 'pointer' 
-            }}
-            onClick={() => setDebugExpanded(!debugExpanded)}
-          >
-            <h3 style={{ marginTop: '0', marginBottom: debugExpanded ? '15px' : '0' }}>
-              Debug Information
-            </h3>
-            <span style={{ fontSize: '18px', fontWeight: 'bold' }}>
-              {debugExpanded ? 'v' : '>'}
-            </span>
-          </div>
-          
-          {debugExpanded && (
-            <>
-              <p>Image loading status: {Object.keys(imageLoadStatus).length} / {images.length} images tracked</p>
-              <ul style={{ maxHeight: '150px', overflowY: 'auto', fontSize: '12px', fontFamily: 'monospace' }}>
-                {Object.entries(imageLoadStatus).map(([imageId, status]) => (
-                  <li key={imageId} style={{ 
-                    color: status.status === 'loaded' ? 'green' : 'red',
-                    marginBottom: '5px'
-                  }}>
-                    {imageId}: {status.status} at {status.timestamp}
-                    {status.error && <div>Error: {status.error}</div>}
-                  </li>
-                ))}
-              </ul>
-              <div style={{ display: 'flex', gap: '10px', marginTop: '10px' }}>
-                <button 
-                  onClick={(e) => {
-                    e.stopPropagation(); // Prevent toggling the debug section
-                    console.log('Current image load status:', imageLoadStatus);
-                    console.log('Images data:', images);
-                  }}
-                  style={{ padding: '5px 10px', fontSize: '12px' }}
-                >
-                  Log Debug Info to Console
-                </button>
-                
-                <button 
-                  onClick={(e) => {
-                    e.stopPropagation(); // Prevent toggling the debug section
-                if (images.length === 0) {
-                  console.log('No images to test');
-                  return;
-                }
-                
-                // Test the first image
-                const testImage = images[0];
-                console.log(`Testing image loading for ${testImage.id}...`);
-                
-                // Test the download URL endpoint
-                fetch(`/api/images/${testImage.id}/download`)
-                  .then(response => {
-                    console.log(`Download URL response: ${response.status} ${response.statusText}`);
-                    return response.json();
-                  })
-                  .then(data => {
-                    console.log('Download URL data:', data);
-                    
-                    // Test the content URL endpoint
-                    return fetch(`/api/images/${testImage.id}/content`);
-                  })
-                  .then(response => {
-                    console.log(`Content URL response: ${response.status} ${response.statusText}`);
-                    console.log('Content-Type:', response.headers.get('content-type'));
-                    
-                    // Test the thumbnail URL endpoint
-                    return fetch(`/api/images/${testImage.id}/thumbnail?width=200&height=200`);
-                  })
-                  .then(response => {
-                    console.log(`Thumbnail URL response: ${response.status} ${response.statusText}`);
-                    console.log('Thumbnail Content-Type:', response.headers.get('content-type'));
-                    
-                    // Create test image elements
-                    const img1 = new Image();
-                    img1.onload = () => console.log('Full image loaded successfully');
-                    img1.onerror = (e) => console.error('Full image failed to load:', e);
-                    img1.src = `/api/images/${testImage.id}/content`;
-                    
-                    const img2 = new Image();
-                    img2.onload = () => console.log('Thumbnail loaded successfully');
-                    img2.onerror = (e) => console.error('Thumbnail failed to load:', e);
-                    img2.src = `/api/images/${testImage.id}/thumbnail?width=200&height=200`;
-                  })
-                  .catch(err => {
-                    console.error('Error testing image URLs:', err);
-                  });
-                  }}
-                  style={{ padding: '5px 10px', fontSize: '12px' }}
-                >
-                  Test Image Loading
-                </button>
-                
-                <button 
-                  onClick={(e) => {
-                    e.stopPropagation(); // Prevent toggling the debug section
-                if (images.length === 0) {
-                  console.log('No images to test');
-                  return;
-                }
-                
-                // Test the first image
-                const testImage = images[0];
-                console.log(`Testing direct URL loading for ${testImage.id}...`);
-                
-                // Get the URL from the download endpoint
-                fetch(`/api/images/${testImage.id}/download`)
-                  .then(response => response.json())
-                  .then(data => {
-                    console.log('Download URL data:', data);
-                    
-                    // Create a test div to show the image
-                    const testDiv = document.createElement('div');
-                    testDiv.style.position = 'fixed';
-                    testDiv.style.top = '20px';
-                    testDiv.style.right = '20px';
-                    testDiv.style.zIndex = '9999';
-                    testDiv.style.padding = '10px';
-                    testDiv.style.background = 'white';
-                    testDiv.style.border = '1px solid black';
-                    testDiv.style.boxShadow = '0 0 10px rgba(0,0,0,0.5)';
-                    
-                    // Add a close button
-                    const closeBtn = document.createElement('button');
-                    closeBtn.innerText = 'Close';
-                    closeBtn.onclick = () => document.body.removeChild(testDiv);
-                    testDiv.appendChild(closeBtn);
-                    
-                    // Add a title
-                    const title = document.createElement('p');
-                    title.innerText = 'Testing direct URL loading';
-                    testDiv.appendChild(title);
-                    
-                    // Create four test images with different URLs
-                    const img1 = document.createElement('img');
-                    img1.src = `/api/images/${testImage.id}/content`;
-                    img1.style.maxWidth = '200px';
-                    img1.style.display = 'block';
-                    img1.style.marginBottom = '10px';
-                    img1.onload = () => console.log('Image loaded with /content URL');
-                    img1.onerror = (e) => console.error('Error loading with /content URL:', e);
-                    
-                    const img2 = document.createElement('img');
-                    img2.src = `/api/images/${testImage.id}/download`;
-                    img2.style.maxWidth = '200px';
-                    img2.style.display = 'block';
-                    img2.style.marginBottom = '10px';
-                    img2.onload = () => console.log('Image loaded with /download URL');
-                    img2.onerror = (e) => console.error('Error loading with /download URL:', e);
-                    
-                    const img3 = document.createElement('img');
-                    img3.src = data.url; // Use the URL from the response
-                    img3.style.maxWidth = '200px';
-                    img3.style.display = 'block';
-                    img3.style.marginBottom = '10px';
-                    img3.onload = () => console.log('Image loaded with response URL');
-                    img3.onerror = (e) => console.error('Error loading with response URL:', e);
-                    
-                    const img4 = document.createElement('img');
-                    img4.src = `/api/images/${testImage.id}/thumbnail?width=200&height=200`;
-                    img4.style.maxWidth = '200px';
-                    img4.style.display = 'block';
-                    img4.style.marginBottom = '10px';
-                    img4.onload = () => console.log('Image loaded with /thumbnail URL');
-                    img4.onerror = (e) => console.error('Error loading with /thumbnail URL:', e);
-                    
-                    // Add labels and images
-                    const label1 = document.createElement('div');
-                    label1.innerText = '/api/content URL:';
-                    testDiv.appendChild(label1);
-                    testDiv.appendChild(img1);
-                    
-                    const label2 = document.createElement('div');
-                    label2.innerText = '/api/download URL:';
-                    testDiv.appendChild(label2);
-                    testDiv.appendChild(img2);
-                    
-                    const label3 = document.createElement('div');
-                    label3.innerText = 'Response URL:';
-                    testDiv.appendChild(label3);
-                    testDiv.appendChild(img3);
-                    
-                    const label4 = document.createElement('div');
-                    label4.innerText = '/api/thumbnail URL:';
-                    testDiv.appendChild(label4);
-                    testDiv.appendChild(img4);
-                    
-                    document.body.appendChild(testDiv);
-                  })
-                  .catch(err => {
-                    console.error('Error testing direct URL loading:', err);
-                  });
-                  }}
-                  style={{ padding: '5px 10px', fontSize: '12px' }}
-                >
-                  Test Direct URLs
-                </button>
-              </div>
-            </>
-          )}
+      </div>
+      
+      {/* Debug section moved to bottom */}
+      <div className="debug-section">
+        <div className="debug-header" onClick={() => setDebugExpanded(!debugExpanded)}>
+          <h4>Debug Information</h4>
+          <span className="debug-toggle">{debugExpanded ? '▲' : '▼'}</span>
         </div>
+        
+        {debugExpanded && (
+          <div className="debug-content">
+            <div className="debug-stats">
+              <p>Image loading status: {Object.keys(imageLoadStatus).length} / {images.length} images tracked</p>
+            </div>
+            
+            <div className="debug-log">
+              <h5>Loading Status Log:</h5>
+              <div className="debug-log-list">
+                {Object.entries(imageLoadStatus).map(([imageId, status]) => (
+                  <div key={imageId} className={`debug-log-item ${status.status}`}>
+                    <span className="log-id">{imageId}</span>
+                    <span className="log-status">{status.status}</span>
+                    <span className="log-time">{new Date(status.timestamp).toLocaleTimeString()}</span>
+                    {status.error && <div className="log-error">Error: {status.error}</div>}
+                  </div>
+                ))}
+              </div>
+            </div>
+            
+            <div className="debug-actions">
+              <button 
+                className="debug-btn"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  console.log('Current image load status:', imageLoadStatus);
+                  console.log('Images data:', images);
+                }}
+              >
+                Log to Console
+              </button>
+              
+              <button 
+                className="debug-btn"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  if (images.length === 0) {
+                    console.log('No images to test');
+                    return;
+                  }
+                  const testImage = images[0];
+                  console.log(`Testing image loading for ${testImage.id}...`);
+                  
+                  fetch(`/api/images/${testImage.id}/download`)
+                    .then(response => response.json())
+                    .then(data => console.log('Download URL data:', data))
+                    .catch(err => console.error('Error testing image URLs:', err));
+                }}
+              >
+                Test Image URLs
+              </button>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

@@ -17,12 +17,12 @@ class Settings(BaseSettings):
     X_USER_ID_HEADER: str = "X-User-Id"
     X_PROXY_SECRET_HEADER: str = "X-Proxy-Secret"
 
-    POSTGRES_USER: str
-    POSTGRES_PASSWORD: str
-    POSTGRES_DB: str
-    POSTGRES_SERVER: str
+    POSTGRES_USER: str = "postgres"
+    POSTGRES_PASSWORD: str = "postgres"
+    POSTGRES_DB: str = "postgres"
+    POSTGRES_SERVER: str = "localhost"
     POSTGRES_PORT: int = 5433
-    DATABASE_URL: str
+    DATABASE_URL: str = "sqlite+aiosqlite:///./test.db"
 
     # S3/MinIO settings - defaults for local development
     # Back-compat: we also honor MINIO_* env vars; see post-init below.

@@ -23,21 +23,100 @@ function ImageDisplay({ imageId, image, isTransitioning }) {
     if (!image) return;
     
     try {
-      // Get the direct content URL
-      const contentUrl = `/api/images/${imageId}/content`;
+      console.log('Starting download for image %s...', imageId);
       
-      // Create a temporary link element
+      // Try multiple endpoints to find the working one
+      const endpoints = [
+        `/api/images/${imageId}/content`,
+        `/api/images/${imageId}/download`,
+      ];
+      
+      let imageBlob = null;
+      let filename = image.filename || `image-${imageId}`;
+      
+      for (const endpoint of endpoints) {
+        try {
+          console.log('Trying endpoint: %s', endpoint);
+          const response = await fetch(endpoint);
+          
+          if (!response.ok) {
+            console.log('Endpoint %s failed: %s %s', endpoint, response.status, response.statusText);
+            continue;
+          }
+          
+          const contentType = response.headers.get('content-type');
+          console.log('Endpoint %s - Content-Type: %s', endpoint, contentType);
+          
+          if (contentType && contentType.includes('application/json')) {
+            // This might be a redirect URL response
+            const jsonData = await response.json();
+            console.log('Got JSON response:', jsonData);
+            
+            if (jsonData.url) {
+              // Try to fetch from the provided URL
+              console.log('Fetching from provided URL: %s', jsonData.url);
+              const imageResponse = await fetch(jsonData.url);
+              
+              if (imageResponse.ok) {
+                const blobContentType = imageResponse.headers.get('content-type');
+                if (blobContentType && blobContentType.startsWith('image/')) {
+                  imageBlob = await imageResponse.blob();
+                  break;
+                }
+              }
+            }
+          } else if (contentType && contentType.startsWith('image/')) {
+            // Direct image response
+            imageBlob = await response.blob();
+            break;
+          } else {
+            console.log('Unexpected content type: %s', contentType);
+          }
+        } catch (endpointError) {
+          console.error('Error with endpoint %s:', endpoint, endpointError);
+          continue;
+        }
+      }
+      
+      if (!imageBlob) {
+        throw new Error('Unable to download image from any available endpoint');
+      }
+      
+      console.log('Successfully got image blob:', {
+        size: imageBlob.size,
+        type: imageBlob.type
+      });
+      
+      // Ensure we have the right file extension
+      if (!filename.includes('.') && imageBlob.type) {
+        const extension = imageBlob.type.split('/')[1];
+        if (extension && extension !== 'jpeg') {
+          filename = `${filename}.${extension}`;
+        } else if (extension === 'jpeg') {
+          filename = `${filename}.jpg`;
+        }
+      }
+      
+      // Create a URL for the blob and trigger download
+      const blobUrl = window.URL.createObjectURL(imageBlob);
+      
       const link = document.createElement('a');
-      link.href = contentUrl;
-      link.download = image.filename || 'image';
+      link.href = blobUrl;
+      link.download = filename;
       
       // Append to the document, click it, and remove it
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
       
+      // Clean up the blob URL
+      window.URL.revokeObjectURL(blobUrl);
+      
+      console.log('Download completed successfully: %s', filename);
+      
     } catch (error) {
       console.error('Error downloading image:', error);
+      alert(`Download failed: ${error.message}`);
     }
   };
 
@@ -78,6 +157,13 @@ function ImageDisplay({ imageId, image, isTransitioning }) {
             id="main-image"
             className="view-image"
             style={{ transform: `scale(${zoomLevel})` }}
+            onError={(e) => {
+              console.error('Failed to load image with ID: %s', imageId, e);
+              // Try the thumbnail endpoint as fallback
+              if (!e.target.src.includes('thumbnail')) {
+                e.target.src = `/api/images/${imageId}/thumbnail?width=800&height=600`;
+              }
+            }}
           />
         )}
       </div>
@@ -106,6 +192,34 @@ function ImageDisplay({ imageId, image, isTransitioning }) {
           onClick={handleDownload}
         >
           Download
+        </button>
+        <button 
+          className="btn btn-secondary control-btn"
+          onClick={() => {
+            console.log('Debug info for image:', {
+              imageId,
+              image,
+              contentUrl: `/api/images/${imageId}/content`,
+              downloadUrl: `/api/images/${imageId}/download`
+            });
+            // Test the endpoints directly
+            fetch(`/api/images/${imageId}/content`)
+              .then(response => {
+                console.log('Content endpoint response:', {
+                  status: response.status,
+                  contentType: response.headers.get('content-type'),
+                  size: response.headers.get('content-length')
+                });
+              })
+              .catch(err => console.error('Content endpoint error:', err));
+            
+            fetch(`/api/images/${imageId}/download`)
+              .then(response => response.json())
+              .then(data => console.log('Download endpoint response:', data))
+              .catch(err => console.error('Download endpoint error:', err));
+          }}
+        >
+          Debug
         </button>
       </div>
     </>

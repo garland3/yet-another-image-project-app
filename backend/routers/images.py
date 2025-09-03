@@ -121,21 +121,18 @@ async def list_images_in_project(
     # Get images for the project
     images = await crud.get_data_instances_for_project(db=db, project_id=project_id, skip=skip, limit=limit)
     
-    # If no images found, return empty list
-    if not images:
-        return []
-        
     # Process images using utility function for consistent serialization
     response_images = []
-    for img in images:
-        try:
-            response_images.append(to_data_instance_schema(img))
-        except Exception as e:
-            print(f"Error serializing image {img.id}: {e}")
-            # Skip this image but continue processing others
-            continue
+    if images:
+        for img in images:
+            try:
+                response_images.append(to_data_instance_schema(img))
+            except Exception as e:
+                print(f"Error serializing image {img.id}: {e}")
+                # Skip this image but continue processing others
+                continue
     
-    # Cache the result (30 minutes)
+    # Cache the result (30 minutes) - cache even if empty list
     cache.set(cache_key, response_images, expire=30*60)
     
     return response_images

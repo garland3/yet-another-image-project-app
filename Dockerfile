@@ -86,4 +86,6 @@ WORKDIR /app
 EXPOSE 8000
 
 # Use uvicorn to run the FastAPI app (remove --reload for production)
-CMD ["uvicorn", "backend.main:app", "--host", "0.0.0.0", "--port", "8000"]
+# Change to backend directory so imports work correctly
+WORKDIR /app/backend
+CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]

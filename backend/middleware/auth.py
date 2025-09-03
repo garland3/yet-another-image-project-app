@@ -42,6 +42,9 @@ async def auth_middleware(request: Request, call_next):
     Extracts user info from headers and sets request state based on config.
     """
     try:
+        # Allow health check endpoint without authentication
+        if request.url.path == "/api/health":
+            return await call_next(request)
         # Case-insensitive headers
         headers = {k.lower(): v for k, v in request.headers.items()}
 

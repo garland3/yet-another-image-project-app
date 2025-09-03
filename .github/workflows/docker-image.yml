@@ -120,16 +120,35 @@ jobs:
       run: |
         # Start the container
         docker run -d --name test-container \
-          -e DATABASE_URL="sqlite:///./test.db" \
+          -e DATABASE_URL="sqlite+aiosqlite:///./test.db" \
           -e FAST_TEST_MODE=true \
+          -e DEBUG=true \
+          -e SKIP_HEADER_CHECK=true \
+          -e POSTGRES_USER=postgres \
+          -e POSTGRES_PASSWORD=postgres \
+          -e POSTGRES_DB=postgres \
+          -e POSTGRES_SERVER=localhost \
           -p 8000:8000 \
           ${{ env.DOCKER_USERNAME }}/${{ env.DOCKER_IMAGE_NAME }}:latest
         
-        # Wait for container to start
-        sleep 10
+        # Wait for container to start and implement health checking with retry
+        echo "Waiting for container to become healthy..."
+        for i in {1..30}; do
+          if curl -f http://localhost:8000/api/health > /dev/null 2>&1; then
+            echo "Container is healthy after ${i} attempts"
+            break
+          fi
+          if [ $i -eq 30 ]; then
+            echo "Container failed to become healthy after 30 attempts"
+            docker logs test-container
+            exit 1
+          fi
+          echo "Attempt $i failed, waiting 2 seconds..."
+          sleep 2
+        done
         
-        # Test health endpoint
-        curl -f http://localhost:8000/api/users/me || exit 1
+        # Test health endpoint one more time to be sure
+        curl -f http://localhost:8000/api/health || exit 1
         
         # Stop container
         docker stop test-container
@@ -138,9 +157,14 @@ jobs:
     - name: Run tests in container
       run: |
         docker run --rm \
-          -e DATABASE_URL="sqlite:///./test.db" \
+          -e DATABASE_URL="sqlite+aiosqlite:///./test.db" \
           -e FAST_TEST_MODE=true \
+          -e DEBUG=true \
           -e SKIP_HEADER_CHECK=true \
+          -e POSTGRES_USER=postgres \
+          -e POSTGRES_PASSWORD=postgres \
+          -e POSTGRES_DB=postgres \
+          -e POSTGRES_SERVER=localhost \
           ${{ env.DOCKER_USERNAME }}/${{ env.DOCKER_IMAGE_NAME }}:latest \
           bash -c "cd backend && bash ../test/run_tests.sh"
 

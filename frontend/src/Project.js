@@ -99,52 +99,37 @@ function Project() {
 
   return (
     <div className="App">
-      <header className="App-header">
-        <div className="header-content">
-          <div className="header-title">
-            <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-4)', marginBottom: 'var(--space-2)' }}>
-              <button 
-                className="btn btn-secondary" 
-                onClick={() => navigate('/')}
-                style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}
-              >
-                &lt; Back to Dashboard
-              </button>
-              <div>
-                <h1 style={{ margin: 0 }}>{project ? project.name : 'Loading project...'}</h1>
-              </div>
+      <header className="project-header">
+        <div className="project-header-content">
+          <div className="project-nav">
+            <button 
+              className="back-btn" 
+              onClick={() => navigate('/')}
+            >
+              <span className="back-icon">←</span>
+              <span>Back to Dashboard</span>
+            </button>
+            <div className="breadcrumb-mini">
+              <span>Projects</span>
+              <span className="breadcrumb-separator">›</span>
+              <span className="current-project">{project ? project.name : 'Loading...'}</span>
             </div>
-            <p style={{ margin: 0, color: 'var(--gray-300)', fontSize: '0.875rem' }}>
+          </div>
+          <div className="project-info">
+            <h1 className="project-title">{project ? project.name : 'Loading project...'}</h1>
+            <p className="project-description">
               {project ? (project.description || 'No description provided') : ''}
             </p>
-            {currentUser && (
-              <div className="user-info">
-                <span>{currentUser.email}</span>
-              </div>
-            )}
+            <div className="project-meta">
+              <span className="project-id">Project ID: {project?.id}</span>
+              <span className="project-group">Group: {project?.meta_group_id}</span>
+              {currentUser && <span className="project-user">{currentUser.email}</span>}
+            </div>
           </div>
         </div>
       </header>
 
-      <div className="container">
-        {/* Breadcrumb Navigation */}
-        <div className="nav-breadcrumb">
-          <div className="breadcrumb">
-            <div className="breadcrumb-item">
-              <a href="/" onClick={(e) => { e.preventDefault(); navigate('/'); }}>
-                Dashboard
-              </a>
-            </div>
-            <span className="breadcrumb-separator">/</span>
-            <div className="breadcrumb-item">
-              <span>Projects</span>
-            </div>
-            <span className="breadcrumb-separator">/</span>
-            <div className="breadcrumb-item">
-              <span>{project ? project.name : 'Loading...'}</span>
-            </div>
-          </div>
-        </div>
+      <div className="project-container">
 
         {error && (
           <div className="alert alert-error">
@@ -160,39 +145,52 @@ function Project() {
         )}
         
         {!loading && (
-          <>
-            <MetadataManager 
-              projectId={id} 
-              metadata={metadata} 
-              setMetadata={setMetadata} 
-              loading={loading} 
-              setLoading={setLoading} 
-              setError={setError} 
-            />
+          <div className="project-content">
+            {/* Main Gallery Section */}
+            <div className="gallery-section">
+              <ImageGallery 
+                projectId={id} 
+                images={images} 
+                loading={loading} 
+              />
+            </div>
             
-            <ImageGallery 
-              projectId={id} 
-              images={images} 
-              loading={loading} 
-            />
+            {/* Quick Upload Section */}
+            <div className="upload-section">
+              <ImageUploader 
+                projectId={id} 
+                onUploadComplete={handleUploadComplete} 
+                loading={loading} 
+                setLoading={setLoading} 
+                setError={setError} 
+              />
+            </div>
             
-            <ClassManager 
-              projectId={id} 
-              classes={classes} 
-              setClasses={setClasses} 
-              loading={loading} 
-              setLoading={setLoading} 
-              setError={setError} 
-            />
-            
-            <ImageUploader 
-              projectId={id} 
-              onUploadComplete={handleUploadComplete} 
-              loading={loading} 
-              setLoading={setLoading} 
-              setError={setError} 
-            />
-          </>
+            {/* Management Sections */}
+            <div className="management-sections">
+              <div className="metadata-section">
+                <MetadataManager 
+                  projectId={id} 
+                  metadata={metadata} 
+                  setMetadata={setMetadata} 
+                  loading={loading} 
+                  setLoading={setLoading} 
+                  setError={setError} 
+                />
+              </div>
+              
+              <div className="classes-section">
+                <ClassManager 
+                  projectId={id} 
+                  classes={classes} 
+                  setClasses={setClasses} 
+                  loading={loading} 
+                  setLoading={setLoading} 
+                  setError={setError} 
+                />
+              </div>
+            </div>
+          </div>
         )}
       </div>
     </div>
