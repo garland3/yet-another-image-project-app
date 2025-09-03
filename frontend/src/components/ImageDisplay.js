@@ -73,7 +73,7 @@ function ImageDisplay({ imageId, image, isTransitioning }) {
             console.log(`Unexpected content type: ${contentType}`);
           }
         } catch (endpointError) {
-          console.error(`Error with endpoint ${endpoint}:`, endpointError);
+          console.error('Error with endpoint %s:', endpoint, endpointError);
           continue;
         }
       }
@@ -158,7 +158,7 @@ function ImageDisplay({ imageId, image, isTransitioning }) {
             className="view-image"
             style={{ transform: `scale(${zoomLevel})` }}
             onError={(e) => {
-              console.error(`Failed to load image ${imageId}:`, e);
+              console.error('Failed to load image with ID: %s', imageId, e);
               // Try the thumbnail endpoint as fallback
               if (!e.target.src.includes('thumbnail')) {
                 e.target.src = `/api/images/${imageId}/thumbnail?width=800&height=600`;
