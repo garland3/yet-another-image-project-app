@@ -47,6 +47,13 @@ class Settings(BaseSettings):
     # Cache configuration
     CACHE_SIZE_MB: int = 1000
 
+    # Image deletion / retention settings
+    IMAGE_DELETE_RETENTION_DAYS: int = 60  # Soft delete retention window (days)
+    IMAGE_DELETE_REASON_MIN_CHARS: int = 10  # Minimum characters required for a deletion reason
+    IMAGE_DELETE_PURGE_BATCH_SIZE: int = 500  # Max images purged per cycle
+    IMAGE_DELETE_PURGE_INTERVAL_SECONDS: int = 3600  # Background purge interval
+    ENABLE_IMAGE_PURGE: bool = True  # Toggle background purge task
+
     @field_validator('DEBUG', 'FAST_TEST_MODE', 'SKIP_HEADER_CHECK', 'S3_USE_SSL', 'SECURITY_NOSNIFF_ENABLED', 'SECURITY_XFO_ENABLED', 'SECURITY_REFERRER_POLICY_ENABLED', 'SECURITY_CSP_ENABLED', mode='before')
     @classmethod
     def parse_bool_with_strip(cls, v):

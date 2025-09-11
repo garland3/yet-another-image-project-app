@@ -36,7 +36,7 @@ def to_data_instance_schema(db_image: models.DataInstance) -> schemas.DataInstan
             metadata_dict = {k: v for k, v in db_image.metadata_.__dict__.items() 
                            if not k.startswith('_')}
     
-    # Build schema matching core.schemas.DataInstance fields
+    # Build schema matching core.schemas.DataInstance fields including deletion metadata
     return schemas.DataInstance(
         id=db_image.id,
         project_id=db_image.project_id,
@@ -49,6 +49,13 @@ def to_data_instance_schema(db_image: models.DataInstance) -> schemas.DataInstan
         uploader_id=getattr(db_image, "uploader_id", None),
         created_at=db_image.created_at,
         updated_at=db_image.updated_at,
+        deleted_at=getattr(db_image, "deleted_at", None),
+        deleted_by_user_id=getattr(db_image, "deleted_by_user_id", None),
+        deletion_reason=getattr(db_image, "deletion_reason", None),
+        pending_hard_delete_at=getattr(db_image, "pending_hard_delete_at", None),
+        hard_deleted_at=getattr(db_image, "hard_deleted_at", None),
+        hard_deleted_by_user_id=getattr(db_image, "hard_deleted_by_user_id", None),
+        storage_deleted=getattr(db_image, "storage_deleted", False),
     )
 
 

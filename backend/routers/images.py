@@ -13,7 +13,7 @@ from core.config import settings
 from core.group_auth_helper import is_user_in_group
 from utils.dependencies import get_current_user
 from utils.dependencies import get_project_or_403
-from utils.boto3_client import upload_file_to_s3, get_presigned_download_url
+from utils.boto3_client import upload_file_to_s3, get_presigned_download_url, delete_file_from_s3
 from utils.serialization import to_data_instance_schema
 from utils.file_security import get_content_disposition_header
 from utils.cache_manager import get_cache
@@ -92,6 +92,8 @@ async def list_images_in_project(
     project_id: uuid.UUID,
     skip: int = 0,
     limit: int = 100,
+    include_deleted: bool = Query(False),
+    deleted_only: bool = Query(False),
     db: AsyncSession = Depends(get_db),
     current_user: schemas.User = Depends(get_current_user),
 ):
@@ -102,7 +104,7 @@ async def list_images_in_project(
     """
     # Check cache first
     cache = get_cache()
-    cache_key = f"project_images:{project_id}:skip:{skip}:limit:{limit}"
+    cache_key = f"project_images:{project_id}:skip:{skip}:limit:{limit}:include_deleted:{include_deleted}:deleted_only:{deleted_only}"
     cached_images = cache.get(cache_key)
     
     if cached_images is not None:
@@ -119,13 +121,18 @@ async def list_images_in_project(
         raise
         
     # Get images for the project
-    images = await crud.get_data_instances_for_project(db=db, project_id=project_id, skip=skip, limit=limit)
+    if deleted_only:
+        images = await crud.get_deleted_images_for_project(db=db, project_id=project_id, skip=skip, limit=limit)
+    else:
+        images = await crud.get_data_instances_for_project(db=db, project_id=project_id, skip=skip, limit=limit)
     
     # Process images using utility function for consistent serialization
     response_images = []
     if images:
         for img in images:
             try:
+                if not include_deleted and img.deleted_at is not None and not deleted_only:
+                    continue
                 response_images.append(to_data_instance_schema(img))
             except Exception as e:
                 print(f"Error serializing image {img.id}: {e}")
@@ -143,6 +150,8 @@ async def list_images_in_project_with_slash(
     project_id: uuid.UUID,
     skip: int = 0,
     limit: int = 100,
+    include_deleted: bool = Query(False),
+    deleted_only: bool = Query(False),
     db: AsyncSession = Depends(get_db),
     current_user: schemas.User = Depends(get_current_user),
 ):
@@ -152,12 +161,13 @@ async def list_images_in_project_with_slash(
     It ensures compatibility with various frontend routing configurations.
     """
     # Just call the main function to avoid code duplication
-    return await list_images_in_project(project_id, skip, limit, db, current_user)
+    return await list_images_in_project(project_id, skip, limit, include_deleted, deleted_only, db, current_user)
 
 
 @router.get("/images/{image_id}", response_model=schemas.DataInstance)
 async def get_image_metadata(
     image_id: uuid.UUID,
+    include_deleted: bool = Query(False),
     db: AsyncSession = Depends(get_db),
     current_user: schemas.User = Depends(get_current_user),
 ):
@@ -175,7 +185,7 @@ async def get_image_metadata(
         return cached_metadata
     
     db_image = await crud.get_data_instance(db=db, image_id=image_id)
-    if db_image is None:
+    if db_image is None or (db_image.deleted_at and not include_deleted):
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Image not found")
     is_member = is_user_in_group(current_user.email, db_image.project.meta_group_id)
     if not is_member:
@@ -196,9 +206,9 @@ import httpx
 from fastapi.responses import StreamingResponse
 
 @router.get("/images/{image_id}/download", response_model=schemas.PresignedUrlResponse)
-#@cached(ttl=3600, key_builder=lambda *args, **kwargs: f"image_download:{kwargs['image_id']}")
 async def get_image_download_url(
     image_id: uuid.UUID,
+    include_deleted: bool = Query(False),
     db: AsyncSession = Depends(get_db),
     current_user: schemas.User = Depends(get_current_user),
 ):
@@ -208,7 +218,7 @@ async def get_image_download_url(
     The URL allows direct download from the object storage.
     """
     db_image = await crud.get_data_instance(db=db, image_id=image_id)
-    if db_image is None:
+    if db_image is None or (db_image.deleted_at and not include_deleted):
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Image not found")
     is_member = is_user_in_group(current_user.email, db_image.project.meta_group_id)
     if not is_member:
@@ -233,6 +243,7 @@ async def get_image_download_url(
 @router.get("/images/{image_id}/content", response_class=StreamingResponse)
 async def get_image_content(
     image_id: uuid.UUID,
+    include_deleted: bool = Query(False),
     db: AsyncSession = Depends(get_db),
     current_user: schemas.User = Depends(get_current_user),
 ):
@@ -242,7 +253,7 @@ async def get_image_content(
     It returns the image data with appropriate headers for inline display.
     """
     db_image = await crud.get_data_instance(db=db, image_id=image_id)
-    if db_image is None:
+    if db_image is None or (db_image.deleted_at and not include_deleted):
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Image not found")
     
     # Check access permissions
@@ -292,6 +303,7 @@ async def get_image_thumbnail(
     image_id: uuid.UUID,
     width: int = Query(200, description="Thumbnail width in pixels"),
     height: int = Query(200, description="Thumbnail height in pixels"),
+    include_deleted: bool = Query(False),
     db: AsyncSession = Depends(get_db),
     current_user: schemas.User = Depends(get_current_user),
 ):
@@ -319,7 +331,7 @@ async def get_image_thumbnail(
         )
     
     db_image = await crud.get_data_instance(db=db, image_id=image_id)
-    if db_image is None:
+    if db_image is None or (db_image.deleted_at and not include_deleted):
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Image not found")
     
     # Check access permissions
@@ -397,6 +409,90 @@ async def get_image_thumbnail(
 class MetadataUpdate(BaseModel):
     key: str
     value: Any
+
+class ImageDeleteRequest(BaseModel):
+    reason: str
+    force: Optional[bool] = False
+
+@router.delete("/projects/{project_id}/images/{image_id}", response_model=schemas.DataInstance)
+async def delete_image(
+    project_id: uuid.UUID,
+    image_id: uuid.UUID,
+    body: ImageDeleteRequest = Body(...),
+    db: AsyncSession = Depends(get_db),
+    current_user: schemas.User = Depends(get_current_user),
+):
+    if len(body.reason or "") < settings.IMAGE_DELETE_REASON_MIN_CHARS:
+        raise HTTPException(status_code=400, detail=f"Reason must be at least {settings.IMAGE_DELETE_REASON_MIN_CHARS} characters")
+    db_image = await crud.get_data_instance(db=db, image_id=image_id)
+    if not db_image or db_image.project_id != project_id:
+        raise HTTPException(status_code=404, detail="Image not found")
+    is_member = is_user_in_group(current_user.email, db_image.project.meta_group_id)
+    if not is_member:
+        raise HTTPException(status_code=403, detail="Forbidden")
+    retention_days = settings.IMAGE_DELETE_RETENTION_DAYS
+    actor_user_id = current_user.id
+    if not db_image.deleted_at:
+        prev_state = {"deleted_at": None}
+        db_image = await crud.soft_delete_image(db, db_image, actor_user_id=actor_user_id, reason=body.reason, retention_days=retention_days)
+        await crud.create_image_deletion_event(db, image=db_image, actor_user_id=actor_user_id, action="soft_delete", reason=body.reason, previous_state=prev_state)
+    if body.force and not db_image.storage_deleted:
+        # Future: verify current_user is project owner/admin; placeholder uses membership only.
+        delete_file_from_s3(settings.S3_BUCKET, db_image.object_storage_key)
+        await crud.mark_image_storage_deleted(db, db_image, actor_user_id=actor_user_id, hard=True)
+        await crud.create_image_deletion_event(db, image=db_image, actor_user_id=actor_user_id, action="force_delete", reason=body.reason, previous_state={})
+    await db.commit()
+    await db.refresh(db_image)
+    cache = get_cache()
+    cache.clear_pattern(f"project_images:{project_id}")
+    cache.delete(f"image:{image_id}:metadata")
+    cache.clear_pattern(f"thumbnail:{image_id}")
+    return to_data_instance_schema(db_image)
+
+@router.post("/projects/{project_id}/images/{image_id}/restore", response_model=schemas.DataInstance)
+async def restore_deleted_image(
+    project_id: uuid.UUID,
+    image_id: uuid.UUID,
+    db: AsyncSession = Depends(get_db),
+    current_user: schemas.User = Depends(get_current_user),
+):
+    db_image = await crud.get_data_instance(db=db, image_id=image_id)
+    if not db_image or db_image.project_id != project_id:
+        raise HTTPException(status_code=404, detail="Image not found")
+    if not db_image.deleted_at:
+        return to_data_instance_schema(db_image)
+    if db_image.storage_deleted:
+        raise HTTPException(status_code=409, detail="Image permanently deleted")
+    is_member = is_user_in_group(current_user.email, db_image.project.meta_group_id)
+    if not is_member:
+        raise HTTPException(status_code=403, detail="Forbidden")
+    from datetime import datetime, timezone
+    retention_deadline = db_image.pending_hard_delete_at
+    if retention_deadline and datetime.now(timezone.utc) > retention_deadline:
+        raise HTTPException(status_code=410, detail="Retention expired")
+    await crud.restore_image(db, db_image)
+    await crud.create_image_deletion_event(db, image=db_image, actor_user_id=current_user.id, action="restore", reason=None, previous_state={})
+    await db.commit()
+    await db.refresh(db_image)
+    cache = get_cache()
+    cache.clear_pattern(f"project_images:{project_id}")
+    cache.delete(f"image:{image_id}:metadata")
+    cache.clear_pattern(f"thumbnail:{image_id}")
+    return to_data_instance_schema(db_image)
+
+@router.get("/projects/{project_id}/images/deletion-events", response_model=schemas.ImageDeletionEventList)
+async def list_image_deletion_events(
+    project_id: uuid.UUID,
+    image_id: Optional[uuid.UUID] = Query(None),
+    skip: int = 0,
+    limit: int = 100,
+    db: AsyncSession = Depends(get_db),
+    current_user: schemas.User = Depends(get_current_user),
+):
+    await get_project_or_403(project_id, db, current_user)
+    events = await crud.list_image_deletion_events(db, project_id, image_id=image_id, skip=skip, limit=limit)
+    total = await crud.count_image_deletion_events(db, project_id, image_id=image_id)
+    return schemas.ImageDeletionEventList(events=events, total=total)
 
 @router.put("/images/{image_id}/metadata", response_model=schemas.DataInstance, status_code=status.HTTP_200_OK)
 async def update_image_metadata(

@@ -16,7 +16,7 @@ class User(Base):
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
     
     # Relationships
-    uploaded_images = relationship("DataInstance", back_populates="uploader")
+    uploaded_images = relationship("DataInstance", back_populates="uploader", foreign_keys="DataInstance.uploader_id")
     comments = relationship("ImageComment", back_populates="author")
     classifications = relationship("ImageClassification", back_populates="created_by")
     api_keys = relationship("ApiKey", back_populates="user")
@@ -52,11 +52,39 @@ class DataInstance(Base):
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
 
+    # Deletion / retention fields
+    deleted_at = Column(DateTime(timezone=True), nullable=True, index=True)
+    deleted_by_user_id = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=True)
+    deletion_reason = Column(Text, nullable=True)
+    pending_hard_delete_at = Column(DateTime(timezone=True), nullable=True, index=True)
+    hard_deleted_at = Column(DateTime(timezone=True), nullable=True)
+    hard_deleted_by_user_id = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=True)
+    storage_deleted = Column(Boolean, nullable=False, server_default='false')
+
     # Relationships
     project = relationship("Project", back_populates="images")
-    uploader = relationship("User", back_populates="uploaded_images")
+    uploader = relationship("User", back_populates="uploaded_images", foreign_keys=[uploader_id])
     comments = relationship("ImageComment", back_populates="image", cascade="all, delete-orphan")
     classifications = relationship("ImageClassification", back_populates="image", cascade="all, delete-orphan")
+
+
+class ImageDeletionEvent(Base):
+    __tablename__ = "image_deletion_events"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    image_id = Column(UUID(as_uuid=True), ForeignKey("data_instances.id"), nullable=False, index=True)
+    project_id = Column(UUID(as_uuid=True), ForeignKey("projects.id"), nullable=False, index=True)
+    actor_user_id = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=True)
+    action = Column(String(32), nullable=False)  # soft_delete, force_delete, restore, hard_delete_job
+    reason = Column(Text, nullable=True)
+    storage_deleted = Column(Boolean, nullable=False, server_default='false')
+    previous_state = Column(JSON, nullable=True)
+    at = Column(DateTime(timezone=True), server_default=func.now(), index=True)
+
+    # Relationships (optional, not eagerly loaded to avoid overhead)
+    # image = relationship("DataInstance")
+    # project = relationship("Project")
+    # actor = relationship("User")
 
 class ImageClass(Base):
     __tablename__ = "image_classes"
@@ -135,3 +163,5 @@ class ApiKey(Base):
     
     # Relationships
     user = relationship("User", back_populates="api_keys")
+
+
