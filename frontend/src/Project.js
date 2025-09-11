@@ -7,6 +7,7 @@ import ImageUploader from './components/ImageUploader';
 import MetadataManager from './components/MetadataManager';
 import ClassManager from './components/ClassManager';
 import ImageGallery from './components/ImageGallery';
+import ImageDeletionControls from './components/ImageDeletionControls';
 
 function Project() {
   const { id } = useParams();
@@ -18,6 +19,26 @@ function Project() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [currentUser, setCurrentUser] = useState(null);
+  const [includeDeleted, setIncludeDeleted] = useState(false);
+  const [deletedOnly, setDeletedOnly] = useState(false);
+
+  const fetchImages = async (projId, opts = {}) => {
+    const inc = opts.includeDeleted ?? includeDeleted;
+    const delOnly = opts.deletedOnly ?? deletedOnly;
+    let url = `/api/projects/${projId}/images`;
+    const params = [];
+    if (delOnly) {
+      params.push('deleted_only=true');
+    } else if (inc) {
+      params.push('include_deleted=true');
+    }
+    if (params.length) url += `?${params.join('&')}`;
+    const imagesResponse = await fetch(url);
+    if (imagesResponse.ok) {
+      const imagesData = await imagesResponse.json();
+      setImages(imagesData);
+    }
+  };
 
   useEffect(() => {
     // Fetch the current user
@@ -69,17 +90,7 @@ function Project() {
           setClasses(classesData);
         }
         
-        // Fetch project images
-        console.log(`Fetching images for project ${id}...`);
-        const imagesResponse = await fetch(`/api/projects/${id}/images`);
-        if (imagesResponse.ok) {
-          const imagesData = await imagesResponse.json();
-          console.log(`Received ${imagesData.length} images for project ${id}`);
-          console.log('Image data sample:', imagesData.length > 0 ? imagesData[0] : 'No images');
-          setImages(imagesData);
-        } else {
-          console.error(`Failed to fetch images: ${imagesResponse.status} ${imagesResponse.statusText}`);
-        }
+  await fetchImages(id);
         
         setLoading(false);
       } catch (err) {
@@ -92,9 +103,32 @@ function Project() {
     fetchProjectData();
   }, [id]);
 
+  // Refetch when deletion visibility changes
+  useEffect(() => {
+    if (project) {
+      fetchImages(project.id, { includeDeleted, deletedOnly });
+    }
+  }, [includeDeleted, deletedOnly]);
+
   // Handle image upload completion
   const handleUploadComplete = (newImages) => {
+    // If not showing deleted, just append
     setImages(prevImages => [...prevImages, ...newImages]);
+  };
+
+  const handleImageStateUpdate = (updatedImage) => {
+    setImages(prev => {
+      const idx = prev.findIndex(i => i.id === updatedImage.id);
+      if (idx === -1) return prev;
+      const copy = [...prev];
+      // If image became deleted and we are NOT including deleted, remove from list
+      if (updatedImage.deleted_at && !includeDeleted && !deletedOnly) {
+        copy.splice(idx, 1);
+        return copy;
+      }
+      copy[idx] = updatedImage;
+      return copy;
+    });
   };
 
   return (
@@ -148,10 +182,36 @@ function Project() {
           <div className="project-content">
             {/* Main Gallery Section */}
             <div className="gallery-section">
+              <div style={{ display: 'flex', gap: '16px', alignItems: 'center', marginBottom: '8px', flexWrap: 'wrap' }}>
+                <label style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
+                  <input 
+                    type="checkbox" 
+                    checked={includeDeleted} 
+                    onChange={(e) => {
+                      const val = e.target.checked;
+                      setIncludeDeleted(val);
+                      if (!val) setDeletedOnly(false);
+                    }}
+                  />
+                  Show deleted
+                </label>
+                <label style={{ display: 'flex', gap: '6px', alignItems: 'center', opacity: includeDeleted ? 1 : 0.4 }}>
+                  <input 
+                    type="checkbox" 
+                    disabled={!includeDeleted} 
+                    checked={deletedOnly} 
+                    onChange={(e) => setDeletedOnly(e.target.checked)}
+                  />
+                  Deleted only
+                </label>
+                <span style={{ fontSize: '0.85rem', color: '#666' }}>Deleted images are kept for retention; force delete removes storage object.</span>
+              </div>
               <ImageGallery 
                 projectId={id} 
                 images={images} 
                 loading={loading} 
+                onImageUpdated={handleImageStateUpdate}
+                refreshProjectImages={() => fetchImages(id)}
               />
             </div>
             

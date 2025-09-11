@@ -8,6 +8,7 @@ import ImageMetadata from './components/ImageMetadata';
 import ImageClassifications from './components/ImageClassifications';
 import CompactImageClassifications from './components/CompactImageClassifications';
 import ImageComments from './components/ImageComments';
+import ImageDeletionControls from './components/ImageDeletionControls';
 
 function ImageView() {
   const { imageId } = useParams();
@@ -255,6 +256,13 @@ function ImageView() {
             loading={loading} 
             setLoading={setLoading} 
             setError={setError} 
+          />
+
+          <ImageDeletionControls 
+            projectId={projectId} 
+            image={image} 
+            setImage={setImage} 
+            refreshProjectImages={loadProjectImages} 
           />
           
           {/* Original classifications component for reference/additional details */}
