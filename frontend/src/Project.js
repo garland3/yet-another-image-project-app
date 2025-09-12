@@ -182,30 +182,6 @@ function Project() {
           <div className="project-content">
             {/* Main Gallery Section */}
             <div className="gallery-section">
-              <div style={{ display: 'flex', gap: '16px', alignItems: 'center', marginBottom: '8px', flexWrap: 'wrap' }}>
-                <label style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
-                  <input 
-                    type="checkbox" 
-                    checked={includeDeleted} 
-                    onChange={(e) => {
-                      const val = e.target.checked;
-                      setIncludeDeleted(val);
-                      if (!val) setDeletedOnly(false);
-                    }}
-                  />
-                  Show deleted
-                </label>
-                <label style={{ display: 'flex', gap: '6px', alignItems: 'center', opacity: includeDeleted ? 1 : 0.4 }}>
-                  <input 
-                    type="checkbox" 
-                    disabled={!includeDeleted} 
-                    checked={deletedOnly} 
-                    onChange={(e) => setDeletedOnly(e.target.checked)}
-                  />
-                  Deleted only
-                </label>
-                <span style={{ fontSize: '0.85rem', color: '#666' }}>Deleted images are kept for retention; force delete removes storage object.</span>
-              </div>
               <ImageGallery 
                 projectId={id} 
                 images={images} 
@@ -248,6 +224,37 @@ function Project() {
                   setLoading={setLoading} 
                   setError={setError} 
                 />
+              </div>
+            </div>
+            
+            {/* Image Deletion Controls - moved to bottom */}
+            <div className="deletion-controls-section" style={{ marginTop: '24px', padding: '16px', backgroundColor: '#f8f9fa', borderRadius: '8px', border: '1px solid #e9ecef' }}>
+              <h3 style={{ margin: '0 0 12px 0', fontSize: '1.1rem', fontWeight: '600', color: '#333' }}>Image View Options</h3>
+              <div style={{ display: 'flex', gap: '16px', alignItems: 'center', flexWrap: 'wrap' }}>
+                <label style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
+                  <input 
+                    type="checkbox" 
+                    checked={includeDeleted} 
+                    onChange={(e) => {
+                      const val = e.target.checked;
+                      setIncludeDeleted(val);
+                      if (!val) setDeletedOnly(false);
+                    }}
+                  />
+                  Show deleted
+                </label>
+                <label style={{ display: 'flex', gap: '6px', alignItems: 'center', opacity: includeDeleted ? 1 : 0.4 }}>
+                  <input 
+                    type="checkbox" 
+                    disabled={!includeDeleted} 
+                    checked={deletedOnly} 
+                    onChange={(e) => setDeletedOnly(e.target.checked)}
+                  />
+                  Deleted only
+                </label>
+                <span style={{ fontSize: '0.85rem', color: '#666', fontStyle: 'italic' }}>
+                  Deleted images are kept for retention; force delete removes storage object.
+                </span>
               </div>
             </div>
           </div>

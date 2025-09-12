@@ -844,6 +844,10 @@ ul li:hover {
   gap: var(--space-6);
 }
 
+.deletion-controls-section {
+  order: 4;
+}
+
 /* Modern Gallery Styles */
 .modern-gallery {
   background: var(--bg-primary);
