@@ -2,6 +2,7 @@
 
 # Backend Test Runner
 # This script runs the comprehensive backend test suite that was developed and stabilized.
+# NOTE: This repo uses UV for package management.
 
 set -e  # Exit on any error
 
@@ -20,28 +21,35 @@ fi
 echo "📁 Current directory: $(pwd)"
 echo "🐍 Python version: $(python3 --version 2>/dev/null || echo 'Python not found')"
 
+# Add uv to PATH
+export PATH="$HOME/.local/bin:$PATH"
+
+# Check if uv is available
+if ! command -v uv &> /dev/null; then
+    echo "❌ Error: uv not found. Please install uv first:"
+    echo "   curl -LsSf https://astral.sh/uv/install.sh | sh"
+    exit 1
+fi
+
+echo "🔧 Using uv version: $(uv --version)"
+
 # Check for virtual environment in backend directory and activate it if it exists
 if [ -f "backend/.venv/bin/activate" ]; then
     echo "🔧 Activating virtual environment..."
     source backend/.venv/bin/activate
-    echo "📦 Installing pytest-xdist..."
-    pip install pytest pytest-asyncio  pytest-xdist    
+    echo "📦 Installing test dependencies with uv..."
+    uv pip install pytest pytest-asyncio pytest-xdist
     PYTEST_PATH=$(which pytest)
 else
-    # Check if pytest is available in system PATH
-    pip install pytest pytest-asyncio  pytest-xdist    
-    PYTEST_PATH=$(command -v pytest 2>/dev/null || echo "")
+    echo "❌ Error: Virtual environment not found at backend/.venv"
+    echo "Please create it first:"
+    echo "   cd backend && uv venv .venv && source .venv/bin/activate && uv pip install -r requirements.txt"
+    exit 1
 fi
 
 # Check if pytest is available
 if [ -z "$PYTEST_PATH" ]; then
-    echo "❌ Error: pytest not found. Please install it first:"
-    if [ -f "backend/.venv/bin/activate" ]; then
-        echo "   cd backend && source .venv/bin/activate && pip install pytest pytest-asyncio"
-    else
-        echo "   pip install pytest pytest-asyncio"
-        pip install pytest pytest-asyncio
-    fi
+    echo "❌ Error: pytest not found after installation. Something went wrong."
     exit 1
 fi
 

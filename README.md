@@ -34,6 +34,18 @@ Access at http://localhost:8000
 Backend: http://localhost:8000
 Frontend: http://localhost:3000
 
+## Backend
+
+the backend uses uv for package managment. 
+
+```
+cd backend
+pip install uv
+uv venv .venv
+source .venv/bin/activate
+uv pip install -r requirements.txt
+```
+
 ## Features
 
 - Project organization and management
