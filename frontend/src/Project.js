@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import './App.css';
 
@@ -21,7 +21,7 @@ function Project() {
   const [includeDeleted, setIncludeDeleted] = useState(false);
   const [deletedOnly, setDeletedOnly] = useState(false);
 
-  const fetchImages = async (projId, opts = {}) => {
+  const fetchImages = useCallback(async (projId, opts = {}) => {
     const inc = opts.includeDeleted ?? includeDeleted;
     const delOnly = opts.deletedOnly ?? deletedOnly;
     let url = `/api/projects/${projId}/images`;
@@ -37,7 +37,7 @@ function Project() {
       const imagesData = await imagesResponse.json();
       setImages(imagesData);
     }
-  };
+  }, [includeDeleted, deletedOnly]);
 
   useEffect(() => {
     // Fetch the current user
@@ -100,14 +100,14 @@ function Project() {
     };
 
     fetchProjectData();
-  }, [id]);
+  }, [id, fetchImages]);
 
   // Refetch when deletion visibility changes
   useEffect(() => {
     if (project) {
       fetchImages(project.id, { includeDeleted, deletedOnly });
     }
-  }, [includeDeleted, deletedOnly]);
+  }, [includeDeleted, deletedOnly, project, fetchImages]);
 
   // Handle image upload completion
   const handleUploadComplete = (newImages) => {
