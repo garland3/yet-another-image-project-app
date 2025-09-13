@@ -16,11 +16,6 @@ function ImageGallery({ projectId, images, loading, onImageUpdated, refreshProje
   const [sortBy, setSortBy] = useState('date'); // date, name, size
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedImages, setSelectedImages] = useState(new Set());
-  const [deleteTarget, setDeleteTarget] = useState(null);
-  const [reason, setReason] = useState("");
-  const [forceDelete, setForceDelete] = useState(false);
-  const [actionError, setActionError] = useState(null);
-  const MIN_REASON = 5;
   
   const imagesPerPage = viewMode === 'small' ? 100 : viewMode === 'medium' ? 50 : 25;
   
@@ -90,33 +85,6 @@ function ImageGallery({ projectId, images, loading, onImageUpdated, refreshProje
     return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
   };
 
-  const handleDelete = async () => {
-    if (!deleteTarget) return;
-    if (reason.trim().length < MIN_REASON) {
-      setActionError(`Reason must be at least ${MIN_REASON} characters`);
-      return;
-    }
-    try {
-      setActionError(null);
-      const resp = await fetch(`/api/projects/${projectId}/images/${deleteTarget.id}`, {
-        method: 'DELETE',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ reason: reason.trim(), force: forceDelete })
-      });
-      if (!resp.ok) {
-        const detail = await resp.text();
-        throw new Error(`Delete failed (${resp.status}): ${detail}`);
-      }
-      const data = await resp.json();
-      if (onImageUpdated) onImageUpdated(data);
-      if (refreshProjectImages) refreshProjectImages();
-      setDeleteTarget(null);
-      setReason("");
-      setForceDelete(false);
-    } catch (e) {
-      setActionError(e.message);
-    }
-  };
 
   const handleRestore = async (image) => {
     try {
@@ -368,31 +336,6 @@ function ImageGallery({ projectId, images, loading, onImageUpdated, refreshProje
         )}
       </div>
 
-      {deleteTarget && (
-        <div className="modal" style={{ display: 'flex' }}>
-          <div className="modal-content">
-            <span className="close-modal" onClick={() => { setDeleteTarget(null); setReason(''); setForceDelete(false); }}>&times;</span>
-            <h3>{forceDelete ? 'Force Delete Image' : 'Delete Image'}</h3>
-            <p>{forceDelete ? 'This will also remove the file from storage immediately.' : 'Image will be soft deleted and can be restored until retention expires.'}</p>
-            <div className="form-group">
-              <label>Reason (required)</label>
-              <textarea rows={3} value={reason} onChange={e => setReason(e.target.value)} />
-              <small>Min {MIN_REASON} characters</small>
-            </div>
-            <div className="form-group">
-              <label style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
-                <input type="checkbox" checked={forceDelete} onChange={e => setForceDelete(e.target.checked)} />
-                Force delete (remove object from storage)
-              </label>
-            </div>
-            {actionError && <div className="alert alert-error">{actionError}</div>}
-            <div style={{ display: 'flex', gap: '10px' }}>
-              <button className="btn btn-secondary" onClick={() => { setDeleteTarget(null); setReason(''); setForceDelete(false); }}>Cancel</button>
-              <button className="btn btn-danger" onClick={handleDelete}>Delete</button>
-            </div>
-          </div>
-        </div>
-      )}
       
       {/* Debug section moved to bottom */}
       <div className="debug-section">
