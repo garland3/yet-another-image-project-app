@@ -37,6 +37,7 @@ async def create_db_and_tables():
     except Exception as e:
         # Handle different types of database connection errors with user-friendly messages
         error_msg = str(e)
+        print(f"   Current DATABASE_URL: {settings.DATABASE_URL}")
         
         if "gaierror" in error_msg or "Name or service not known" in error_msg:
             print("\n❌ DATABASE CONNECTION ERROR:")
@@ -55,6 +56,7 @@ async def create_db_and_tables():
             print("\nPossible solutions:")
             print("1. Start PostgreSQL container: cd backend && ./run.sh")
             print("2. Wait for PostgreSQL to finish starting up")
+            print(f"   Current DATABASE_URL: {settings.DATABASE_URL}")
             print("3. Check if the database port is correct (default: 5433)")
             
         elif "authentication failed" in error_msg or "password authentication failed" in error_msg:

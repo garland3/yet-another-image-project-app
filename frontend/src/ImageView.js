@@ -8,6 +8,7 @@ import ImageMetadata from './components/ImageMetadata';
 import ImageClassifications from './components/ImageClassifications';
 import CompactImageClassifications from './components/CompactImageClassifications';
 import ImageComments from './components/ImageComments';
+import ImageDeletionControls from './components/ImageDeletionControls';
 
 function ImageView() {
   const { imageId } = useParams();
@@ -30,18 +31,35 @@ function ImageView() {
     try {
       setLoading(true);
       
-      // Fetch image metadata
-      const response = await fetch(`/api/images/${imageId}`);
+      // Try to fetch image metadata directly first
+      let response = await fetch(`/api/images/${imageId}`);
       
       if (!response.ok) {
-        throw new Error(`HTTP error! Status: ${response.status}`);
+        // If direct fetch fails (likely because image is deleted), 
+        // try to find it through the project endpoint with deleted images included
+        console.log('Direct image fetch failed, trying project endpoint with deleted images...');
+        const projectResponse = await fetch(`/api/projects/${projectId}/images?include_deleted=true`);
+        
+        if (!projectResponse.ok) {
+          throw new Error(`Failed to fetch project images: ${projectResponse.status}`);
+        }
+        
+        const projectImages = await projectResponse.json();
+        const imageData = projectImages.find(img => img.id === imageId);
+        
+        if (!imageData) {
+          throw new Error('Image not found in project');
+        }
+        
+        setImage(imageData);
+        // Update document title
+        document.title = `${imageData.filename || 'Image'} - Image Manager`;
+      } else {
+        const imageData = await response.json();
+        setImage(imageData);
+        // Update document title
+        document.title = `${imageData.filename || 'Image'} - Image Manager`;
       }
-      
-      const imageData = await response.json();
-      setImage(imageData);
-      
-      // Update document title
-      document.title = `${imageData.filename || 'Image'} - Image Manager`;
       
     } catch (error) {
       console.error('Error loading image data:', error);
@@ -49,13 +67,13 @@ function ImageView() {
     } finally {
       setLoading(false);
     }
-  }, [imageId]);
+  }, [imageId, projectId]);
 
   // Load project images for navigation
   const loadProjectImages = useCallback(async () => {
     try {
       console.log('Fetching images for project:', projectId);
-      const response = await fetch(`/api/projects/${projectId}/images/`);
+      const response = await fetch(`/api/projects/${projectId}/images?include_deleted=true`);
       
       if (!response.ok) {
         throw new Error(`HTTP error! Status: ${response.status}`);
@@ -238,7 +256,10 @@ function ImageView() {
           <ImageDisplay 
             imageId={imageId} 
             image={image} 
-            isTransitioning={isTransitioning} 
+            isTransitioning={isTransitioning}
+            projectId={projectId}
+            setImage={setImage}
+            refreshProjectImages={loadProjectImages}
           />
           
           <ImageComments 
@@ -255,6 +276,13 @@ function ImageView() {
             loading={loading} 
             setLoading={setLoading} 
             setError={setError} 
+          />
+
+          <ImageDeletionControls 
+            projectId={projectId} 
+            image={image} 
+            setImage={setImage} 
+            refreshProjectImages={loadProjectImages} 
           />
           
           {/* Original classifications component for reference/additional details */}

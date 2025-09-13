@@ -57,10 +57,20 @@ def setup_logging():
     for handler in root_logger.handlers[:]:
         root_logger.removeHandler(handler)
     
-    # Add our handler
-    handler = logging.StreamHandler()
-    handler.setFormatter(JSONFormatter())
-    root_logger.addHandler(handler)
+    # Create JSON formatter
+    formatter = JSONFormatter()
+    
+    # Add console handler
+    console_handler = logging.StreamHandler()
+    console_handler.setFormatter(formatter)
+    root_logger.addHandler(console_handler)
+    
+    # Add file handler for app.json
+    log_file_path = os.path.join(os.getcwd(), "logs", "app.json")
+    os.makedirs(os.path.dirname(log_file_path), exist_ok=True)
+    file_handler = logging.FileHandler(log_file_path)
+    file_handler.setFormatter(formatter)
+    root_logger.addHandler(file_handler)
     
     return logging.getLogger(__name__)
 

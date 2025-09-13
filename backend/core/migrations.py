@@ -22,6 +22,9 @@ async def run_migrations():
     
     # Migrate existing data
     await migrate_existing_data()
+
+    # Add deletion / audit structures
+    await add_image_deletion_features()
     
     print("Database migrations completed successfully.")
 
@@ -51,6 +54,7 @@ async def migrate_existing_data():
     async with AsyncSessionLocal() as session:
         # Update existing DataInstance records to link to User records
         await migrate_data_instances(session)
+
 
 async def migrate_data_instances(session):
     """
@@ -119,6 +123,55 @@ async def migrate_data_instances(session):
         await session.rollback()
         print(f"Error migrating data instances: {str(e)}")
         raise
+
+async def add_image_deletion_features():
+    """Add soft delete columns and image_deletion_events table if they do not exist."""
+    async with engine.begin() as conn:
+        # Check and add columns to data_instances
+        column_checks = {
+            'deleted_at': "ALTER TABLE data_instances ADD COLUMN deleted_at TIMESTAMPTZ",
+            'deleted_by_user_id': "ALTER TABLE data_instances ADD COLUMN deleted_by_user_id UUID REFERENCES users(id)",
+            'deletion_reason': "ALTER TABLE data_instances ADD COLUMN deletion_reason TEXT",
+            'pending_hard_delete_at': "ALTER TABLE data_instances ADD COLUMN pending_hard_delete_at TIMESTAMPTZ",
+            'hard_deleted_at': "ALTER TABLE data_instances ADD COLUMN hard_deleted_at TIMESTAMPTZ",
+            'hard_deleted_by_user_id': "ALTER TABLE data_instances ADD COLUMN hard_deleted_by_user_id UUID REFERENCES users(id)",
+            'storage_deleted': "ALTER TABLE data_instances ADD COLUMN storage_deleted BOOLEAN NOT NULL DEFAULT FALSE"
+        }
+        for col, ddl in column_checks.items():
+            try:
+                await conn.execute(text(f"SELECT {col} FROM data_instances LIMIT 1"))
+            except Exception:
+                try:
+                    await conn.execute(text(ddl))
+                    print(f"Added column {col} to data_instances")
+                except Exception as e:
+                    print(f"Failed adding column {col}: {e}")
+
+        # Create image_deletion_events table if missing
+        try:
+            await conn.execute(text("SELECT 1 FROM image_deletion_events LIMIT 1"))
+        except Exception:
+            try:
+                await conn.execute(text(
+                    """
+                    CREATE TABLE image_deletion_events (
+                        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+                        image_id UUID NOT NULL REFERENCES data_instances(id),
+                        project_id UUID NOT NULL REFERENCES projects(id),
+                        actor_user_id UUID NULL REFERENCES users(id),
+                        action VARCHAR(32) NOT NULL,
+                        reason TEXT NULL,
+                        storage_deleted BOOLEAN NOT NULL DEFAULT FALSE,
+                        previous_state JSON NULL,
+                        at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+                    )
+                    """
+                ))
+                await conn.execute(text("CREATE INDEX IF NOT EXISTS idx_image_deletion_events_image_time ON image_deletion_events (image_id, at DESC)"))
+                await conn.execute(text("CREATE INDEX IF NOT EXISTS idx_image_deletion_events_project_time ON image_deletion_events (project_id, at DESC)"))
+                print("Created image_deletion_events table and indexes")
+            except Exception as e:
+                print(f"Failed creating image_deletion_events table: {e}")
 
 if __name__ == "__main__":
     # Run migrations when script is executed directly

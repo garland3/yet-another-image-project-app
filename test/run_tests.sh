@@ -1,91 +1,96 @@
-#!/bin/bash
-
-# Backend Test Runner
-# This script runs the comprehensive backend test suite that was developed and stabilized.
-
-set -e  # Exit on any error
+#!/usr/bin/env bash
+# Backend Test Runner (Fedora-friendly, no `which`)
+set -euo pipefail
 
 echo "🧪 Running Backend Test Suite"
 echo "=============================="
 
-# Change to the project root directory
 cd "$(dirname "$0")/.."
 
-# Ensure we're in the correct directory
 if [ ! -d "backend" ]; then
-    echo "❌ Error: backend directory not found. Make sure you're running this from the project root."
-    exit 1
+  echo "❌ Error: backend directory not found. Run from project root."
+  exit 1
 fi
 
 echo "📁 Current directory: $(pwd)"
-echo "🐍 Python version: $(python3 --version 2>/dev/null || echo 'Python not found')"
+PY_BIN="$(command -v python3 || command -v python || true)"
+echo "🐍 Python version: $([ -n "${PY_BIN}" ] && "${PY_BIN}" --version 2>/dev/null || echo 'Python not found')"
 
-# Check for virtual environment in backend directory and activate it if it exists
-if [ -f "backend/.venv/bin/activate" ]; then
-    echo "🔧 Activating virtual environment..."
-    source backend/.venv/bin/activate
-    echo "📦 Installing pytest-xdist..."
-    pip install pytest pytest-asyncio  pytest-xdist    
-    PYTEST_PATH=$(which pytest)
+export PATH="$HOME/.local/bin:$PATH"
+
+if ! command -v uv >/dev/null 2>&1; then
+  echo "❌ Error: uv not found. Install with:"
+  echo " curl -LsSf https://astral.sh/uv/install.sh | sh"
+  exit 1
+fi
+echo "🔧 Using uv: $(uv --version)"
+
+if [ -f "/opt/venv/bin/activate" ]; then
+  echo "🔧 Activating Docker virtual environment..."
+  # shellcheck disable=SC1091
+  source /opt/venv/bin/activate
+  echo "📦 Installing test deps..."
+  uv pip install pytest pytest-asyncio pytest-xdist
+elif [ -f "backend/.venv/bin/activate" ]; then
+  echo "🔧 Activating local virtual environment..."
+  # shellcheck disable=SC1091
+  source backend/.venv/bin/activate
+  echo "📦 Installing test deps..."
+  uv pip install pytest pytest-asyncio pytest-xdist
 else
-    # Check if pytest is available in system PATH
-    pip install pytest pytest-asyncio  pytest-xdist    
-    PYTEST_PATH=$(command -v pytest 2>/dev/null || echo "")
+  echo "❌ Error: Virtual environment not found
+Expected:
+ - Docker: /opt/venv/bin/activate
+ - Local: backend/.venv/bin/activate
+
+For local dev:
+ cd backend && uv venv .venv && source .venv/bin/activate && uv pip install -r requirements.txt"
+  exit 1
 fi
 
-# Check if pytest is available
-if [ -z "$PYTEST_PATH" ]; then
-    echo "❌ Error: pytest not found. Please install it first:"
-    if [ -f "backend/.venv/bin/activate" ]; then
-        echo "   cd backend && source .venv/bin/activate && pip install pytest pytest-asyncio"
-    else
-        echo "   pip install pytest pytest-asyncio"
-        pip install pytest pytest-asyncio
-    fi
-    exit 1
+# Ensure we have a python executable post-activate
+PY_BIN="$(command -v python3 || command -v python || true)"
+if [ -z "${PY_BIN}" ]; then
+  echo "❌ Error: python not found in the active environment."
+  exit 1
 fi
+echo "🔧 Using python: ${PY_BIN}"
 
-echo "🔧 Using pytest: $PYTEST_PATH"
-
-# Change to backend directory for tests
 cd backend
-
 echo ""
 echo "🚀 Starting backend tests..."
 echo "----------------------------"
 
-# Run the full test suite with the same options that were successful
-# Specifically target the tests directory to avoid picking up other test files
-"$PYTEST_PATH" -n auto -q tests/
-
-# Capture the exit code
+set +e
+"${PY_BIN}" -m pytest -n auto -q tests/
 TEST_EXIT_CODE=$?
+set -e
 
 echo ""
 if [ $TEST_EXIT_CODE -eq 0 ]; then
-    echo "✅ All backend tests passed!"
-    echo ""
-    echo "📊 Test Summary:"
-    echo "   - Configuration tests: ✅"
-    echo "   - Database tests: ✅"
-    echo "   - Authentication/Dependencies tests: ✅"
-    echo "   - Router tests (users, projects, images, metadata): ✅"
-    echo "   - CRUD operation tests: ✅"
-    echo "   - Schema validation tests: ✅"
-    echo "   - Content delivery tests: ✅"
-    echo "   - Edge case handling tests: ✅"
-    echo ""
-    echo "🎉 Backend is ready for production!"
+  echo "✅ All backend tests passed!"
+  echo ""
+  echo "📊 Test Summary:"
+  echo " - Configuration tests: ✅"
+  echo " - Database tests: ✅"
+  echo " - Authentication/Dependencies tests: ✅"
+  echo " - Router tests (users, projects, images, metadata): ✅"
+  echo " - CRUD operation tests: ✅"
+  echo " - Schema validation tests: ✅"
+  echo " - Content delivery tests: ✅"
+  echo " - Edge case handling tests: ✅"
+  echo ""
+  echo "🎉 Backend is ready for production!"
 else
-    echo "❌ Some tests failed (exit code: $TEST_EXIT_CODE)"
-    echo ""
-    echo "🔍 Troubleshooting tips:"
-    echo "   - Check if all required environment variables are set"
-    echo "   - Ensure database connectivity (if using PostgreSQL)"
-    echo "   - Verify S3/MinIO configuration (if needed)"
-    echo "   - Check pytest and dependency versions"
-    echo ""
-    echo "📝 For detailed output, run: pytest -v"
+  echo "❌ Some tests failed (exit code: $TEST_EXIT_CODE)"
+  echo ""
+  echo "🔍 Troubleshooting tips:"
+  echo " - Check required environment variables"
+  echo " - Ensure database connectivity"
+  echo " - Verify S3/MinIO configuration"
+  echo " - Check pytest and dependency versions"
+  echo ""
+  echo "📝 For detailed output, run: ${PY_BIN} -m pytest -v"
 fi
 
 exit $TEST_EXIT_CODE

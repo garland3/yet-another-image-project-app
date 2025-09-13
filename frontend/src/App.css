@@ -844,6 +844,10 @@ ul li:hover {
   gap: var(--space-6);
 }
 
+.deletion-controls-section {
+  order: 4;
+}
+
 /* Modern Gallery Styles */
 .modern-gallery {
   background: var(--bg-primary);
@@ -2131,4 +2135,37 @@ ul li:hover {
     align-items: stretch;
     gap: var(--space-3);
   }
+}
+
+/* Deleted Image Styles */
+.gallery-item.deleted {
+  opacity: 0.7;
+  position: relative;
+}
+
+.gallery-item.deleted::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(196, 48, 43, 0.1);
+  border: 2px dashed #f59e0b;
+  border-radius: var(--border-radius);
+  pointer-events: none;
+  z-index: 1;
+}
+
+.deleted-image {
+  filter: grayscale(20%) contrast(0.9);
+  border: 2px dashed #f59e0b;
+  border-radius: var(--border-radius);
+  background: #fbf5f5;
+}
+
+.view-image.deleted-image {
+  max-width: 100%;
+  max-height: 80vh;
+  object-fit: contain;
 }

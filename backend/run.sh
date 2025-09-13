@@ -43,6 +43,47 @@ ensure_network() {
 	fi
 }
 
+# Test connectivity to services
+test_connectivity() {
+    say "Testing connectivity to services..."
+    
+    # Test PostgreSQL
+    if have_cmd pg_isready; then
+        if pg_isready -h localhost -p "$POSTGRES_PORT_HOST" -U "$POSTGRES_USER" >/dev/null 2>&1; then
+            say "✅ PostgreSQL is accessible from host"
+        else
+            say "❌ PostgreSQL is not accessible from host on port $POSTGRES_PORT_HOST"
+            return 1
+        fi
+    elif have_cmd nc; then
+        if nc -z localhost "$POSTGRES_PORT_HOST" >/dev/null 2>&1; then
+            say "✅ PostgreSQL port $POSTGRES_PORT_HOST is accessible"
+        else
+            say "❌ PostgreSQL port $POSTGRES_PORT_HOST is not accessible"
+            return 1
+        fi
+    fi
+    
+    # Test MinIO
+    if have_cmd curl; then
+        if curl -sf "http://localhost:9000/minio/health/live" >/dev/null; then
+            say "✅ MinIO is accessible from host"
+        else
+            say "❌ MinIO is not accessible from host on port 9000"
+            return 1
+        fi
+    elif have_cmd nc; then
+        if nc -z localhost 9000 >/dev/null 2>&1; then
+            say "✅ MinIO port 9000 is accessible"
+        else
+            say "❌ MinIO port 9000 is not accessible"
+            return 1
+        fi
+    fi
+    
+    return 0
+}
+
 ensure_volume() {
 	local vol="$1"
 	if ! "$CONTAINER_ENGINE" volume ls --format '{{.Name}}' | grep -qx "$vol"; then
@@ -154,6 +195,14 @@ start_backend() {
     start_postgres
     start_minio
     
+    # Test connectivity before starting backend
+    if ! test_connectivity; then
+        say "ERROR: Cannot connect to required services. Check your configuration."
+        say "Current port mappings from docker ps:"
+        docker ps --format "table {{.Names}}\t{{.Ports}}"
+        exit 1
+    fi
+    
     # Ensure Python virtual environment is activated
     if [[ -z "${VIRTUAL_ENV:-}" ]]; then
         if [[ -f .venv/bin/activate ]]; then
@@ -178,7 +227,7 @@ start_backend() {
     
     # Start the FastAPI application
     # Note: Using 'main:app' instead of 'app.main:app' since we're now in the backend directory
-    uvicorn main:app --host 0.0.0.0 --port 8000
+    uvicorn main:app --host 0.0.0.0 --port 8000 --reload
 }
 
 # Stop any existing uvicorn instance if running (ignore if none)

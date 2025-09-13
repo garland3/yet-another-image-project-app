@@ -66,6 +66,14 @@ class DataInstance(DataInstanceBase):
     uploader_id: Optional[uuid.UUID] = None
     created_at: datetime
     updated_at: Optional[datetime] = None
+    # Deletion fields
+    deleted_at: Optional[datetime] = None
+    deleted_by_user_id: Optional[uuid.UUID] = None
+    deletion_reason: Optional[str] = None
+    pending_hard_delete_at: Optional[datetime] = None
+    hard_deleted_at: Optional[datetime] = None
+    hard_deleted_by_user_id: Optional[uuid.UUID] = None
+    storage_deleted: bool = False
 
     @field_validator('metadata_', mode='before')
     @classmethod
@@ -239,3 +247,27 @@ class ApiKey(ApiKeyBase):
 class ApiKeyCreateResponse(BaseModel):
     api_key: ApiKey
     key: str  # The raw API key (only shown once)
+
+
+# Deletion / Audit Schemas
+class ImageDeletionEvent(BaseModel):
+    id: uuid.UUID
+    image_id: uuid.UUID
+    project_id: uuid.UUID
+    actor_user_id: Optional[uuid.UUID] = None
+    action: str
+    reason: Optional[str] = None
+    storage_deleted: bool
+    previous_state: Optional[Dict[str, Any]] = None
+    at: datetime
+
+    model_config = {
+        "from_attributes": True,
+        "populate_by_name": True
+    }
+
+class ImageDeletionEventList(BaseModel):
+    events: List[ImageDeletionEvent]
+    total: int
+
+

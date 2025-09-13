@@ -4,7 +4,10 @@ import { useNavigate } from 'react-router-dom';
 // Fallback SVG for failed image loads
 const FALLBACK_IMAGE_SVG = 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNDAwIiBoZWlnaHQ9IjQwMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iNDAwIiBoZWlnaHQ9IjQwMCIgZmlsbD0iI2YzZjRmNiIgc3Ryb2tlPSIjZTVlN2ViIiBzdHJva2Utd2lkdGg9IjIiLz48dGV4dCB4PSI1MCUiIHk9IjQ1JSIgZm9udC1mYW1pbHk9IkFyaWFsLCBzYW5zLXNlcmlmIiBmb250LXNpemU9IjE2IiBmb250LXdlaWdodD0iNTAwIiB0ZXh0LWFuY2hvcj0ibWlkZGxlIiBkeT0iLjNlbSIgZmlsbD0iIzlmYTZiMiI+SW1hZ2UgVW5hdmFpbGFibGU8L3RleHQ+PHRleHQgeD0iNTAlIiB5PSI1NSUiIGZvbnQtZmFtaWx5PSJBcmlhbCwgc2Fucy1zZXJpZiIgZm9udC1zaXplPSIyNCIgdGV4dC1hbmNob3I9Im1pZGRsZSIgZHk9Ii4zZW0iIGZpbGw9IiNkMWQ1ZGIiPvCfk7c8L3RleHQ+PC9zdmc+';
 
-function ImageGallery({ projectId, images, loading }) {
+// Deleted image placeholder SVG
+const DELETED_IMAGE_SVG = 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNDAwIiBoZWlnaHQ9IjQwMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iNDAwIiBoZWlnaHQ9IjQwMCIgZmlsbD0iI2ZiZjVmNSIgc3Ryb2tlPSIjZjU5ZTBiIiBzdHJva2Utd2lkdGg9IjMiIHN0cm9rZS1kYXNoYXJyYXk9IjEwLDUiLz48dGV4dCB4PSI1MCUiIHk9IjQwJSIgZm9udC1mYW1pbHk9IkFyaWFsLCBzYW5zLXNlcmlmIiBmb250LXNpemU9IjE4IiBmb250LXdlaWdodD0iNjAwIiB0ZXh0LWFuY2hvcj0ibWlkZGxlIiBkeT0iLjNlbSIgZmlsbD0iI2M0MzAyYiI+SW1hZ2UgRGVsZXRlZDwvdGV4dD48dGV4dCB4PSI1MCUiIHk9IjU1JSIgZm9udC1mYW1pbHk9IkFyaWFsLCBzYW5zLXNlcmlmIiBmb250LXNpemU9IjMyIiB0ZXh0LWFuY2hvcj0ibWlkZGxlIiBkeT0iLjNlbSIgZmlsbD0iI2Y1OWUwYiI+8J+XkeKcgO+4jzwvdGV4dD48dGV4dCB4PSI1MCUiIHk9IjY4JSIgZm9udC1mYW1pbHk9IkFyaWFsLCBzYW5zLXNlcmlmIiBmb250LXNpemU9IjEyIiB0ZXh0LWFuY2hvcj0ibWlkZGxlIiBkeT0iLjNlbSIgZmlsbD0iIzk3OWNhMSI+Q2xpY2sgdG8gdmlldyBkZXRhaWxzPC90ZXh0Pjwvc3ZnPg==';
+
+function ImageGallery({ projectId, images, loading, onImageUpdated, refreshProjectImages }) {
   const navigate = useNavigate();
   const [imageLoadStatus, setImageLoadStatus] = useState({});
   const [currentPage, setCurrentPage] = useState(1);
@@ -13,6 +16,7 @@ function ImageGallery({ projectId, images, loading }) {
   const [sortBy, setSortBy] = useState('date'); // date, name, size
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedImages, setSelectedImages] = useState(new Set());
+  const [actionError, setActionError] = useState(null);
   
   const imagesPerPage = viewMode === 'small' ? 100 : viewMode === 'medium' ? 50 : 25;
   
@@ -80,6 +84,22 @@ function ImageGallery({ projectId, images, loading }) {
     const sizes = ['Bytes', 'KB', 'MB', 'GB', 'TB'];
     const i = Math.floor(Math.log(bytes) / Math.log(k));
     return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+  };
+
+
+  const handleRestore = async (image) => {
+    try {
+      const resp = await fetch(`/api/projects/${projectId}/images/${image.id}/restore`, { method: 'POST' });
+      if (!resp.ok) {
+        const detail = await resp.text();
+        throw new Error(`Restore failed (${resp.status}): ${detail}`);
+      }
+      const data = await resp.json();
+      if (onImageUpdated) onImageUpdated(data);
+      if (refreshProjectImages) refreshProjectImages();
+    } catch (e) {
+      setActionError(e.message);
+    }
   };
 
   return (
@@ -158,6 +178,14 @@ function ImageGallery({ projectId, images, loading }) {
         </div>
       </div>
 
+      {/* Error Display */}
+      {actionError && (
+        <div className="error-banner">
+          <span className="error-message">{actionError}</span>
+          <button onClick={() => setActionError(null)} className="error-close">×</button>
+        </div>
+      )}
+
       {/* Gallery Content */}
       <div className="gallery-content">
         {loading && (
@@ -203,10 +231,10 @@ function ImageGallery({ projectId, images, loading }) {
             </div>
             
             <div className={`gallery-grid view-${viewMode}`}>
-              {currentImages.map(image => (
+        {currentImages.map(image => (
                 <div 
                   key={image.id} 
-                  className={`gallery-item ${selectedImages.has(image.id) ? 'selected' : ''}`}
+          className={`gallery-item ${selectedImages.has(image.id) ? 'selected' : ''} ${image.deleted_at ? 'deleted' : ''}`}
                 >
                   <div className="gallery-item-checkbox">
                     <input
@@ -222,7 +250,7 @@ function ImageGallery({ projectId, images, loading }) {
                     onClick={() => navigate(`/view/${image.id}?project=${projectId}`)}
                   >
                     <img 
-                      src={`/api/images/${image.id}/thumbnail?width=400&height=400`} 
+                      src={image.deleted_at ? DELETED_IMAGE_SVG : `/api/images/${image.id}/thumbnail?width=400&height=400`} 
                       alt={image.filename || 'Image'} 
                       loading="lazy"
                       onLoad={() => {
@@ -237,7 +265,7 @@ function ImageGallery({ projectId, images, loading }) {
                           [image.id]: { status: 'error', timestamp: new Date().toISOString(), error: e.message }
                         }));
                         e.target.onerror = null;
-                        e.target.src = FALLBACK_IMAGE_SVG;
+                        e.target.src = image.deleted_at ? DELETED_IMAGE_SVG : FALLBACK_IMAGE_SVG;
                       }}
                     />
                     <div className="gallery-item-overlay">
@@ -248,9 +276,13 @@ function ImageGallery({ projectId, images, loading }) {
                             e.stopPropagation();
                             navigate(`/view/${image.id}?project=${projectId}`);
                           }}
-                        >
-                          View
-                        </button>
+                        >View</button>
+                        {image.deleted_at && !image.storage_deleted && (
+                          <button 
+                            className="overlay-btn"
+                            onClick={(e) => { e.stopPropagation(); handleRestore(image); }}
+                          >Restore</button>
+                        )}
                       </div>
                     </div>
                   </div>
@@ -261,6 +293,9 @@ function ImageGallery({ projectId, images, loading }) {
                     </div>
                     <div className="item-meta">
                       <span className="item-size">{formatFileSize(image.size_bytes)}</span>
+                      {image.deleted_at && (
+                        <span className="item-status" style={{ color: '#c0392b', fontWeight: '600', marginLeft: '6px' }}>Deleted</span>
+                      )}
                     </div>
                   </div>
                 </div>
@@ -309,6 +344,7 @@ function ImageGallery({ projectId, images, loading }) {
           </>
         )}
       </div>
+
       
       {/* Debug section moved to bottom */}
       <div className="debug-section">
@@ -372,7 +408,7 @@ function ImageGallery({ projectId, images, loading }) {
           </div>
         )}
       </div>
-    </div>
+  </div>
   );
 }
 

@@ -54,7 +54,7 @@ jobs:
     - name: Install system dependencies
       run: |
         sudo apt-get update
-        sudo apt-get install -y libpq-dev
+        sudo apt-get install -y libpq-dev which
     
     - name: Build frontend
       run: |
@@ -62,11 +62,17 @@ jobs:
         npm ci
         npm run build
     
-    - name: Install Python dependencies
+    - name: Install uv
+      run: |
+        curl -LsSf https://astral.sh/uv/install.sh | sh
+        echo "$HOME/.local/bin" >> $GITHUB_PATH
+        
+    - name: Install Python dependencies with uv
       working-directory: ./backend
       run: |
-        python -m pip install --upgrade pip
-        pip install -r requirements.txt
+        uv venv .venv
+        source .venv/bin/activate
+        uv pip install -r requirements.txt
         
     - name: Set up test environment
       working-directory: ./backend
@@ -76,6 +82,8 @@ jobs:
     - name: Run tests
       working-directory: ./backend
       run: |
+        source .venv/bin/activate
+        
         bash ../test/run_tests.sh
       env:
         DATABASE_URL: postgresql+asyncpg://postgres:postgres@localhost:5432/postgres
@@ -166,7 +174,7 @@ jobs:
           -e POSTGRES_DB=postgres \
           -e POSTGRES_SERVER=localhost \
           ${{ env.DOCKER_USERNAME }}/${{ env.DOCKER_IMAGE_NAME }}:latest \
-          bash -c "cd backend && bash ../test/run_tests.sh"
+          bash -c "bash ../test/run_tests.sh"
 
     - name: Push Docker image
       if: github.event_name != 'pull_request'
@@ -178,4 +186,6 @@ jobs:
           ${{ env.DOCKER_USERNAME }}/${{ env.DOCKER_IMAGE_NAME }}:latest
           ${{ env.DOCKER_USERNAME }}/${{ env.DOCKER_IMAGE_NAME }}:${{ github.sha }}
         cache-from: type=gha
+
         cache-to: type=gha,mode=max
+

@@ -74,10 +74,15 @@ FROM base AS final
 COPY --from=builder /opt/venv /opt/venv
 ENV PATH="/opt/venv/bin:$PATH"
 
+# Install uv in the final stage for testing
+RUN pip install --no-cache-dir uv
+
 # Copy backend code
 COPY --from=builder /app/backend /app/backend
 # Copy frontend build files
 COPY --from=builder /app/frontend/build /app/ui2
+# Copy test folder
+COPY test ./test
 
 # Set frontend build path environment variable
 ENV FRONTEND_BUILD_PATH=/app/ui2
