@@ -110,8 +110,12 @@ class TestSettings:
 
     def test_frontend_build_path_default(self):
         """Test frontend build path default value"""
+        import os
         settings = Settings(_env_file=None)
-        assert settings.FRONTEND_BUILD_PATH == "frontend/build"
+        # In Docker, FRONTEND_BUILD_PATH is set to /app/ui2
+        # Locally, it defaults to frontend/build
+        expected_path = os.environ.get("FRONTEND_BUILD_PATH", "frontend/build")
+        assert settings.FRONTEND_BUILD_PATH == expected_path
 
     def test_cors_origins_from_settings(self):
         """Test CORS origins configuration"""
