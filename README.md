@@ -60,9 +60,13 @@ Copy `.env.example` to `.env` and configure:
 
 Test deployment on minikube:
 
+Noe: in the dev conatainer, I added minikube and kubectl, so you can run this directly from the dev container.
+* it will have minikube, kubectl, and helm installed
+
 ```bash
 # Start minikube
 minikube start
+# minikube start --driver=docker
 
 # Build and load image
 docker build -t image-project-manager:latest .

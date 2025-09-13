@@ -230,6 +230,39 @@ def get_presigned_download_url(bucket_name: str, object_name: str, expires_delta
     if not boto3_client:
         logger.error("Boto3 S3 client not initialized, cannot generate URL")
         return None
+    
+    try:
+        # Generate presigned URL with expiration time
+        expires_in = int(expires_delta.total_seconds())
+        url = boto3_client.generate_presigned_url(
+            'get_object',
+            Params={'Bucket': bucket_name, 'Key': object_name},
+            ExpiresIn=expires_in
+        )
+        logger.debug("Generated presigned URL", extra={
+            "object_name": object_name,
+            "bucket": bucket_name,
+            "expires_in": expires_in
+        })
+        return url
+    except ClientError as e:
+        error_code = e.response.get('Error', {}).get('Code')
+        error_message = e.response.get('Error', {}).get('Message', str(e))
+        logger.error("S3 error generating presigned URL", extra={
+            "object_name": object_name,
+            "bucket": bucket_name,
+            "error_code": error_code,
+            "error_message": error_message
+        })
+        return None
+    except Exception as e:
+        logger.error("Unexpected error generating presigned URL", extra={
+            "object_name": object_name,
+            "bucket": bucket_name,
+            "error": str(e),
+            "error_type": type(e).__name__
+        })
+        return None
 
 
 def delete_file_from_s3(bucket_name: str, object_name: str) -> bool:

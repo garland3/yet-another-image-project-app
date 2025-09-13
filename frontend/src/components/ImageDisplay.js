@@ -1,7 +1,16 @@
 import React, { useState, useEffect } from 'react';
 
-function ImageDisplay({ imageId, image, isTransitioning }) {
+// Deleted image placeholder SVG for larger display
+const DELETED_IMAGE_DISPLAY_SVG = 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iODAwIiBoZWlnaHQ9IjYwMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iODAwIiBoZWlnaHQ9IjYwMCIgZmlsbD0iI2ZiZjVmNSIgc3Ryb2tlPSIjZjU5ZTBiIiBzdHJva2Utd2lkdGg9IjQiIHN0cm9rZS1kYXNoYXJyYXk9IjE1LDgiLz48dGV4dCB4PSI1MCUiIHk9IjM1JSIgZm9udC1mYW1pbHk9IkFyaWFsLCBzYW5zLXNlcmlmIiBmb250LXNpemU9IjM2IiBmb250LXdlaWdodD0iNjAwIiB0ZXh0LWFuY2hvcj0ibWlkZGxlIiBkeT0iLjNlbSIgZmlsbD0iI2M0MzAyYiI+SW1hZ2UgRGVsZXRlZDwvdGV4dD48dGV4dCB4PSI1MCUiIHk9IjUwJSIgZm9udC1mYW1pbHk9IkFyaWFsLCBzYW5zLXNlcmlmIiBmb250LXNpemU9IjY0IiB0ZXh0LWFuY2hvcj0ibWlkZGxlIiBkeT0iLjNlbSIgZmlsbD0iI2Y1OWUwYiI+8J+XkeKcgO+4jzwvdGV4dD48dGV4dCB4PSI1MCUiIHk9IjY1JSIgZm9udC1mYW1pbHk9IkFyaWFsLCBzYW5zLXNlcmlmIiBmb250LXNpemU9IjE4IiB0ZXh0LWFuY2hvcj0ibWlkZGxlIiBkeT0iLjNlbSIgZmlsbD0iIzk3OWNhMSI+VGhpcyBpbWFnZSBoYXMgYmVlbiBkZWxldGVkPC90ZXh0Pjx0ZXh0IHg9IjUwJSIgeT0iNzAlIiBmb250LWZhbWlseT0iQXJpYWwsIHNhbnMtc2VyaWYiIGZvbnQtc2l6ZT0iMTQiIHRleHQtYW5jaG9yPSJtaWRkbGUiIGR5PSIuM2VtIiBmaWxsPSIjOTc5Y2ExIj5DaGVjayB0aGUgZGVsZXRpb24gY29udHJvbHMgYmVsb3cgZm9yIG1vcmUgaW5mbzwvdGV4dD48L3N2Zz4=';
+
+function ImageDisplay({ imageId, image, isTransitioning, projectId, setImage, refreshProjectImages }) {
   const [zoomLevel, setZoomLevel] = useState(1);
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [reason, setReason] = useState("");
+  const [force, setForce] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+  const [deleteError, setDeleteError] = useState(null);
+  const MIN_REASON = 5;
 
   // Apply zoom
   const handleZoomIn = () => {
@@ -16,6 +25,37 @@ function ImageDisplay({ imageId, image, isTransitioning }) {
   // Handle reset zoom
   const handleResetZoom = () => {
     setZoomLevel(1);
+  };
+
+  // Handle delete
+  const handleDelete = async () => {
+    if (reason.trim().length < MIN_REASON) {
+      setDeleteError(`Reason must be at least ${MIN_REASON} characters`);
+      return;
+    }
+    setSubmitting(true);
+    try {
+      const resp = await fetch(`/api/projects/${projectId}/images/${image.id}`, {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ reason: reason.trim(), force })
+      });
+      if (!resp.ok) {
+        const detail = await resp.text();
+        throw new Error(`Delete failed (${resp.status}): ${detail}`);
+      }
+      const data = await resp.json();
+      setImage(data);
+      if (refreshProjectImages) refreshProjectImages();
+      setShowDeleteModal(false);
+      setReason("");
+      setForce(false);
+      setDeleteError(null);
+    } catch (e) {
+      setDeleteError(e.message);
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   // Handle download
@@ -150,6 +190,14 @@ function ImageDisplay({ imageId, image, isTransitioning }) {
             <div className="loading"></div>
             <p>Loading image...</p>
           </div>
+        ) : image.deleted_at ? (
+          <img 
+            src={DELETED_IMAGE_DISPLAY_SVG}
+            alt="Deleted Image" 
+            id="main-image"
+            className="view-image deleted-image"
+            style={{ transform: `scale(${zoomLevel})` }}
+          />
         ) : (
           <img 
             src={`/api/images/${imageId}/content`}
@@ -193,35 +241,68 @@ function ImageDisplay({ imageId, image, isTransitioning }) {
         >
           Download
         </button>
-        <button 
-          className="btn btn-secondary control-btn"
-          onClick={() => {
-            console.log('Debug info for image:', {
-              imageId,
-              image,
-              contentUrl: `/api/images/${imageId}/content`,
-              downloadUrl: `/api/images/${imageId}/download`
-            });
-            // Test the endpoints directly
-            fetch(`/api/images/${imageId}/content`)
-              .then(response => {
-                console.log('Content endpoint response:', {
-                  status: response.status,
-                  contentType: response.headers.get('content-type'),
-                  size: response.headers.get('content-length')
-                });
-              })
-              .catch(err => console.error('Content endpoint error:', err));
-            
-            fetch(`/api/images/${imageId}/download`)
-              .then(response => response.json())
-              .then(data => console.log('Download endpoint response:', data))
-              .catch(err => console.error('Download endpoint error:', err));
-          }}
-        >
-          Debug
-        </button>
+        {image && !image.deleted_at && (
+          <button 
+            className="btn btn-danger control-btn"
+            onClick={() => setShowDeleteModal(true)}
+          >
+            Delete
+          </button>
+        )}
       </div>
+      
+      {showDeleteModal && (
+        <div className="modal" style={{ display: 'flex' }}>
+          <div className="modal-content">
+            <div className="modal-header">
+              <h3>{force ? 'Force Delete Image' : 'Delete Image'}</h3>
+              <span className="close-modal" onClick={() => {
+                setShowDeleteModal(false);
+                setReason("");
+                setForce(false);
+                setDeleteError(null);
+              }}>&times;</span>
+            </div>
+            
+            <div className="modal-body">
+              <p>{force ? 'This will remove the file from storage immediately. Database record stays for audit.' : 'The image will be hidden and can be restored until retention expires.'}</p>
+              
+              <div className="form-group">
+                <label htmlFor="delete-reason">Reason (required)</label>
+                <textarea 
+                  id="delete-reason" 
+                  rows={3} 
+                  value={reason} 
+                  onChange={e => setReason(e.target.value)}
+                  placeholder="Enter a reason for deleting this image..."
+                />
+                <small>Min {MIN_REASON} chars. Helps auditing.</small>
+              </div>
+              
+              <div className="form-group">
+                <label style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                  <input type="checkbox" checked={force} onChange={e => setForce(e.target.checked)} />
+                  Force delete (also remove object from storage)
+                </label>
+              </div>
+              
+              {deleteError && <div className="alert alert-error">{deleteError}</div>}
+            </div>
+            
+            <div className="modal-footer">
+              <button className="btn btn-secondary" onClick={() => {
+                setShowDeleteModal(false);
+                setReason("");
+                setForce(false);
+                setDeleteError(null);
+              }} disabled={submitting}>Cancel</button>
+              <button className="btn btn-danger" onClick={handleDelete} disabled={submitting}>
+                {submitting ? 'Deleting...' : (force ? 'Force Delete' : 'Delete')}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </>
   );
 }

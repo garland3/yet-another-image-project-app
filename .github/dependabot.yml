@@ -1,112 +1,12 @@
+# To get started with Dependabot version updates, you'll need to specify which
+# package ecosystems to update and where the package manifests are located.
+# Please see the documentation for more information:
+# https://docs.github.com/github/administering-a-repository/configuration-options-for-dependency-updates
+# https://containers.dev/guide/dependabot
+
 version: 2
 updates:
-  # Python dependencies
-  - package-ecosystem: "pip"
-    directory: "/backend"
-    schedule:
-      interval: "weekly"
-      day: "monday"
-      time: "09:00"
-      timezone: "UTC"
-    open-pull-requests-limit: 5
-    reviewers:
-      - "garland3"
-    assignees:
-      - "garland3"
-    commit-message:
-      prefix: "deps"
-      prefix-development: "deps-dev"
-      include: "scope"
-    labels:
-      - "dependencies"
-      - "python"
-    groups:
-      security-updates:
-        applies-to: security-updates
-        patterns:
-          - "*"
-      minor-and-patch:
-        applies-to: version-updates
-        update-types:
-          - "minor"
-          - "patch"
-        exclude-patterns:
-          - "django*"  # Group Django updates separately if needed
-          - "fastapi*"  # Group FastAPI updates separately if needed
-
-  # Node.js/NPM dependencies
-  - package-ecosystem: "npm"
-    directory: "/frontend"
-    schedule:
-      interval: "weekly" 
-      day: "monday"
-      time: "09:00"
-      timezone: "UTC"
-    open-pull-requests-limit: 5
-    reviewers:
-      - "garland3"
-    assignees:
-      - "garland3"
-    commit-message:
-      prefix: "deps"
-      prefix-development: "deps-dev"
-      include: "scope"
-    labels:
-      - "dependencies"
-      - "javascript"
-    groups:
-      react-ecosystem:
-        patterns:
-          - "react*"
-          - "@types/react*"
-          - "react-dom*"
-          - "react-scripts*"
-      security-updates:
-        applies-to: security-updates
-        patterns:
-          - "*"
-      minor-and-patch:
-        applies-to: version-updates
-        update-types:
-          - "minor" 
-          - "patch"
-
-  # Docker dependencies
-  - package-ecosystem: "docker"
-    directory: "/"
-    schedule:
-      interval: "weekly"
-      day: "tuesday"
-      time: "09:00"
-      timezone: "UTC"
-    open-pull-requests-limit: 3
-    reviewers:
-      - "garland3"
-    assignees:
-      - "garland3"
-    commit-message:
-      prefix: "deps"
-      include: "scope"
-    labels:
-      - "dependencies"
-      - "docker"
-
-  # GitHub Actions dependencies
-  - package-ecosystem: "github-actions"
-    directory: "/"
-    schedule:
-      interval: "weekly"
-      day: "tuesday"
-      time: "10:00"
-      timezone: "UTC"
-    open-pull-requests-limit: 3
-    reviewers:
-      - "garland3"
-    assignees:
-      - "garland3"
-    commit-message:
-      prefix: "ci"
-      include: "scope"
-    labels:
-      - "dependencies"
-      - "github-actions"
+ - package-ecosystem: "devcontainers"
+   directory: "/"
+   schedule:
+     interval: weekly
