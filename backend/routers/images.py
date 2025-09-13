@@ -131,7 +131,8 @@ async def list_images_in_project(
     if images:
         for img in images:
             try:
-                if not include_deleted and img.deleted_at is not None and not deleted_only:
+                # Skip deleted images unless explicitly requested
+                if img.deleted_at is not None and not include_deleted and not deleted_only:
                     continue
                 response_images.append(to_data_instance_schema(img))
             except Exception as e:

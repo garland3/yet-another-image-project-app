@@ -22,15 +22,6 @@ const mockDeletedImage = {
   deletion_reason: 'Test deletion'
 };
 
-const mockPermanentlyDeletedImage = {
-  id: 'img-3',
-  filename: 'permanently-deleted.jpg',
-  size_bytes: 256000,
-  created_at: '2023-01-01T00:00:00Z',
-  deleted_at: '2023-01-02T00:00:00Z',
-  storage_deleted: true,
-  deletion_reason: 'Permanent deletion test'
-};
 
 const renderImageDisplay = (props = {}) => {
   const defaultProps = {

@@ -7,7 +7,6 @@ import ImageUploader from './components/ImageUploader';
 import MetadataManager from './components/MetadataManager';
 import ClassManager from './components/ClassManager';
 import ImageGallery from './components/ImageGallery';
-import ImageDeletionControls from './components/ImageDeletionControls';
 
 function Project() {
   const { id } = useParams();

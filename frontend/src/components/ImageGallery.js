@@ -16,6 +16,7 @@ function ImageGallery({ projectId, images, loading, onImageUpdated, refreshProje
   const [sortBy, setSortBy] = useState('date'); // date, name, size
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedImages, setSelectedImages] = useState(new Set());
+  const [actionError, setActionError] = useState(null);
   
   const imagesPerPage = viewMode === 'small' ? 100 : viewMode === 'medium' ? 50 : 25;
   
@@ -176,6 +177,14 @@ function ImageGallery({ projectId, images, loading, onImageUpdated, refreshProje
           )}
         </div>
       </div>
+
+      {/* Error Display */}
+      {actionError && (
+        <div className="error-banner">
+          <span className="error-message">{actionError}</span>
+          <button onClick={() => setActionError(null)} className="error-close">×</button>
+        </div>
+      )}
 
       {/* Gallery Content */}
       <div className="gallery-content">
