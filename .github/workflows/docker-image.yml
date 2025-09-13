@@ -62,11 +62,17 @@ jobs:
         npm ci
         npm run build
     
-    - name: Install Python dependencies
+    - name: Install uv
+      run: |
+        curl -LsSf https://astral.sh/uv/install.sh | sh
+        echo "$HOME/.local/bin" >> $GITHUB_PATH
+        
+    - name: Install Python dependencies with uv
       working-directory: ./backend
       run: |
-        python -m pip install --upgrade pip
-        pip install -r requirements.txt
+        uv venv .venv
+        source .venv/bin/activate
+        uv pip install -r requirements.txt
         
     - name: Set up test environment
       working-directory: ./backend
@@ -76,6 +82,7 @@ jobs:
     - name: Run tests
       working-directory: ./backend
       run: |
+        source .venv/bin/activate
         bash ../test/run_tests.sh
       env:
         DATABASE_URL: postgresql+asyncpg://postgres:postgres@localhost:5432/postgres

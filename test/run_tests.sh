@@ -33,16 +33,26 @@ fi
 
 echo "🔧 Using uv version: $(uv --version)"
 
-# Check for virtual environment in backend directory and activate it if it exists
-if [ -f "backend/.venv/bin/activate" ]; then
-    echo "🔧 Activating virtual environment..."
+# Check for virtual environment (Docker uses /opt/venv, local dev uses backend/.venv)
+if [ -f "/opt/venv/bin/activate" ]; then
+    echo "🔧 Activating Docker virtual environment..."
+    source /opt/venv/bin/activate
+    echo "📦 Installing test dependencies with uv..."
+    uv pip install pytest pytest-asyncio pytest-xdist
+    PYTEST_PATH=$(which pytest)
+elif [ -f "backend/.venv/bin/activate" ]; then
+    echo "🔧 Activating local virtual environment..."
     source backend/.venv/bin/activate
     echo "📦 Installing test dependencies with uv..."
     uv pip install pytest pytest-asyncio pytest-xdist
     PYTEST_PATH=$(which pytest)
 else
-    echo "❌ Error: Virtual environment not found at backend/.venv"
-    echo "Please create it first:"
+    echo "❌ Error: Virtual environment not found"
+    echo "Expected locations:"
+    echo "   - Docker: /opt/venv/bin/activate"
+    echo "   - Local: backend/.venv/bin/activate"
+    echo ""
+    echo "For local development, create it first:"
     echo "   cd backend && uv venv .venv && source .venv/bin/activate && uv pip install -r requirements.txt"
     exit 1
 fi
