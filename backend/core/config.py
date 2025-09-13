@@ -54,7 +54,13 @@ class Settings(BaseSettings):
     IMAGE_DELETE_PURGE_INTERVAL_SECONDS: int = 3600  # Background purge interval
     ENABLE_IMAGE_PURGE: bool = True  # Toggle background purge task
 
-    @field_validator('DEBUG', 'FAST_TEST_MODE', 'SKIP_HEADER_CHECK', 'S3_USE_SSL', 'SECURITY_NOSNIFF_ENABLED', 'SECURITY_XFO_ENABLED', 'SECURITY_REFERRER_POLICY_ENABLED', 'SECURITY_CSP_ENABLED', 'ENABLE_IMAGE_PURGE', mode='before')
+    @field_validator(
+        'DEBUG', 'FAST_TEST_MODE', 'SKIP_HEADER_CHECK', 'S3_USE_SSL', 
+        'SECURITY_NOSNIFF_ENABLED', 'SECURITY_XFO_ENABLED', 
+        'SECURITY_REFERRER_POLICY_ENABLED', 'SECURITY_CSP_ENABLED', 
+        'ENABLE_IMAGE_PURGE', 
+        mode='before'
+    )
     @classmethod
     def parse_bool_with_strip(cls, v):
         if isinstance(v, str):

@@ -35,7 +35,7 @@ function testImageDisplayFunctionality() {
   const hasDeletedImageRendering = content.includes('image.deleted_at ?');
   const noDebugButton = !content.includes('Debug</button>');
   
-  console.log('\\n✅ ImageDisplay Tests:');
+  console.log('\n✅ ImageDisplay Tests:');
   console.log(`   - Has deleted image display SVG: ${hasDeletedDisplaySVG ? '✓' : '✗'}`);
   console.log(`   - Has delete button: ${hasDeleteButton ? '✓' : '✗'}`);
   console.log(`   - Has delete modal functionality: ${hasDeleteModal ? '✓' : '✗'}`);
@@ -55,7 +55,7 @@ function testImageViewFallback() {
   const hasErrorHandling = content.includes('Direct image fetch failed');
   const hasProjectEndpointFallback = content.includes('projectImages.find');
   
-  console.log('\\n✅ ImageView Tests:');
+  console.log('\n✅ ImageView Tests:');
   console.log(`   - Has include_deleted=true parameter: ${hasFallbackLogic ? '✓' : '✗'}`);
   console.log(`   - Has fallback error handling: ${hasErrorHandling ? '✓' : '✗'}`);
   console.log(`   - Has project endpoint fallback: ${hasProjectEndpointFallback ? '✓' : '✗'}`);
@@ -72,7 +72,7 @@ function testDeletedImageCSS() {
   const hasDeletedGalleryItemClass = content.includes('.gallery-item.deleted');
   const hasDeletedStyles = content.includes('border: 2px dashed #f59e0b');
   
-  console.log('\\n✅ CSS Tests:');
+  console.log('\n✅ CSS Tests:');
   console.log(`   - Has .deleted-image class: ${hasDeletedImageClass ? '✓' : '✗'}`);
   console.log(`   - Has .gallery-item.deleted class: ${hasDeletedGalleryItemClass ? '✓' : '✗'}`);
   console.log(`   - Has deleted image styling: ${hasDeletedStyles ? '✓' : '✗'}`);
@@ -88,7 +88,7 @@ function testUnitTestsExist() {
     path.join(__dirname, '..', '__tests__', 'ImageView.test.js')
   ];
   
-  console.log('\\n✅ Unit Tests:');
+  console.log('\n✅ Unit Tests:');
   testFiles.forEach(filePath => {
     const exists = fs.existsSync(filePath);
     const fileName = path.basename(filePath);
@@ -99,7 +99,7 @@ function testUnitTestsExist() {
 }
 
 // Run all tests
-console.log('Running functionality verification tests...\\n');
+console.log('Running functionality verification tests...\n');
 
 const results = [
   testImageGalleryPlaceholder(),
@@ -111,7 +111,7 @@ const results = [
 
 const allPassed = results.every(result => result);
 
-console.log('\\n' + '='.repeat(50));
+console.log('\n' + '='.repeat(50));
 console.log(`🎯 Overall Result: ${allPassed ? '✅ ALL TESTS PASSED' : '❌ SOME TESTS FAILED'}`);
 console.log('='.repeat(50));
 

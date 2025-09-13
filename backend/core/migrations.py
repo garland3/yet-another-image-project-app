@@ -155,7 +155,7 @@ async def add_image_deletion_features():
                 await conn.execute(text(
                     """
                     CREATE TABLE image_deletion_events (
-                        id UUID PRIMARY KEY,
+                        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
                         image_id UUID NOT NULL REFERENCES data_instances(id),
                         project_id UUID NOT NULL REFERENCES projects(id),
                         actor_user_id UUID NULL REFERENCES users(id),

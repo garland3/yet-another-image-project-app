@@ -193,7 +193,7 @@ function ImageDisplay({ imageId, image, isTransitioning, projectId, setImage, re
         ) : image.deleted_at ? (
           <img 
             src={DELETED_IMAGE_DISPLAY_SVG}
-            alt="Deleted Image" 
+            alt="Deleted" 
             id="main-image"
             className="view-image deleted-image"
             style={{ transform: `scale(${zoomLevel})` }}
@@ -201,7 +201,7 @@ function ImageDisplay({ imageId, image, isTransitioning, projectId, setImage, re
         ) : (
           <img 
             src={`/api/images/${imageId}/content`}
-            alt={image.filename || 'Image'} 
+            alt={image.filename || ''} 
             id="main-image"
             className="view-image"
             style={{ transform: `scale(${zoomLevel})` }}
