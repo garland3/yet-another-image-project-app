@@ -54,7 +54,7 @@ jobs:
     - name: Install system dependencies
       run: |
         sudo apt-get update
-        sudo apt-get install -y libpq-dev
+        sudo apt-get install -y libpq-dev which
     
     - name: Build frontend
       run: |
@@ -83,6 +83,7 @@ jobs:
       working-directory: ./backend
       run: |
         source .venv/bin/activate
+        
         bash ../test/run_tests.sh
       env:
         DATABASE_URL: postgresql+asyncpg://postgres:postgres@localhost:5432/postgres
@@ -187,3 +188,4 @@ jobs:
         cache-from: type=gha
 
         cache-to: type=gha,mode=max
+
