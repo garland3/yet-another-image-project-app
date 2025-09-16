@@ -94,6 +94,8 @@ async def list_images_in_project(
     limit: int = 100,
     include_deleted: bool = Query(False),
     deleted_only: bool = Query(False),
+    search_field: Optional[str] = Query(None),
+    search_value: Optional[str] = Query(None),
     db: AsyncSession = Depends(get_db),
     current_user: schemas.User = Depends(get_current_user),
 ):
@@ -104,7 +106,7 @@ async def list_images_in_project(
     """
     # Check cache first
     cache = get_cache()
-    cache_key = f"project_images:{project_id}:skip:{skip}:limit:{limit}:include_deleted:{include_deleted}:deleted_only:{deleted_only}"
+    cache_key = f"project_images:{project_id}:skip:{skip}:limit:{limit}:include_deleted:{include_deleted}:deleted_only:{deleted_only}:search_field:{search_field}:search_value:{search_value}"
     cached_images = cache.get(cache_key)
     
     if cached_images is not None:
@@ -124,7 +126,7 @@ async def list_images_in_project(
     if deleted_only:
         images = await crud.get_deleted_images_for_project(db=db, project_id=project_id, skip=skip, limit=limit)
     else:
-        images = await crud.get_data_instances_for_project(db=db, project_id=project_id, skip=skip, limit=limit)
+        images = await crud.get_data_instances_for_project(db=db, project_id=project_id, skip=skip, limit=limit, search_field=search_field, search_value=search_value)
     
     # Process images using utility function for consistent serialization
     response_images = []
@@ -153,6 +155,8 @@ async def list_images_in_project_with_slash(
     limit: int = 100,
     include_deleted: bool = Query(False),
     deleted_only: bool = Query(False),
+    search_field: Optional[str] = Query(None),
+    search_value: Optional[str] = Query(None),
     db: AsyncSession = Depends(get_db),
     current_user: schemas.User = Depends(get_current_user),
 ):
@@ -162,7 +166,7 @@ async def list_images_in_project_with_slash(
     It ensures compatibility with various frontend routing configurations.
     """
     # Just call the main function to avoid code duplication
-    return await list_images_in_project(project_id, skip, limit, include_deleted, deleted_only, db, current_user)
+    return await list_images_in_project(project_id, skip, limit, include_deleted, deleted_only, search_field, search_value, db, current_user)
 
 
 @router.get("/images/{image_id}", response_model=schemas.DataInstance)

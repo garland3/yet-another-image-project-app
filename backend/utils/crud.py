@@ -1,5 +1,5 @@
 import uuid
-from sqlalchemy import select, update, delete, and_
+from sqlalchemy import select, update, delete, and_, text, or_
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 from core import models, schemas
@@ -155,18 +155,34 @@ async def get_image(db: AsyncSession, image_id: uuid.UUID) -> Optional[models.Da
     """
     return await get_data_instance(db, image_id)
 
-async def get_data_instances_for_project(db: AsyncSession, project_id: uuid.UUID, skip: int = 0, limit: int = 100) -> List[models.DataInstance]:
+async def get_data_instances_for_project(db: AsyncSession, project_id: uuid.UUID, skip: int = 0, limit: int = 100, search_field: Optional[str] = None, search_value: Optional[str] = None) -> List[models.DataInstance]:
     # First check if the project exists
     project = await get_project(db, project_id)
     if not project:
         return []
         
-    result = await db.execute(
-        select(models.DataInstance)
-        .where(models.DataInstance.project_id == project_id)
-        .offset(skip)
-        .limit(limit)
-    )
+    query = select(models.DataInstance).where(models.DataInstance.project_id == project_id)
+    
+    if search_field and search_value:
+        search_value_lower = f"%{search_value.lower()}%"
+        
+        if search_field == 'filename':
+            query = query.where(models.DataInstance.filename.ilike(search_value_lower))
+        elif search_field == 'content_type':
+            query = query.where(models.DataInstance.content_type.ilike(search_value_lower))
+        elif search_field == 'uploaded_by':
+            query = query.where(models.DataInstance.uploaded_by_user_id.ilike(search_value_lower))
+        elif search_field == 'metadata':
+            # Search across all metadata values using JSON text search
+            # This uses PostgreSQL's jsonb operators
+            query = query.where(text("metadata_::text ILIKE :search_value")).params(search_value=search_value_lower)
+        else:
+            # Search specific metadata key using JSON path
+            # This searches for the specific key in the metadata JSON
+            query = query.where(text("metadata_ ->> :key ILIKE :search_value")).params(key=search_field, search_value=search_value_lower)
+    
+    query = query.offset(skip).limit(limit)
+    result = await db.execute(query)
     return result.scalars().all()
 
 async def get_deleted_images_for_project(db: AsyncSession, project_id: uuid.UUID, skip: int = 0, limit: int = 100) -> List[models.DataInstance]:
