@@ -71,13 +71,15 @@ function ImageMetadata({ imageId, image, setImage, loading, setLoading, setError
       
       // Update the image metadata
       setImage(prev => {
+        const currentMetadata = prev.metadata || prev.metadata_ || {};
         const updatedMetadata = {
-          ...(prev.metadata_ || {}),
+          ...currentMetadata,
           [newMetadata.key]: parseMetadataValue(newMetadata.value)
         };
-        
+
         return {
           ...prev,
+          metadata: updatedMetadata,
           metadata_: updatedMetadata
         };
       });
@@ -118,13 +120,15 @@ function ImageMetadata({ imageId, image, setImage, loading, setLoading, setError
       
       // Update the image metadata
       setImage(prev => {
+        const currentMetadata = prev.metadata || prev.metadata_ || {};
         const updatedMetadata = {
-          ...(prev.metadata_ || {}),
+          ...currentMetadata,
           [editingMetadata.key]: parseMetadataValue(editingMetadata.value)
         };
-        
+
         return {
           ...prev,
+          metadata: updatedMetadata,
           metadata_: updatedMetadata
         };
       });
@@ -161,11 +165,13 @@ function ImageMetadata({ imageId, image, setImage, loading, setLoading, setError
       
       // Update the image metadata
       setImage(prev => {
-        const updatedMetadata = { ...(prev.metadata_ || {}) };
+        const currentMetadata = prev.metadata || prev.metadata_ || {};
+        const updatedMetadata = { ...currentMetadata };
         delete updatedMetadata[key];
-        
+
         return {
           ...prev,
+          metadata: updatedMetadata,
           metadata_: updatedMetadata
         };
       });
@@ -216,10 +222,17 @@ function ImageMetadata({ imageId, image, setImage, loading, setLoading, setError
             </table>
             
             <h3>Custom Metadata</h3>
-            {image.metadata_ && Object.keys(image.metadata_).length > 0 ? (
-              <table className="metadata-table">
+            {((image.metadata || image.metadata_) && Object.keys(image.metadata || image.metadata_).length > 0) ? (
+              <table className="metadata-table custom-metadata-table">
+                <thead>
+                  <tr>
+                    <th>Key</th>
+                    <th>Value</th>
+                    <th>Actions</th>
+                  </tr>
+                </thead>
                 <tbody>
-                  {Object.entries(image.metadata_).map(([key, value]) => (
+                  {Object.entries(image.metadata || image.metadata_).map(([key, value]) => (
                     <tr key={key}>
                       <td className="metadata-label">{key}</td>
                       <td className="metadata-value">

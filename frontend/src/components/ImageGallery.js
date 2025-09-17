@@ -31,21 +31,29 @@ function ImageGallery({ projectId, images, loading, onImageUpdated, refreshProje
       
       switch (searchField) {
         case 'filename':
-          return (image.filename || '').toLowerCase().includes(searchLower);
+          const filename = (image.filename || '').toLowerCase();
+          // Support wildcard search with *
+          if (searchLower.includes('*')) {
+            const regex = new RegExp(searchLower.replace(/\*/g, '.*'), 'i');
+            return regex.test(filename);
+          }
+          return filename.includes(searchLower);
         case 'content_type':
           return (image.content_type || '').toLowerCase().includes(searchLower);
         case 'uploaded_by':
           return (image.uploaded_by_user_id || '').toLowerCase().includes(searchLower);
         case 'metadata':
           // Search across all metadata values
-          if (!image.metadata_) return false;
-          return Object.values(image.metadata_).some(value => 
+          const metadata = image.metadata || image.metadata_;
+          if (!metadata) return false;
+          return Object.values(metadata).some(value =>
             String(value).toLowerCase().includes(searchLower)
           );
         default:
           // Search specific metadata key
-          if (!image.metadata_ || !image.metadata_[searchField]) return false;
-          return String(image.metadata_[searchField]).toLowerCase().includes(searchLower);
+          const metadataObj = image.metadata || image.metadata_;
+          if (!metadataObj || !metadataObj[searchField]) return false;
+          return String(metadataObj[searchField]).toLowerCase().includes(searchLower);
       }
     })
     .sort((a, b) => {
@@ -77,11 +85,14 @@ function ImageGallery({ projectId, images, loading, onImageUpdated, refreshProje
   useEffect(() => {
     const keys = new Set();
     images.forEach(image => {
-      if (image.metadata_) {
-        Object.keys(image.metadata_).forEach(key => keys.add(key));
+      // Check both 'metadata' and 'metadata_' field names
+      const metadata = image.metadata || image.metadata_;
+      if (metadata && typeof metadata === 'object') {
+        Object.keys(metadata).forEach(key => keys.add(key));
       }
     });
-    setAvailableMetadataKeys(Array.from(keys).sort());
+    const sortedKeys = Array.from(keys).sort();
+    setAvailableMetadataKeys(sortedKeys);
   }, [images]);
   
   // Fetch images when search parameters change
@@ -92,7 +103,7 @@ function ImageGallery({ projectId, images, loading, onImageUpdated, refreshProje
         searchValue: searchValue || null
       });
     }
-  }, [searchField, searchValue, refreshProjectImages]);
+  }, [searchField, searchValue]);
   
   // Page change handler
   const handlePageChange = (pageNumber) => {
@@ -165,22 +176,34 @@ function ImageGallery({ projectId, images, loading, onImageUpdated, refreshProje
         
         <div className="gallery-controls">
           <div className="search-control">
-            <select 
-              value={searchField} 
+            <select
+              value={searchField}
               onChange={(e) => setSearchField(e.target.value)}
               className="search-field-select"
             >
-              <option value="filename">Filename</option>
-              <option value="content_type">Content Type</option>
-              <option value="uploaded_by">Uploaded By</option>
-              <option value="metadata">All Metadata</option>
-              {availableMetadataKeys.map(key => (
-                <option key={key} value={key}>{key}</option>
-              ))}
+              <optgroup label="Basic Search">
+                <option value="filename">Filename (supports * wildcards)</option>
+                <option value="content_type">Content Type</option>
+                <option value="uploaded_by">Uploaded By</option>
+                <option value="metadata">All Metadata</option>
+              </optgroup>
+              {availableMetadataKeys.length > 0 && (
+                <optgroup label="Custom Metadata Keys">
+                  {availableMetadataKeys.map(key => (
+                    <option key={key} value={key}>{key}</option>
+                  ))}
+                </optgroup>
+              )}
             </select>
             <input
               type="text"
-              placeholder={`Search by ${searchField}...`}
+              placeholder={
+                searchField === 'filename'
+                  ? "Search filenames... (use * for wildcards, e.g., *.jpg or *test*)"
+                  : availableMetadataKeys.includes(searchField)
+                  ? `Search ${searchField} values...`
+                  : `Search by ${searchField}...`
+              }
               value={searchValue}
               onChange={(e) => setSearchValue(e.target.value)}
               className="search-input"

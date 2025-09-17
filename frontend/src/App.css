@@ -2059,6 +2059,95 @@ ul li:hover {
   background: var(--gray-50);
 }
 
+/* Custom Metadata Table Styling */
+.custom-metadata-table {
+  margin-top: var(--space-4);
+  border: 1px solid var(--border-light);
+  border-radius: var(--radius-md);
+  overflow: hidden;
+}
+
+.custom-metadata-table th {
+  background: var(--primary-600);
+  color: white;
+  font-weight: 600;
+  text-align: left;
+  padding: var(--space-3) var(--space-4);
+  border-bottom: none;
+}
+
+.custom-metadata-table td {
+  padding: var(--space-3) var(--space-4);
+  border-bottom: 1px solid var(--border-light);
+}
+
+.custom-metadata-table .metadata-label {
+  font-weight: 600;
+  color: var(--gray-700);
+  background: var(--gray-50);
+  width: 25%;
+}
+
+.custom-metadata-table .metadata-value {
+  font-family: var(--font-family-mono);
+  font-size: 0.875rem;
+  color: var(--gray-800);
+  word-break: break-word;
+  width: 50%;
+}
+
+.custom-metadata-table .metadata-actions {
+  width: 25%;
+  text-align: right;
+}
+
+.custom-metadata-table .metadata-actions .btn {
+  margin-left: var(--space-2);
+}
+
+.custom-metadata-table .metadata-null {
+  color: var(--gray-500);
+  font-style: italic;
+}
+
+.custom-metadata-table pre {
+  background: var(--gray-100);
+  padding: var(--space-2);
+  border-radius: var(--radius-sm);
+  margin: 0;
+  font-size: 0.75rem;
+  overflow-x: auto;
+}
+
+/* Search Field Select Styling */
+.search-field-select {
+  min-width: 200px;
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--border-light);
+  border-radius: var(--radius-md);
+  background: white;
+  font-size: 0.875rem;
+  margin-right: var(--space-2);
+}
+
+.search-field-select optgroup {
+  font-weight: 600;
+  color: var(--gray-700);
+  background: var(--gray-50);
+  padding: var(--space-1);
+}
+
+.search-field-select option {
+  padding: var(--space-1) var(--space-2);
+  color: var(--gray-800);
+}
+
+.search-field-select optgroup[label="Custom Metadata Keys"] option {
+  font-family: var(--font-family-mono);
+  font-size: 0.8rem;
+  padding-left: var(--space-4);
+}
+
 .key-id {
   background: var(--gray-100);
   padding: var(--space-1) var(--space-2);
