@@ -1,5 +1,6 @@
 import uuid
-from sqlalchemy import select, update, delete, and_, text
+import re
+from sqlalchemy import select, update, delete, and_, text, or_, cast, String
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 from core import models, schemas
@@ -173,13 +174,18 @@ async def get_data_instances_for_project(db: AsyncSession, project_id: uuid.UUID
         elif search_field == 'uploaded_by':
             query = query.where(models.DataInstance.uploaded_by_user_id.ilike(search_value_lower))
         elif search_field == 'metadata':
-            # Search across all metadata values using JSON text search
-            # This uses PostgreSQL's jsonb operators
-            query = query.where(text("metadata_::text ILIKE :search_value")).params(search_value=search_value_lower)
+            # Search across all metadata values using safe SQLAlchemy cast
+            query = query.where(cast(models.DataInstance.metadata_, String).ilike(search_value_lower))
         else:
-            # Search specific metadata key using JSON path
-            # This searches for the specific key in the metadata JSON
-            query = query.where(text("metadata_ ->> :key ILIKE :search_value")).params(key=search_field, search_value=search_value_lower)
+            # Search specific metadata key using JSON path with input validation
+            # Only allow alphanumeric characters, underscores, and hyphens for security
+            if re.match(r'^[a-zA-Z0-9_-]+$', search_field):
+                # Use SQLAlchemy's JSON path operator safely
+                query = query.where(models.DataInstance.metadata_[search_field].astext.ilike(search_value_lower))
+            else:
+                # Invalid key format, skip filtering for security
+                logger.warning(f"Invalid metadata key format rejected: {search_field}")
+                pass
     
     query = query.offset(skip).limit(limit)
     result = await db.execute(query)

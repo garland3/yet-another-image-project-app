@@ -32,9 +32,13 @@ function ImageGallery({ projectId, images, loading, onImageUpdated, refreshProje
       switch (searchField) {
         case 'filename':
           const filename = (image.filename || '').toLowerCase();
-          // Support wildcard search with *
+          // Support wildcard search with * (with ReDoS protection)
           if (searchLower.includes('*')) {
-            const regex = new RegExp(searchLower.replace(/\*/g, '.*'), 'i');
+            // Escape all regex special characters except *
+            const escapeRegExp = (str) => str.replace(/[-[\]/{}()+?.\\^$|]/g, '\\$&');
+            const safePattern = escapeRegExp(searchLower).replace(/\\\*/g, '.*');
+            // Add anchors and limit regex complexity to prevent ReDoS
+            const regex = new RegExp('^' + safePattern + '$', 'i');
             return regex.test(filename);
           }
           return filename.includes(searchLower);
@@ -103,6 +107,7 @@ function ImageGallery({ projectId, images, loading, onImageUpdated, refreshProje
         searchValue: searchValue || null
       });
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [searchField, searchValue]);
   
   // Page change handler
@@ -182,7 +187,7 @@ function ImageGallery({ projectId, images, loading, onImageUpdated, refreshProje
               className="search-field-select"
             >
               <optgroup label="Basic Search">
-                <option value="filename">Filename (supports * wildcards)</option>
+                <option value="filename">Filename</option>
                 <option value="content_type">Content Type</option>
                 <option value="uploaded_by">Uploaded By</option>
                 <option value="metadata">All Metadata</option>
@@ -198,9 +203,7 @@ function ImageGallery({ projectId, images, loading, onImageUpdated, refreshProje
             <input
               type="text"
               placeholder={
-                searchField === 'filename'
-                  ? "Search filenames... (use * for wildcards, e.g., *.jpg or *test*)"
-                  : availableMetadataKeys.includes(searchField)
+                availableMetadataKeys.includes(searchField)
                   ? `Search ${searchField} values...`
                   : `Search by ${searchField}...`
               }
