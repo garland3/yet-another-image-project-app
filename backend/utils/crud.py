@@ -184,8 +184,8 @@ async def get_data_instances_for_project(db: AsyncSession, project_id: uuid.UUID
                 query = query.where(models.DataInstance.metadata_[search_field].astext.ilike(search_value_lower))
             else:
                 # Invalid key format, skip filtering for security
-                logger.warning(f"Invalid metadata key format rejected: {search_field}")
-                pass
+                safe_search_field = search_field.replace('\n', '').replace('\r', '') if search_field else 'None'
+                logger.warning(f"Invalid metadata key format rejected: {safe_search_field}")
     
     query = query.offset(skip).limit(limit)
     result = await db.execute(query)
