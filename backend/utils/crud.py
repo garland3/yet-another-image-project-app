@@ -1,5 +1,6 @@
 import uuid
-from sqlalchemy import select, update, delete, and_
+import re
+from sqlalchemy import select, update, delete, and_, text, or_, cast, String
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 from core import models, schemas
@@ -155,18 +156,39 @@ async def get_image(db: AsyncSession, image_id: uuid.UUID) -> Optional[models.Da
     """
     return await get_data_instance(db, image_id)
 
-async def get_data_instances_for_project(db: AsyncSession, project_id: uuid.UUID, skip: int = 0, limit: int = 100) -> List[models.DataInstance]:
+async def get_data_instances_for_project(db: AsyncSession, project_id: uuid.UUID, skip: int = 0, limit: int = 100, search_field: Optional[str] = None, search_value: Optional[str] = None) -> List[models.DataInstance]:
     # First check if the project exists
     project = await get_project(db, project_id)
     if not project:
         return []
         
-    result = await db.execute(
-        select(models.DataInstance)
-        .where(models.DataInstance.project_id == project_id)
-        .offset(skip)
-        .limit(limit)
-    )
+    query = select(models.DataInstance).where(models.DataInstance.project_id == project_id)
+    
+    if search_field and search_value:
+        search_value_lower = f"%{search_value.lower()}%"
+        
+        if search_field == 'filename':
+            query = query.where(models.DataInstance.filename.ilike(search_value_lower))
+        elif search_field == 'content_type':
+            query = query.where(models.DataInstance.content_type.ilike(search_value_lower))
+        elif search_field == 'uploaded_by':
+            query = query.where(models.DataInstance.uploaded_by_user_id.ilike(search_value_lower))
+        elif search_field == 'metadata':
+            # Search across all metadata values using safe SQLAlchemy cast
+            query = query.where(cast(models.DataInstance.metadata_, String).ilike(search_value_lower))
+        else:
+            # Search specific metadata key using JSON path with input validation
+            # Only allow alphanumeric characters, underscores, and hyphens for security
+            if re.match(r'^[a-zA-Z0-9_-]+$', search_field):
+                # Use SQLAlchemy's JSON path operator safely
+                query = query.where(models.DataInstance.metadata_[search_field].astext.ilike(search_value_lower))
+            else:
+                # Invalid key format, skip filtering for security
+                safe_search_field = search_field.replace('\n', '').replace('\r', '') if search_field else 'None'
+                logger.warning(f"Invalid metadata key format rejected: {safe_search_field}")
+    
+    query = query.offset(skip).limit(limit)
+    result = await db.execute(query)
     return result.scalars().all()
 
 async def get_deleted_images_for_project(db: AsyncSession, project_id: uuid.UUID, skip: int = 0, limit: int = 100) -> List[models.DataInstance]:

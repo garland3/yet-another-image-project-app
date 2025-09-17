@@ -24,12 +24,18 @@ function Project() {
   const fetchImages = useCallback(async (projId, opts = {}) => {
     const inc = opts.includeDeleted ?? includeDeleted;
     const delOnly = opts.deletedOnly ?? deletedOnly;
+    const searchField = opts.searchField;
+    const searchValue = opts.searchValue;
     let url = `/api/projects/${projId}/images`;
     const params = [];
     if (delOnly) {
       params.push('deleted_only=true');
     } else if (inc) {
       params.push('include_deleted=true');
+    }
+    if (searchField && searchValue) {
+      params.push(`search_field=${encodeURIComponent(searchField)}`);
+      params.push(`search_value=${encodeURIComponent(searchValue)}`);
     }
     if (params.length) url += `?${params.join('&')}`;
     const imagesResponse = await fetch(url);
@@ -186,7 +192,7 @@ function Project() {
                 images={images} 
                 loading={loading} 
                 onImageUpdated={handleImageStateUpdate}
-                refreshProjectImages={() => fetchImages(id)}
+                refreshProjectImages={(searchOpts) => fetchImages(id, searchOpts)}
               />
             </div>
             

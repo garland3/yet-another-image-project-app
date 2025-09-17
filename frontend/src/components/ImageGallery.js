@@ -14,7 +14,9 @@ function ImageGallery({ projectId, images, loading, onImageUpdated, refreshProje
   const [debugExpanded, setDebugExpanded] = useState(false);
   const [viewMode, setViewMode] = useState('medium'); // small, medium, large
   const [sortBy, setSortBy] = useState('date'); // date, name, size
-  const [searchTerm, setSearchTerm] = useState('');
+  const [searchField, setSearchField] = useState('filename'); // 'filename', 'content_type', 'uploaded_by', 'metadata', or specific key
+  const [searchValue, setSearchValue] = useState('');
+  const [availableMetadataKeys, setAvailableMetadataKeys] = useState([]);
   const [selectedImages, setSelectedImages] = useState(new Set());
   const [actionError, setActionError] = useState(null);
   
@@ -23,9 +25,40 @@ function ImageGallery({ projectId, images, loading, onImageUpdated, refreshProje
   // Filter and sort images
   const filteredImages = images
     .filter(image => {
-      if (!searchTerm) return true;
-      const filename = (image.filename || '').toLowerCase();
-      return filename.includes(searchTerm.toLowerCase());
+      if (!searchValue) return true;
+      
+      const searchLower = searchValue.toLowerCase();
+      
+      switch (searchField) {
+        case 'filename':
+          const filename = (image.filename || '').toLowerCase();
+          // Support wildcard search with * (with ReDoS protection)
+          if (searchLower.includes('*')) {
+            // Escape all regex special characters except *
+            const escapeRegExp = (str) => str.replace(/[-[\]/{}()+?.\\^$|]/g, '\\$&');
+            const safePattern = escapeRegExp(searchLower).replace(/\\\*/g, '.*');
+            // Add anchors and limit regex complexity to prevent ReDoS
+            const regex = new RegExp('^' + safePattern + '$', 'i');
+            return regex.test(filename);
+          }
+          return filename.includes(searchLower);
+        case 'content_type':
+          return (image.content_type || '').toLowerCase().includes(searchLower);
+        case 'uploaded_by':
+          return (image.uploaded_by_user_id || '').toLowerCase().includes(searchLower);
+        case 'metadata':
+          // Search across all metadata values
+          const metadata = image.metadata || image.metadata_;
+          if (!metadata) return false;
+          return Object.values(metadata).some(value =>
+            String(value).toLowerCase().includes(searchLower)
+          );
+        default:
+          // Search specific metadata key
+          const metadataObj = image.metadata || image.metadata_;
+          if (!metadataObj || !metadataObj[searchField]) return false;
+          return String(metadataObj[searchField]).toLowerCase().includes(searchLower);
+      }
     })
     .sort((a, b) => {
       switch (sortBy) {
@@ -50,7 +83,32 @@ function ImageGallery({ projectId, images, loading, onImageUpdated, refreshProje
   // Reset to first page when images or filters change
   useEffect(() => {
     setCurrentPage(1);
-  }, [images.length, searchTerm, sortBy]);
+  }, [images.length, searchValue, searchField, sortBy]);
+  
+  // Collect available metadata keys
+  useEffect(() => {
+    const keys = new Set();
+    images.forEach(image => {
+      // Check both 'metadata' and 'metadata_' field names
+      const metadata = image.metadata || image.metadata_;
+      if (metadata && typeof metadata === 'object') {
+        Object.keys(metadata).forEach(key => keys.add(key));
+      }
+    });
+    const sortedKeys = Array.from(keys).sort();
+    setAvailableMetadataKeys(sortedKeys);
+  }, [images]);
+  
+  // Fetch images when search parameters change
+  useEffect(() => {
+    if (refreshProjectImages) {
+      refreshProjectImages({
+        searchField: searchValue ? searchField : null,
+        searchValue: searchValue || null
+      });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchField, searchValue]);
   
   // Page change handler
   const handlePageChange = (pageNumber) => {
@@ -111,7 +169,7 @@ function ImageGallery({ projectId, images, loading, onImageUpdated, refreshProje
           <div className="gallery-stats">
             <span className="image-count">
               {filteredImages.length} {filteredImages.length === 1 ? 'image' : 'images'}
-              {searchTerm && ` found for "${searchTerm}"`}
+              {searchValue && ` found for "${searchValue}" in ${searchField}`}
             </span>
             {selectedImages.size > 0 && (
               <span className="selection-count">
@@ -123,11 +181,34 @@ function ImageGallery({ projectId, images, loading, onImageUpdated, refreshProje
         
         <div className="gallery-controls">
           <div className="search-control">
+            <select
+              value={searchField}
+              onChange={(e) => setSearchField(e.target.value)}
+              className="search-field-select"
+            >
+              <optgroup label="Basic Search">
+                <option value="filename">Filename</option>
+                <option value="content_type">Content Type</option>
+                <option value="uploaded_by">Uploaded By</option>
+                <option value="metadata">All Metadata</option>
+              </optgroup>
+              {availableMetadataKeys.length > 0 && (
+                <optgroup label="Custom Metadata Keys">
+                  {availableMetadataKeys.map(key => (
+                    <option key={key} value={key}>{key}</option>
+                  ))}
+                </optgroup>
+              )}
+            </select>
             <input
               type="text"
-              placeholder="Search images..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
+              placeholder={
+                availableMetadataKeys.includes(searchField)
+                  ? `Search ${searchField} values...`
+                  : `Search by ${searchField}...`
+              }
+              value={searchValue}
+              onChange={(e) => setSearchValue(e.target.value)}
               className="search-input"
             />
           </div>
@@ -209,7 +290,10 @@ function ImageGallery({ projectId, images, loading, onImageUpdated, refreshProje
             <h3>No images found</h3>
             <p>Try adjusting your search terms</p>
             <button 
-              onClick={() => setSearchTerm('')} 
+              onClick={() => {
+                setSearchValue('');
+                setSearchField('filename');
+              }} 
               className="btn btn-primary btn-small"
             >
               Clear Search
