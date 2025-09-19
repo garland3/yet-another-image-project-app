@@ -72,6 +72,12 @@
   --transition-fast: 150ms ease-in-out;
   --transition-normal: 250ms ease-in-out;
   --transition-slow: 350ms ease-in-out;
+
+  /* Image View Layout */
+  --view-header-height: 50px;
+  --view-image-reserve: 55px;
+  --view-header-height-mobile: 40px;
+  --view-image-reserve-mobile: 45px;
 }
 
 /* Global Styles */
@@ -1964,7 +1970,7 @@ ul li:hover {
   display: flex;
   justify-content: center;
   align-items: flex-start;
-  height: calc(100vh - 50px);
+  height: calc(100vh - var(--view-header-height));
   background: var(--bg-primary);
   border: 1px solid var(--border-light);
   border-radius: var(--radius-lg);
@@ -1985,7 +1991,7 @@ ul li:hover {
 
 #image-display .view-image {
   max-width: 100%;
-  max-height: calc(100vh - 55px);
+  max-height: calc(100vh - var(--view-image-reserve));
   width: auto;
   height: auto;
   border-radius: var(--radius-md);
@@ -2032,13 +2038,13 @@ ul li:hover {
 /* Responsive adjustments for image display */
 @media (max-width: 768px) {
   #image-display {
-    height: calc(100vh - 40px);
+    height: calc(100vh - var(--view-header-height-mobile));
     margin: 0;
     padding: var(--space-1);
   }
 
   #image-display .view-image {
-    max-height: calc(100vh - 45px);
+    max-height: calc(100vh - var(--view-image-reserve-mobile));
   }
   
   .image-controls {
