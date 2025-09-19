@@ -89,7 +89,7 @@ function ImageView() {
       // Sort images by date (newest first) to match the gallery default sorting
       // Use spread operator to avoid mutating the original array
       const sortedImages = [...images].sort((a, b) => {
-        return new Date(b.created_at || 0) - new Date(a.created_at || 0);
+        return new Date(b.created_at || '1970-01-01') - new Date(a.created_at || '1970-01-01');
       });
 
       setProjectImages(sortedImages);

@@ -1970,6 +1970,8 @@ ul li:hover {
   display: flex;
   justify-content: center;
   align-items: flex-start;
+  /* The height calculation below depends on --view-header-height.
+     If you change the header height, update --view-header-height in :root accordingly. */
   height: calc(100vh - var(--view-header-height));
   background: var(--bg-primary);
   border: 1px solid var(--border-light);
