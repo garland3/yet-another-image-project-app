@@ -86,10 +86,16 @@ function ImageView() {
         throw new Error('Invalid server response: expected an array of images');
       }
       
-      setProjectImages(images);
-      
-      // Find the index of the current image
-      const index = images.findIndex(img => img.id === imageId);
+      // Sort images by date (newest first) to match the gallery default sorting
+      // Use spread operator to avoid mutating the original array
+      const sortedImages = [...images].sort((a, b) => {
+        return new Date(b.created_at || '1970-01-01') - new Date(a.created_at || '1970-01-01');
+      });
+
+      setProjectImages(sortedImages);
+
+      // Find the index of the current image in the sorted array
+      const index = sortedImages.findIndex(img => img.id === imageId);
       setCurrentImageIndex(index);
       
     } catch (error) {
@@ -195,25 +201,23 @@ function ImageView() {
   }, [currentImageIndex, projectImages.length, navigateToNextImage, navigateToPreviousImage]);
 
   return (
-    <div className="App" style={{ maxWidth: '100%', padding: '10px' }}>
-      <header className="App-header">
-        <div id="view-header">
-          <button 
-            className="btn btn-secondary" 
+    <div className="App" style={{ maxWidth: '100%', padding: '0' }}>
+      <header className="view-header-compact">
+        <div className="view-header-content">
+          <button
+            className="btn btn-secondary btn-small"
             onClick={() => navigate(`/project/${projectId}`)}
           >
-            &lt; Back to Project
+            ← Back
           </button>
-          <h1>{image ? image.filename : 'Loading image...'}</h1>
+          <span className="view-filename">{image ? image.filename : 'Loading...'}</span>
           {currentUser && (
-            <div className="user-info">
-              <span>Logged in as: {currentUser.email}</span>
-            </div>
+            <span className="view-user-info">{currentUser.email}</span>
           )}
         </div>
       </header>
 
-      <div className="container" style={{ maxWidth: '100%' }}>
+      <div className="container" style={{ maxWidth: '100%', padding: 'var(--space-4)' }}>
         {error && (
           <div className="alert alert-error">
             {error}
@@ -227,39 +231,26 @@ function ImageView() {
         )}
         
         <div className="image-view-container">
-          <div className="image-navigation">
-            <button 
-              className="btn btn-secondary navigation-btn"
-              onClick={navigateToPreviousImage}
-              disabled={currentImageIndex <= 0}
-            >
-              &lt; Previous
-            </button>
-            <button 
-              className="btn btn-secondary navigation-btn"
-              onClick={navigateToNextImage}
-              disabled={currentImageIndex >= projectImages.length - 1 || currentImageIndex === -1}
-            >
-              Next &gt;
-            </button>
-          </div>
-          
           {/* Compact classification buttons above image */}
-          <CompactImageClassifications 
-            imageId={imageId} 
-            classes={classes} 
-            loading={loading} 
-            setLoading={setLoading} 
-            setError={setError} 
+          <CompactImageClassifications
+            imageId={imageId}
+            classes={classes}
+            loading={loading}
+            setLoading={setLoading}
+            setError={setError}
           />
-          
-          <ImageDisplay 
-            imageId={imageId} 
-            image={image} 
+
+          <ImageDisplay
+            imageId={imageId}
+            image={image}
             isTransitioning={isTransitioning}
             projectId={projectId}
             setImage={setImage}
             refreshProjectImages={loadProjectImages}
+            navigateToPreviousImage={navigateToPreviousImage}
+            navigateToNextImage={navigateToNextImage}
+            currentImageIndex={currentImageIndex}
+            projectImages={projectImages}
           />
           
           <ImageComments 
