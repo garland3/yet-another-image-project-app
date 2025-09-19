@@ -3,7 +3,18 @@ import React, { useState, useEffect } from 'react';
 // Deleted image placeholder SVG for larger display
 const DELETED_IMAGE_DISPLAY_SVG = 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iODAwIiBoZWlnaHQ9IjYwMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iODAwIiBoZWlnaHQ9IjYwMCIgZmlsbD0iI2ZiZjVmNSIgc3Ryb2tlPSIjZjU5ZTBiIiBzdHJva2Utd2lkdGg9IjQiIHN0cm9rZS1kYXNoYXJyYXk9IjE1LDgiLz48dGV4dCB4PSI1MCUiIHk9IjM1JSIgZm9udC1mYW1pbHk9IkFyaWFsLCBzYW5zLXNlcmlmIiBmb250LXNpemU9IjM2IiBmb250LXdlaWdodD0iNjAwIiB0ZXh0LWFuY2hvcj0ibWlkZGxlIiBkeT0iLjNlbSIgZmlsbD0iI2M0MzAyYiI+SW1hZ2UgRGVsZXRlZDwvdGV4dD48dGV4dCB4PSI1MCUiIHk9IjUwJSIgZm9udC1mYW1pbHk9IkFyaWFsLCBzYW5zLXNlcmlmIiBmb250LXNpemU9IjY0IiB0ZXh0LWFuY2hvcj0ibWlkZGxlIiBkeT0iLjNlbSIgZmlsbD0iI2Y1OWUwYiI+8J+XkeKcgO+4jzwvdGV4dD48dGV4dCB4PSI1MCUiIHk9IjY1JSIgZm9udC1mYW1pbHk9IkFyaWFsLCBzYW5zLXNlcmlmIiBmb250LXNpemU9IjE4IiB0ZXh0LWFuY2hvcj0ibWlkZGxlIiBkeT0iLjNlbSIgZmlsbD0iIzk3OWNhMSI+VGhpcyBpbWFnZSBoYXMgYmVlbiBkZWxldGVkPC90ZXh0Pjx0ZXh0IHg9IjUwJSIgeT0iNzAlIiBmb250LWZhbWlseT0iQXJpYWwsIHNhbnMtc2VyaWYiIGZvbnQtc2l6ZT0iMTQiIHRleHQtYW5jaG9yPSJtaWRkbGUiIGR5PSIuM2VtIiBmaWxsPSIjOTc5Y2ExIj5DaGVjayB0aGUgZGVsZXRpb24gY29udHJvbHMgYmVsb3cgZm9yIG1vcmUgaW5mbzwvdGV4dD48L3N2Zz4=';
 
-function ImageDisplay({ imageId, image, isTransitioning, projectId, setImage, refreshProjectImages }) {
+function ImageDisplay({
+  imageId,
+  image,
+  isTransitioning,
+  projectId,
+  setImage,
+  refreshProjectImages,
+  navigateToPreviousImage,
+  navigateToNextImage,
+  currentImageIndex,
+  projectImages
+}) {
   const [zoomLevel, setZoomLevel] = useState(1);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [reason, setReason] = useState("");
@@ -226,32 +237,55 @@ function ImageDisplay({ imageId, image, isTransitioning, projectId, setImage, re
       </div>
       
       <div className="image-controls">
-        <button 
+        {/* Navigation buttons */}
+        {navigateToPreviousImage && (
+          <button
+            className="btn btn-secondary btn-small control-btn"
+            onClick={navigateToPreviousImage}
+            disabled={currentImageIndex <= 0}
+          >
+            ← Prev
+          </button>
+        )}
+        {navigateToNextImage && (
+          <button
+            className="btn btn-secondary btn-small control-btn"
+            onClick={navigateToNextImage}
+            disabled={currentImageIndex >= (projectImages?.length || 0) - 1 || currentImageIndex === -1}
+          >
+            Next →
+          </button>
+        )}
+
+        {/* Zoom controls */}
+        <button
           className="btn btn-secondary control-btn"
           onClick={handleZoomIn}
         >
           Zoom In
         </button>
-        <button 
+        <button
           className="btn btn-secondary control-btn"
           onClick={handleZoomOut}
         >
           Zoom Out
         </button>
-        <button 
+        <button
           className="btn btn-secondary control-btn"
           onClick={handleResetZoom}
         >
           Reset
         </button>
-        <button 
+
+        {/* Other controls */}
+        <button
           className="btn btn-success control-btn"
           onClick={handleDownload}
         >
           Download
         </button>
         {image && !image.deleted_at && (
-          <button 
+          <button
             className="btn btn-danger control-btn"
             onClick={() => setShowDeleteModal(true)}
           >

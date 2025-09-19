@@ -10,7 +10,10 @@ function CompactImageClassifications({ imageId, classes, loading, setLoading, se
     const hotkeyMap = new Map();
     const priorityKeys = ['a', 's', 'd', 'f', 'q', 'w', 'e', 'r']; // Home row + top row
     const allKeys = 'abcdefghijklmnopqrstuvwxyz1234567890'.split('');
-    
+
+    // Reserve 'h' for help functionality
+    usedKeys.add('h');
+
     // First pass: try first letter of class name
     classList.forEach(cls => {
       const firstLetter = cls.name.toLowerCase().charAt(0);
