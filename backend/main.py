@@ -10,8 +10,7 @@ from fastapi.responses import JSONResponse, FileResponse
 from pydantic import ValidationError
 
 from core.config import settings
-from core.database import create_db_and_tables
-from core.migrations import run_migrations
+from core.migrations import check_and_apply_migrations
 from utils.boto3_client import boto3_client, ensure_bucket_exists
 from middleware.cors_debug import add_cors_middleware, debug_exception_middleware
 from middleware.auth import auth_middleware
@@ -86,12 +85,7 @@ async def lifespan(app: FastAPI):
     if settings.FAST_TEST_MODE:
         logger.info("FAST_TEST_MODE enabled: skipping DB create/migrate and S3 bucket checks.")
     else:
-        logger.info("Creating database tables if they don't exist...")
-        await create_db_and_tables()
-        logger.info("Database tables checked/created.")
-        
-        # Run migrations to set up new tables and migrate existing data
-        await run_migrations()
+        await check_and_apply_migrations()
         logger.info(f"Checking/Creating S3 bucket: {settings.S3_BUCKET}")
         if boto3_client:
             bucket_exists = ensure_bucket_exists(boto3_client, settings.S3_BUCKET)

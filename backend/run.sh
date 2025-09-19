@@ -10,6 +10,7 @@ CONTAINER_ENGINE="${CONTAINER_ENGINE:-docker}"
 NETWORK_NAME="data_mgmt_net"
 PG_CONTAINER="postgres_db"
 MINIO_CONTAINER="minio_storage"
+ADMINER_CONTAINER="adminer_db"
 PG_VOLUME="postgres_data"
 MINIO_VOLUME="minio_data"
 
@@ -182,6 +183,27 @@ start_minio() {
 	fi
 }
 
+start_adminer() {
+	ensure_network
+
+	if container_running "$ADMINER_CONTAINER"; then
+		say "Adminer already running ($ADMINER_CONTAINER)"
+	else
+		if container_exists "$ADMINER_CONTAINER"; then
+			say "Starting existing Adminer container"
+			"$CONTAINER_ENGINE" start "$ADMINER_CONTAINER" >/dev/null
+		else
+			say "Launching Adminer ($ADMINER_CONTAINER) on port 8080"
+			"$CONTAINER_ENGINE" run -d \
+				--name "$ADMINER_CONTAINER" \
+				--network "$NETWORK_NAME" \
+				-p 8080:8080 \
+				adminer:latest >/dev/null
+		fi
+	fi
+	say "Adminer is available at http://localhost:8080"
+}
+
 start_backend() {
     # Check if we're in the backend directory
     if [[ ! -f "main.py" ]]; then
@@ -194,6 +216,7 @@ start_backend() {
     # Start containers first
     start_postgres
     start_minio
+    start_adminer
     
     # Test connectivity before starting backend
     if ! test_connectivity; then

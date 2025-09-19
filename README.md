@@ -46,6 +46,23 @@ source .venv/bin/activate
 uv pip install -r requirements.txt
 ```
 
+### Database Migrations
+
+This project now uses Alembic for schema management. The FastAPI app applies migrations on startup, but you can run them manually during development:
+
+```
+cd backend
+uv run alembic upgrade head
+```
+
+To generate a new migration after updating the SQLAlchemy models:
+
+```
+cd backend
+uv run alembic revision --autogenerate -m "short description"
+uv run alembic upgrade head
+```
+
 ## Features
 
 - Project organization and management
