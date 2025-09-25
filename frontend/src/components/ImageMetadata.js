@@ -265,7 +265,7 @@ function ImageMetadata({ imageId, image, setImage, loading, setLoading, setError
                               key,
                               value: typeof value === 'object'
                                 ? JSON.stringify(value, null, 2)
-                                : (value === null ? '' : value.toString())
+                                : value.toString()
                             })} style={{ cursor: 'pointer' }}>
                               {key}
                             </span>
@@ -285,7 +285,7 @@ function ImageMetadata({ imageId, image, setImage, loading, setLoading, setError
                               key,
                               value: typeof value === 'object'
                                 ? JSON.stringify(value, null, 2)
-                                : (value === null ? '' : value.toString())
+                                : value.toString()
                             })} style={{ cursor: 'pointer' }}>
                               {value === null ? (
                                 <span className="metadata-null">null</span>
@@ -307,7 +307,7 @@ function ImageMetadata({ imageId, image, setImage, loading, setLoading, setError
                                   key,
                                   value: typeof value === 'object'
                                     ? JSON.stringify(value, null, 2)
-                                    : (value === null ? '' : value.toString())
+                                    : value.toString()
                                 })}
                               >
                                 Edit
@@ -319,6 +319,9 @@ function ImageMetadata({ imageId, image, setImage, loading, setLoading, setError
                                 Delete
                               </button>
                             </>
+                          )}
+                          {editingMetadata && editingMetadata.originalKey === key && (
+                            <span className="editing-indicator">Editing...</span>
                           )}
                         </td>
                       </tr>

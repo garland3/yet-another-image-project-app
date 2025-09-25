@@ -11,7 +11,6 @@ function ProjectReport() {
   const [error, setError] = useState(null);
   const [currentUser, setCurrentUser] = useState(null);
   const [generating, setGenerating] = useState(false);
-  const [showReport, setShowReport] = useState(false);
   const [fullWidthImages, setFullWidthImages] = useState(false);
 
   // Load project data
@@ -84,6 +83,34 @@ function ProjectReport() {
     loadData();
   }, [id]);
 
+  // Helper function to escape CSV values properly with CSV injection protection
+  const escapeCsvValue = (value) => {
+    if (value === null || value === undefined) {
+      return '';
+    }
+
+    let stringValue = value.toString().trim();
+
+    // CSV injection protection: prevent formula execution in spreadsheet applications
+    // Characters that start formulas: = @ + - and also tab characters
+    if (stringValue.match(/^[=@+\-\t]/) || stringValue.toLowerCase().startsWith('cmd|') || stringValue.toLowerCase().startsWith('dde|')) {
+      stringValue = `'${stringValue}`;
+    }
+
+    // If the value contains quotes, commas, newlines, or other special characters, escape it
+    if (stringValue.includes('"') || stringValue.includes(',') || stringValue.includes('\n') || stringValue.includes('\r') || stringValue.includes('\t')) {
+      // Escape quotes by doubling them and wrap the entire value in quotes
+      return `"${stringValue.replace(/"/g, '""')}"`;
+    }
+
+    // Additional protection: wrap values that start with dangerous characters
+    if (stringValue.match(/^[=@+\-]/)) {
+      return `"${stringValue}"`;
+    }
+
+    return stringValue;
+  };
+
   // Generate CSV export
   const generateCSV = () => {
     setGenerating(true);
@@ -103,25 +130,25 @@ function ProjectReport() {
       ];
 
       const rows = images.map(image => {
-        const comments = image.comments?.map(c => `"${c.text} (by ${c.author?.email || 'Unknown'} on ${new Date(c.created_at).toLocaleString()})"`).join('; ') || '';
+        const comments = image.comments?.map(c => `${c.text} (by ${c.author?.email || 'Unknown'} on ${new Date(c.created_at).toLocaleString()})`).join('; ') || '';
         const classifications = image.classifications?.map(c => classes.find(cls => cls.id === c.class_id)?.name || 'Unknown').join(', ') || '';
         const customMetadata = image.metadata ? JSON.stringify(image.metadata) : '';
 
         return [
-          image.id,
-          `"${image.filename || ''}"`,
-          image.size_bytes || 0,
-          `"${image.content_type || ''}"`,
-          new Date(image.created_at).toLocaleString(),
-          image.deleted_at ? 'Yes' : 'No',
-          image.comments?.length || 0,
-          `"${comments}"`,
-          `"${classifications}"`,
-          `"${customMetadata}"`
+          escapeCsvValue(image.id),
+          escapeCsvValue(image.filename || ''),
+          escapeCsvValue(image.size_bytes || 0),
+          escapeCsvValue(image.content_type || ''),
+          escapeCsvValue(new Date(image.created_at).toLocaleString()),
+          escapeCsvValue(image.deleted_at ? 'Yes' : 'No'),
+          escapeCsvValue(image.comments?.length || 0),
+          escapeCsvValue(comments),
+          escapeCsvValue(classifications),
+          escapeCsvValue(customMetadata)
         ];
       });
 
-      const csvContent = [headers, ...rows].map(row => row.join(',')).join('\n');
+      const csvContent = [headers.map(escapeCsvValue), ...rows].map(row => row.join(',')).join('\n');
 
       const blob = new Blob([csvContent], { type: 'text/csv' });
       const url = window.URL.createObjectURL(blob);
