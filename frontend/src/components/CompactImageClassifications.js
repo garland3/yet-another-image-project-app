@@ -84,7 +84,7 @@ function CompactImageClassifications({ imageId, classes, loading, setLoading, se
     if (imageId) {
       loadClassifications();
     }
-  }, [imageId, setError]);
+  }, [imageId, setError, onClassificationsChange]);
 
   // Handle deleting a classification
   const handleDeleteClassification = useCallback(async (id) => {
@@ -113,7 +113,7 @@ function CompactImageClassifications({ imageId, classes, loading, setLoading, se
     } finally {
       setLoading(false);
     }
-  }, [setLoading, setError]);
+  }, [imageClassifications, setLoading, setError, onClassificationsChange]);
 
   // Handle classifying an image
   const handleClassifyImage = useCallback(async (classId) => {
@@ -164,7 +164,7 @@ function CompactImageClassifications({ imageId, classes, loading, setLoading, se
     } finally {
       setLoading(false);
     }
-  }, [imageId, imageClassifications, setLoading, setError, handleDeleteClassification]);
+  }, [imageId, imageClassifications, setLoading, setError, handleDeleteClassification, onClassificationsChange]);
 
   // Check if a class is selected
   const isClassSelected = (classId) => {

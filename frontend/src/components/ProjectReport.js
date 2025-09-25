@@ -93,7 +93,7 @@ function ProjectReport() {
 
     // CSV injection protection: prevent formula execution in spreadsheet applications
     // Characters that start formulas: = @ + - and also tab characters
-    if (stringValue.match(/^[=@+\-\t]/) || stringValue.toLowerCase().startsWith('cmd|') || stringValue.toLowerCase().startsWith('dde|')) {
+    if (stringValue.match(/^[=@+\t-]/) || stringValue.toLowerCase().startsWith('cmd|') || stringValue.toLowerCase().startsWith('dde|')) {
       stringValue = `'${stringValue}`;
     }
 
@@ -104,7 +104,7 @@ function ProjectReport() {
     }
 
     // Additional protection: wrap values that start with dangerous characters
-    if (stringValue.match(/^[=@+\-]/)) {
+    if (stringValue.match(/^[=@+-]/)) {
       return `"${stringValue}"`;
     }
 
