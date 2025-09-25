@@ -224,13 +224,6 @@ function ImageMetadata({ imageId, image, setImage, loading, setLoading, setError
             <h3>Custom Metadata</h3>
             {((image.metadata || image.metadata_) && Object.keys(image.metadata || image.metadata_).length > 0) ? (
               <table className="metadata-table custom-metadata-table">
-                <thead>
-                  <tr>
-                    <th>Key</th>
-                    <th>Value</th>
-                    <th>Actions</th>
-                  </tr>
-                </thead>
                 <tbody>
                   {Object.entries(image.metadata || image.metadata_).map(([key, value]) => (
                     <tr key={key}>
@@ -245,13 +238,13 @@ function ImageMetadata({ imageId, image, setImage, loading, setLoading, setError
                         )}
                       </td>
                       <td className="metadata-actions">
-                        <button 
+                        <button
                           className="btn btn-small"
                           onClick={() => {
                             setEditingMetadata({
                               key,
-                              value: typeof value === 'object' 
-                                ? JSON.stringify(value, null, 2) 
+                              value: typeof value === 'object'
+                                ? JSON.stringify(value, null, 2)
                                 : (value === null ? '' : value)
                             });
                             setShowEditMetadataModal(true);
@@ -259,7 +252,7 @@ function ImageMetadata({ imageId, image, setImage, loading, setLoading, setError
                         >
                           Edit
                         </button>
-                        <button 
+                        <button
                           className="btn btn-small btn-danger"
                           onClick={() => handleDeleteMetadata(key)}
                         >
@@ -315,39 +308,59 @@ function ImageMetadata({ imageId, image, setImage, loading, setLoading, setError
       {/* Edit metadata modal */}
       {showEditMetadataModal && (
         <div className="modal">
-          <div className="modal-content">
-            <span 
-              className="close-modal" 
-              onClick={() => {
-                setShowEditMetadataModal(false);
-                setEditingMetadata(null);
-              }}
-            >
-              &times;
-            </span>
-            <h2>Edit Metadata</h2>
-            <form id="edit-metadata-form" className="form">
-              <input type="hidden" value={editingMetadata.key} />
-              <div className="form-group">
-                <label htmlFor="edit-metadata-value">Value:</label>
-                <textarea 
-                  id="edit-metadata-value" 
-                  name="edit-metadata-value" 
-                  rows="3"
-                  value={editingMetadata.value}
-                  onChange={(e) => setEditingMetadata({...editingMetadata, value: e.target.value})}
-                ></textarea>
-                <small>You can enter a simple value or valid JSON</small>
-              </div>
-              <button 
-                type="button" 
+          <div className="modal-content edit-metadata-modal">
+            <div className="modal-header">
+              <h3>Edit Metadata: {editingMetadata.key}</h3>
+              <span
+                className="close-modal"
+                onClick={() => {
+                  setShowEditMetadataModal(false);
+                  setEditingMetadata(null);
+                }}
+              >
+                &times;
+              </span>
+            </div>
+            <div className="modal-body">
+              <form id="edit-metadata-form" className="form">
+                <div className="form-group">
+                  <label htmlFor="edit-metadata-value">Value:</label>
+                  <textarea
+                    id="edit-metadata-value"
+                    name="edit-metadata-value"
+                    className="metadata-edit-textarea"
+                    rows="12"
+                    value={editingMetadata.value}
+                    onChange={(e) => setEditingMetadata({...editingMetadata, value: e.target.value})}
+                    placeholder="Enter a simple value or valid JSON"
+                  ></textarea>
+                  <small className="form-help">
+                    Tip: For JSON values, use proper formatting with indentation.
+                    The value will be automatically parsed when saved.
+                  </small>
+                </div>
+              </form>
+            </div>
+            <div className="modal-footer">
+              <button
+                type="button"
+                className="btn btn-secondary"
+                onClick={() => {
+                  setShowEditMetadataModal(false);
+                  setEditingMetadata(null);
+                }}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
                 className="btn btn-primary"
                 onClick={handleUpdateMetadata}
                 disabled={loading}
               >
-                Update Metadata
+                {loading ? 'Updating...' : 'Update Metadata'}
               </button>
-            </form>
+            </div>
           </div>
         </div>
       )}

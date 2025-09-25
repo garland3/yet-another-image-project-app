@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 
-function CompactImageClassifications({ imageId, classes, loading, setLoading, setError }) {
+function CompactImageClassifications({ imageId, classes, loading, setLoading, setError, onClassificationsChange }) {
   const [imageClassifications, setImageClassifications] = useState([]);
   const [showHelp, setShowHelp] = useState(false);
 
@@ -71,6 +71,9 @@ function CompactImageClassifications({ imageId, classes, loading, setLoading, se
         
         const classificationsData = await response.json();
         setImageClassifications(classificationsData);
+        if (onClassificationsChange) {
+          onClassificationsChange(classificationsData);
+        }
         
       } catch (error) {
         console.error('Error loading classifications:', error);
@@ -97,7 +100,11 @@ function CompactImageClassifications({ imageId, classes, loading, setLoading, se
         throw new Error(`HTTP error! Status: ${response.status}`);
       }
       
-      setImageClassifications(prev => prev.filter(classification => String(classification.id) !== idStr));
+      const newClassifications = imageClassifications.filter(classification => String(classification.id) !== idStr);
+      setImageClassifications(newClassifications);
+      if (onClassificationsChange) {
+        onClassificationsChange(newClassifications);
+      }
       setError(null);
       
     } catch (error) {
@@ -144,7 +151,11 @@ function CompactImageClassifications({ imageId, classes, loading, setLoading, se
       }
       
       const newClassification = await response.json();
-      setImageClassifications(prev => [...prev, newClassification]);
+      const newClassifications = [...imageClassifications, newClassification];
+      setImageClassifications(newClassifications);
+      if (onClassificationsChange) {
+        onClassificationsChange(newClassifications);
+      }
       setError(null);
       
     } catch (error) {
@@ -273,20 +284,6 @@ function CompactImageClassifications({ imageId, classes, loading, setLoading, se
         </div>
       )}
       
-      {imageClassifications.length > 0 && (
-        <div className="current-classifications">
-          <span className="classifications-label">Current: </span>
-          {imageClassifications.map(classification => {
-            const classIdStr = String(classification.class_id);
-            const classInfo = classes.find(c => String(c.id) === classIdStr);
-            return (
-              <span key={classification.id} className="current-class-tag">
-                {classInfo ? classInfo.name : 'Unknown'}
-              </span>
-            );
-          })}
-        </div>
-      )}
     </div>
   );
 }

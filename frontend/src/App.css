@@ -1969,7 +1969,7 @@ ul li:hover {
 .image-view-main {
   display: flex;
   gap: var(--space-4);
-  height: calc(100vh - var(--view-header-height) - 120px); /* Account for header and other elements */
+  height: calc(100vh - var(--view-header-height) - 80px); /* Account for header and reduced spacing */
   overflow: hidden; /* Prevent main container from scrolling */
 }
 
@@ -2142,6 +2142,61 @@ ul li:hover {
   color: var(--gray-700);
 }
 
+
+/* CompactImageClassifications in Sidebar */
+.image-view-sidebar .compact-classifications {
+  margin-bottom: var(--space-3);
+  padding: var(--space-3) var(--space-4);
+  background: var(--bg-primary);
+  border: 1px solid var(--border-light);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-sm);
+}
+
+.image-view-sidebar .compact-classifications-header {
+  gap: var(--space-2);
+  flex-wrap: wrap;
+}
+
+.image-view-sidebar .classifications-buttons {
+  gap: var(--space-2);
+}
+
+.image-view-sidebar .compact-class-btn {
+  font-size: 0.75rem;
+  padding: var(--space-2) var(--space-3);
+}
+
+.image-view-sidebar .compact-class-btn .hotkey {
+  font-size: 0.6875rem;
+}
+
+.image-view-sidebar .help-toggle-btn {
+  width: 24px;
+  height: 24px;
+  font-size: 0.75rem;
+}
+
+.image-view-sidebar .compact-help-panel {
+  margin-top: var(--space-3);
+  padding: var(--space-3);
+}
+
+.image-view-sidebar .help-content h4 {
+  font-size: 0.875rem;
+  margin-bottom: var(--space-2);
+}
+
+.image-view-sidebar .help-section {
+  font-size: 0.75rem;
+}
+
+.image-view-sidebar .help-section kbd {
+  font-size: 0.6875rem;
+  padding: var(--space-1);
+  min-width: 16px;
+}
+
 /* Resizable divider */
 .resize-divider {
   width: 8px;
@@ -2270,7 +2325,7 @@ ul li:hover {
 
   .image-view-content {
     order: 1;
-    height: calc(60vh - var(--view-header-height));
+    height: calc(70vh - var(--view-header-height));
   }
 
   #image-display {
@@ -2295,7 +2350,7 @@ ul li:hover {
   }
 
   .image-view-content {
-    height: calc(50vh - var(--view-header-height-mobile));
+    height: calc(60vh - var(--view-header-height-mobile));
   }
 
   #image-display {
@@ -2397,15 +2452,6 @@ ul li:hover {
   overflow: hidden;
 }
 
-.custom-metadata-table th {
-  background: var(--primary-600);
-  color: white;
-  font-weight: 600;
-  text-align: left;
-  padding: var(--space-3) var(--space-4);
-  border-bottom: none;
-}
-
 .custom-metadata-table td {
   padding: var(--space-3) var(--space-4);
   border-bottom: 1px solid var(--border-light);
@@ -2504,6 +2550,80 @@ ul li:hover {
 .status-badge.inactive {
   background: #fee2e2;
   color: #991b1b;
+}
+
+/* Metadata Edit Modal Improvements */
+.edit-metadata-modal {
+  max-width: 700px;
+  width: 90%;
+}
+
+.metadata-edit-textarea {
+  font-family: var(--font-family-mono);
+  font-size: 0.875rem;
+  line-height: 1.5;
+  resize: vertical;
+  min-height: 250px;
+  background: var(--gray-50);
+  border: 2px solid var(--border-medium);
+  border-radius: var(--radius-md);
+  padding: var(--space-4);
+  transition: all var(--transition-fast);
+}
+
+.metadata-edit-textarea:focus {
+  border-color: var(--primary-color);
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
+  background: var(--bg-primary);
+  outline: none;
+}
+
+.metadata-edit-textarea::placeholder {
+  color: var(--gray-400);
+  font-style: italic;
+}
+
+.form-help {
+  display: block;
+  margin-top: var(--space-2);
+  padding: var(--space-2) var(--space-3);
+  background: var(--primary-light);
+  border-left: 3px solid var(--primary-color);
+  border-radius: var(--radius-sm);
+  font-size: 0.8125rem;
+  color: var(--gray-700);
+  line-height: 1.4;
+}
+
+/* Comment Edit Modal Styles */
+.comment-edit-modal {
+  max-width: 600px;
+  width: 90%;
+}
+
+.comment-edit-textarea {
+  font-family: var(--font-family-base);
+  font-size: 0.875rem;
+  line-height: 1.5;
+  resize: vertical;
+  min-height: 180px;
+  background: var(--gray-50);
+  border: 2px solid var(--border-medium);
+  border-radius: var(--radius-md);
+  padding: var(--space-4);
+  transition: all var(--transition-fast);
+}
+
+.comment-edit-textarea:focus {
+  border-color: var(--primary-color);
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
+  background: var(--bg-primary);
+  outline: none;
+}
+
+.comment-edit-textarea::placeholder {
+  color: var(--gray-400);
+  font-style: italic;
 }
 
 .api-key-display {

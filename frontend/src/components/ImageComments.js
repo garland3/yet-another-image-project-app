@@ -239,38 +239,57 @@ function ImageComments({ imageId, loading, setLoading, setError }) {
       {/* Edit comment modal */}
       {showEditCommentModal && (
         <div className="modal">
-          <div className="modal-content">
-            <span 
-              className="close-modal" 
-              onClick={() => {
-                setShowEditCommentModal(false);
-                setEditingComment(null);
-              }}
-            >
-              &times;
-            </span>
-            <h2>Edit Comment</h2>
-            <form id="edit-comment-form" className="form">
-              <div className="form-group">
-                <label htmlFor="edit-comment-text">Comment:</label>
-                <textarea 
-                  id="edit-comment-text" 
-                  name="edit-comment-text" 
-                  rows="3"
-                  value={editingComment.text}
-                  onChange={(e) => setEditingComment({...editingComment, text: e.target.value})}
-                  required
-                ></textarea>
-              </div>
-              <button 
-                type="button" 
+          <div className="modal-content comment-edit-modal">
+            <div className="modal-header">
+              <h2>Edit Comment</h2>
+              <span
+                className="close-modal"
+                onClick={() => {
+                  setShowEditCommentModal(false);
+                  setEditingComment(null);
+                }}
+              >
+                &times;
+              </span>
+            </div>
+            <div className="modal-body">
+              <form id="edit-comment-form" className="form">
+                <div className="form-group">
+                  <label htmlFor="edit-comment-text">Comment Text:</label>
+                  <textarea
+                    id="edit-comment-text"
+                    name="edit-comment-text"
+                    className="comment-edit-textarea"
+                    rows="8"
+                    value={editingComment.text}
+                    onChange={(e) => setEditingComment({...editingComment, text: e.target.value})}
+                    required
+                    placeholder="Enter your comment text here..."
+                  ></textarea>
+                  <small className="form-text">Edit your comment text above</small>
+                </div>
+              </form>
+            </div>
+            <div className="modal-footer">
+              <button
+                type="button"
+                className="btn btn-secondary"
+                onClick={() => {
+                  setShowEditCommentModal(false);
+                  setEditingComment(null);
+                }}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
                 className="btn btn-primary"
                 onClick={handleUpdateComment}
                 disabled={loading}
               >
                 Update Comment
               </button>
-            </form>
+            </div>
           </div>
         </div>
       )}

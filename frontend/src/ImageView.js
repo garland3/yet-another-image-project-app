@@ -5,7 +5,6 @@ import './App.css';
 // Import components
 import ImageDisplay from './components/ImageDisplay';
 import ImageMetadata from './components/ImageMetadata';
-import ImageClassifications from './components/ImageClassifications';
 import CompactImageClassifications from './components/CompactImageClassifications';
 import ImageComments from './components/ImageComments';
 import ImageDeletionControls from './components/ImageDeletionControls';
@@ -223,6 +222,7 @@ function ImageView() {
     }
   }, [isResizing, handleMouseMove, handleMouseUp]);
 
+
   // Keyboard navigation
   useEffect(() => {
     const handleKeyDown = (e) => {
@@ -271,21 +271,22 @@ function ImageView() {
         )}
         
         <div className="image-view-container">
-          {/* Compact classification buttons above everything */}
-          <CompactImageClassifications
-            imageId={imageId}
-            classes={classes}
-            loading={loading}
-            setLoading={setLoading}
-            setError={setError}
-          />
-
           <div className="image-view-main">
-            {/* Left sidebar with metadata, comments, and labels */}
+            {/* Left sidebar with classification controls, metadata, and comments */}
             <div
               className="image-view-sidebar"
               style={{ width: `${sidebarWidth}px`, minWidth: `${sidebarWidth}px` }}
             >
+              {/* Classification controls at the top of sidebar */}
+              <CompactImageClassifications
+                imageId={imageId}
+                classes={classes}
+                loading={loading}
+                setLoading={setLoading}
+                setError={setError}
+              />
+
+
               <ImageComments
                 imageId={imageId}
                 loading={loading}
@@ -297,15 +298,6 @@ function ImageView() {
                 imageId={imageId}
                 image={image}
                 setImage={setImage}
-                loading={loading}
-                setLoading={setLoading}
-                setError={setError}
-              />
-
-              {/* Original classifications component for reference/additional details */}
-              <ImageClassifications
-                imageId={imageId}
-                classes={classes}
                 loading={loading}
                 setLoading={setLoading}
                 setError={setError}
