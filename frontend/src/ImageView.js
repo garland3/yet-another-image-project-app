@@ -5,7 +5,6 @@ import './App.css';
 // Import components
 import ImageDisplay from './components/ImageDisplay';
 import ImageMetadata from './components/ImageMetadata';
-import ImageClassifications from './components/ImageClassifications';
 import CompactImageClassifications from './components/CompactImageClassifications';
 import ImageComments from './components/ImageComments';
 import ImageDeletionControls from './components/ImageDeletionControls';
@@ -25,6 +24,8 @@ function ImageView() {
   const [error, setError] = useState(null);
   const [isTransitioning, setIsTransitioning] = useState(false);
   const [currentUser, setCurrentUser] = useState(null);
+  const [sidebarWidth, setSidebarWidth] = useState(350);
+  const [isResizing, setIsResizing] = useState(false);
 
   // Load image data
   const loadImageData = useCallback(async () => {
@@ -183,6 +184,45 @@ function ImageView() {
     setIsTransitioning(false);
   }, [imageId]);
 
+  // Handle resize functionality
+  const handleMouseDown = useCallback(() => {
+    setIsResizing(true);
+  }, []);
+
+  const handleMouseMove = useCallback((e) => {
+    if (!isResizing) return;
+
+    const newWidth = e.clientX;
+    const minWidth = 250;
+    const maxWidth = window.innerWidth * 0.6; // Max 60% of screen width
+
+    if (newWidth >= minWidth && newWidth <= maxWidth) {
+      setSidebarWidth(newWidth);
+    }
+  }, [isResizing]);
+
+  const handleMouseUp = useCallback(() => {
+    setIsResizing(false);
+  }, []);
+
+  // Add global mouse event listeners for resizing
+  useEffect(() => {
+    if (isResizing) {
+      document.addEventListener('mousemove', handleMouseMove);
+      document.addEventListener('mouseup', handleMouseUp);
+      document.body.style.cursor = 'ew-resize';
+      document.body.style.userSelect = 'none';
+
+      return () => {
+        document.removeEventListener('mousemove', handleMouseMove);
+        document.removeEventListener('mouseup', handleMouseUp);
+        document.body.style.cursor = '';
+        document.body.style.userSelect = '';
+      };
+    }
+  }, [isResizing, handleMouseMove, handleMouseUp]);
+
+
   // Keyboard navigation
   useEffect(() => {
     const handleKeyDown = (e) => {
@@ -231,58 +271,71 @@ function ImageView() {
         )}
         
         <div className="image-view-container">
-          {/* Compact classification buttons above image */}
-          <CompactImageClassifications
-            imageId={imageId}
-            classes={classes}
-            loading={loading}
-            setLoading={setLoading}
-            setError={setError}
-          />
+          <div className="image-view-main">
+            {/* Left sidebar with classification controls, metadata, and comments */}
+            <div
+              className="image-view-sidebar"
+              style={{ width: `${sidebarWidth}px`, minWidth: `${sidebarWidth}px` }}
+            >
+              {/* Classification controls at the top of sidebar */}
+              <CompactImageClassifications
+                imageId={imageId}
+                classes={classes}
+                loading={loading}
+                setLoading={setLoading}
+                setError={setError}
+              />
 
-          <ImageDisplay
-            imageId={imageId}
-            image={image}
-            isTransitioning={isTransitioning}
+
+              <ImageComments
+                imageId={imageId}
+                loading={loading}
+                setLoading={setLoading}
+                setError={setError}
+              />
+
+              <ImageMetadata
+                imageId={imageId}
+                image={image}
+                setImage={setImage}
+                loading={loading}
+                setLoading={setLoading}
+                setError={setError}
+              />
+            </div>
+
+            {/* Resizable divider */}
+            <div
+              className="resize-divider"
+              onMouseDown={handleMouseDown}
+              style={{ cursor: isResizing ? 'ew-resize' : 'ew-resize' }}
+            >
+              <div className="resize-handle"></div>
+            </div>
+
+            {/* Right side with image display */}
+            <div className="image-view-content">
+              <ImageDisplay
+                imageId={imageId}
+                image={image}
+                isTransitioning={isTransitioning}
+                projectId={projectId}
+                setImage={setImage}
+                refreshProjectImages={loadProjectImages}
+                navigateToPreviousImage={navigateToPreviousImage}
+                navigateToNextImage={navigateToNextImage}
+                currentImageIndex={currentImageIndex}
+                projectImages={projectImages}
+              />
+            </div>
+          </div>
+
+          {/* Keep deletion controls at the bottom for all to see */}
+          <ImageDeletionControls
             projectId={projectId}
+            image={image}
             setImage={setImage}
             refreshProjectImages={loadProjectImages}
-            navigateToPreviousImage={navigateToPreviousImage}
-            navigateToNextImage={navigateToNextImage}
-            currentImageIndex={currentImageIndex}
-            projectImages={projectImages}
-          />
-          
-          <ImageComments 
-            imageId={imageId} 
-            loading={loading} 
-            setLoading={setLoading} 
-            setError={setError} 
-          />
-          
-          <ImageMetadata 
-            imageId={imageId} 
-            image={image} 
-            setImage={setImage} 
-            loading={loading} 
-            setLoading={setLoading} 
-            setError={setError} 
-          />
-
-          <ImageDeletionControls 
-            projectId={projectId} 
-            image={image} 
-            setImage={setImage} 
-            refreshProjectImages={loadProjectImages} 
-          />
-          
-          {/* Original classifications component for reference/additional details */}
-          <ImageClassifications 
-            imageId={imageId} 
-            classes={classes} 
-            loading={loading} 
-            setLoading={setLoading} 
-            setError={setError} 
           />
         </div>
       </div>
