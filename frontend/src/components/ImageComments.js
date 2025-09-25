@@ -4,7 +4,6 @@ function ImageComments({ imageId, loading, setLoading, setError }) {
   const [comments, setComments] = useState([]);
   const [newComment, setNewComment] = useState('');
   const [editingComment, setEditingComment] = useState(null);
-  const [showEditCommentModal, setShowEditCommentModal] = useState(false);
 
   // Helper function to format date
   const formatDate = (dateString) => {
@@ -95,10 +94,10 @@ function ImageComments({ imageId, loading, setLoading, setError }) {
   // Handle updating a comment
   const handleUpdateComment = async () => {
     if (!editingComment) return;
-    
+
     try {
       setLoading(true);
-      
+
       const response = await fetch(`/api/comments/${editingComment.id}`, {
         method: 'PATCH',
         headers: {
@@ -108,25 +107,24 @@ function ImageComments({ imageId, loading, setLoading, setError }) {
           text: editingComment.text,
         }),
       });
-      
+
       if (!response.ok) {
         throw new Error(`HTTP error! Status: ${response.status}`);
       }
-      
+
       const updatedComment = await response.json();
-      
+
       // Update the comment in the list
-      setComments(prev => 
-        prev.map(comment => 
+      setComments(prev =>
+        prev.map(comment =>
           comment.id === editingComment.id ? updatedComment : comment
         )
       );
-      
-      // Close modal
-      setShowEditCommentModal(false);
+
+      // Exit inline editing
       setEditingComment(null);
       setError(null);
-      
+
     } catch (error) {
       console.error('Error updating comment:', error);
       setError('Failed to update comment. Please try again later.');
@@ -186,18 +184,49 @@ function ImageComments({ imageId, loading, setLoading, setError }) {
                     </span>
                   </div>
                   <div className="comment-content">
-                    {comment.text}
+                    {editingComment && editingComment.id === comment.id ? (
+                      <div className="inline-edit">
+                        <textarea
+                          className="comment-edit-textarea-inline"
+                          rows="4"
+                          value={editingComment.text}
+                          onChange={(e) => setEditingComment({...editingComment, text: e.target.value})}
+                          placeholder="Enter your comment text here..."
+                          autoFocus
+                        ></textarea>
+                        <div className="inline-edit-actions">
+                          <button
+                            className="btn btn-small btn-primary"
+                            onClick={handleUpdateComment}
+                            disabled={loading}
+                          >
+                            {loading ? 'Saving...' : 'Save'}
+                          </button>
+                          <button
+                            className="btn btn-small btn-secondary"
+                            onClick={() => {
+                              setEditingComment(null);
+                            }}
+                          >
+                            Cancel
+                          </button>
+                        </div>
+                      </div>
+                    ) : (
+                      <div onClick={() => setEditingComment(comment)} style={{ cursor: 'pointer' }}>
+                        {comment.text}
+                      </div>
+                    )}
                   </div>
                   <div className="comment-actions">
-                    <button 
-                      className="btn btn-small"
-                      onClick={() => {
-                        setEditingComment(comment);
-                        setShowEditCommentModal(true);
-                      }}
-                    >
-                      Edit
-                    </button>
+                    {(!editingComment || editingComment.id !== comment.id) && (
+                      <button
+                        className="btn btn-small"
+                        onClick={() => setEditingComment(comment)}
+                      >
+                        Edit
+                      </button>
+                    )}
                     <button 
                       className="btn btn-small btn-danger"
                       onClick={() => handleDeleteComment(comment.id)}
@@ -236,63 +265,6 @@ function ImageComments({ imageId, loading, setLoading, setError }) {
         </form>
       </div>
 
-      {/* Edit comment modal */}
-      {showEditCommentModal && (
-        <div className="modal">
-          <div className="modal-content comment-edit-modal">
-            <div className="modal-header">
-              <h2>Edit Comment</h2>
-              <span
-                className="close-modal"
-                onClick={() => {
-                  setShowEditCommentModal(false);
-                  setEditingComment(null);
-                }}
-              >
-                &times;
-              </span>
-            </div>
-            <div className="modal-body">
-              <form id="edit-comment-form" className="form">
-                <div className="form-group">
-                  <label htmlFor="edit-comment-text">Comment Text:</label>
-                  <textarea
-                    id="edit-comment-text"
-                    name="edit-comment-text"
-                    className="comment-edit-textarea"
-                    rows="8"
-                    value={editingComment.text}
-                    onChange={(e) => setEditingComment({...editingComment, text: e.target.value})}
-                    required
-                    placeholder="Enter your comment text here..."
-                  ></textarea>
-                  <small className="form-text">Edit your comment text above</small>
-                </div>
-              </form>
-            </div>
-            <div className="modal-footer">
-              <button
-                type="button"
-                className="btn btn-secondary"
-                onClick={() => {
-                  setShowEditCommentModal(false);
-                  setEditingComment(null);
-                }}
-              >
-                Cancel
-              </button>
-              <button
-                type="button"
-                className="btn btn-primary"
-                onClick={handleUpdateComment}
-                disabled={loading}
-              >
-                Update Comment
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 }

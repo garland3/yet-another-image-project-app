@@ -211,20 +211,22 @@ function ImageDisplay({
             <p>Loading image...</p>
           </div>
         ) : image.deleted_at ? (
-          <img 
+          <img
             src={DELETED_IMAGE_DISPLAY_SVG}
-            alt="Deleted" 
+            alt="Deleted"
             id="main-image"
             className="view-image deleted-image"
             style={{ transform: `scale(${zoomLevel})` }}
+            onClick={handleZoomIn}
           />
         ) : (
-          <img 
+          <img
             src={`/api/images/${imageId}/content`}
-            alt={image.filename || ''} 
+            alt={image.filename || ''}
             id="main-image"
             className="view-image"
             style={{ transform: `scale(${zoomLevel})` }}
+            onClick={handleZoomIn}
             onError={(e) => {
               console.error('Failed to load image with ID: %s', imageId, e);
               // Try the thumbnail endpoint as fallback
