@@ -2735,6 +2735,369 @@ ul li:hover {
   border-top: 1px solid var(--border-light);
 }
 
+/* Project Actions */
+.project-actions {
+  margin-top: var(--space-4);
+}
+
+/* Report Page Styles */
+.report-container {
+  max-width: 1400px;
+  margin: 0 auto;
+  padding: var(--space-4);
+}
+
+.report-actions {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: var(--space-6);
+  padding-bottom: var(--space-4);
+  border-bottom: 1px solid var(--border-light);
+}
+
+.image-toggle {
+  display: flex;
+  align-items: center;
+}
+
+.toggle-label {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  cursor: pointer;
+  user-select: none;
+}
+
+.toggle-label input[type="checkbox"] {
+  margin: 0;
+}
+
+.toggle-text {
+  font-size: 0.9rem;
+  color: var(--gray-700);
+}
+
+.export-buttons-small {
+  display: flex;
+  gap: var(--space-3);
+  align-items: center;
+}
+
+/* This CSS rule is no longer needed since we switched to project-header */
+
+.report-content {
+  line-height: 1.6;
+}
+
+.report-header {
+  border-bottom: 2px solid var(--gray-300);
+  padding-bottom: var(--space-6);
+  margin-bottom: var(--space-8);
+}
+
+.report-content .project-title {
+  color: #000000 !important;
+  background: none !important;
+  -webkit-background-clip: initial !important;
+  -webkit-text-fill-color: initial !important;
+  background-clip: initial !important;
+  margin: 0 0 var(--space-4) 0;
+  font-size: 2.5rem;
+  font-weight: 700;
+}
+
+.project-meta {
+  color: var(--gray-600);
+}
+
+.project-meta p {
+  margin: var(--space-2) 0;
+}
+
+.report-section {
+  margin: var(--space-8) 0;
+}
+
+.section-title {
+  color: var(--gray-900);
+  border-left: 4px solid var(--primary-color);
+  padding-left: var(--space-3);
+  margin-bottom: var(--space-6);
+  font-size: 1.5rem;
+  font-weight: 600;
+}
+
+.stats-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: var(--space-4);
+  margin: var(--space-6) 0;
+}
+
+.stat-item {
+  text-align: center;
+  padding: var(--space-4);
+  background: var(--gray-50);
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border-light);
+}
+
+.stat-number {
+  font-size: 2.5rem;
+  font-weight: bold;
+  color: var(--primary-color);
+  line-height: 1;
+}
+
+.stat-label {
+  color: var(--gray-600);
+  font-size: 0.9rem;
+  margin-top: var(--space-1);
+}
+
+.classifications-list {
+  padding-left: var(--space-6);
+}
+
+.classifications-list li {
+  margin: var(--space-2) 0;
+}
+
+.images-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-6);
+}
+
+.image-item {
+  padding: var(--space-4);
+  border: 1px solid var(--border-light);
+  border-radius: var(--radius-md);
+  background: var(--bg-primary);
+}
+
+.image-display-section {
+  display: flex;
+  gap: var(--space-4);
+  margin-bottom: var(--space-4);
+}
+
+.image-display-section.full-width {
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.image-thumbnail {
+  flex-shrink: 0;
+  width: 200px;
+  height: 200px;
+  border-radius: var(--radius-md);
+  overflow: hidden;
+  border: 1px solid var(--border-light);
+  background: var(--gray-50);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.image-thumbnail.full-width-thumbnail {
+  width: 100%;
+  height: auto;
+  max-height: 600px;
+  min-height: 300px;
+}
+
+.report-image {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.deleted-image-placeholder {
+  width: 100%;
+  height: 100%;
+  background: #fbf5f5;
+  border: 2px dashed #f56565;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+}
+
+.deleted-image-text {
+  color: #c53030;
+  font-weight: 600;
+  font-size: 0.9rem;
+}
+
+.deleted-date {
+  font-size: 0.7rem;
+  margin-top: var(--space-1);
+  font-weight: 400;
+}
+
+.image-details {
+  flex: 1;
+}
+
+.image-title {
+  font-weight: bold;
+  font-size: 1.1rem;
+  color: var(--gray-900);
+  margin-bottom: var(--space-2);
+}
+
+.image-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-4);
+  margin: var(--space-3) 0;
+  color: var(--gray-600);
+  font-size: 0.9rem;
+}
+
+.image-meta span {
+  white-space: nowrap;
+}
+
+.deleted-indicator {
+  color: var(--red-600) !important;
+}
+
+.image-classifications,
+.image-comments,
+.image-metadata {
+  margin: var(--space-3) 0;
+}
+
+.image-comments {
+  background: var(--gray-50);
+  padding: var(--space-3);
+  border-radius: var(--radius-sm);
+}
+
+.comment {
+  margin: var(--space-2) 0;
+  padding: var(--space-2);
+  background: var(--bg-primary);
+  border-radius: var(--radius-sm);
+}
+
+.comment-date {
+  color: var(--gray-500) !important;
+  font-size: 0.8rem;
+}
+
+.image-metadata {
+  background: var(--gray-50);
+  padding: var(--space-3);
+  border-radius: var(--radius-sm);
+}
+
+.metadata-json {
+  background: var(--bg-primary);
+  border: 1px solid var(--border-light);
+  border-radius: var(--radius-sm);
+  padding: var(--space-3);
+  margin: var(--space-2) 0 0 0;
+  font-family: var(--font-family-mono);
+  font-size: 0.8rem;
+  overflow-x: auto;
+}
+
+/* Print Styles */
+@media print {
+  .no-print,
+  .App-header,
+  .project-header,
+  header {
+    display: none !important;
+  }
+
+  body {
+    margin: 0;
+    padding: 0;
+  }
+
+  .App {
+    margin: 0;
+    padding: 0;
+  }
+
+  .container {
+    margin: 0;
+    padding: 0;
+    max-width: none;
+  }
+
+  .report-container {
+    max-width: none;
+    padding: 20pt;
+    margin: 0;
+  }
+
+  .report-content {
+    font-size: 12pt;
+    line-height: 1.4;
+  }
+
+  .project-title {
+    font-size: 24pt;
+    margin-bottom: 12pt;
+  }
+
+  .section-title {
+    font-size: 16pt;
+    margin-top: 20pt;
+    margin-bottom: 12pt;
+    page-break-after: avoid;
+  }
+
+  .image-item {
+    border: 1px solid #ccc;
+    margin-bottom: 12pt;
+    page-break-inside: avoid;
+  }
+
+  .image-display-section,
+  .image-display-section.full-width {
+    flex-direction: column;
+  }
+
+  .image-thumbnail,
+  .image-thumbnail.full-width-thumbnail {
+    width: 300px;
+    height: 300px;
+    margin: 0 auto 12pt auto;
+    max-height: 300px;
+    min-height: auto;
+  }
+
+  .report-image {
+    border: 1px solid #ccc;
+    object-fit: contain;
+  }
+
+  .stats-grid {
+    grid-template-columns: repeat(5, 1fr);
+  }
+
+  .stat-item {
+    border: 1px solid #ccc;
+  }
+
+  .image-meta {
+    flex-direction: column;
+    gap: 6pt;
+  }
+
+  .image-meta span {
+    white-space: normal;
+  }
+}
+
 .api-key-display {
   display: flex;
   align-items: center;

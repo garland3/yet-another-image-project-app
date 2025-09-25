@@ -164,6 +164,14 @@ function Project() {
               <span className="project-group">Group: {project?.meta_group_id}</span>
               {currentUser && <span className="project-user">{currentUser.email}</span>}
             </div>
+            <div className="project-actions">
+              <button
+                className="btn btn-secondary"
+                onClick={() => navigate(`/project/${id}/report`)}
+              >
+                Generate Report
+              </button>
+            </div>
           </div>
         </div>
       </header>

@@ -7,6 +7,7 @@ import Toast from './components/Toast';
 const Project = lazy(() => import('./Project'));
 const ImageView = lazy(() => import('./ImageView'));
 const ApiKeys = lazy(() => import('./ApiKeys'));
+const ProjectReport = lazy(() => import('./components/ProjectReport'));
 
 // Debug counter to track renders
 let renderCount = 0;
@@ -405,21 +406,29 @@ function App() {
   return (
     <Routes>
       <Route path="/" element={<HomePage />} />
-      <Route 
-        path="/project/:id" 
+      <Route
+        path="/project/:id"
         element={
           <Suspense fallback={<div className="loading-container">Loading project...</div>}>
             <Project />
           </Suspense>
-        } 
+        }
       />
-      <Route 
-        path="/view/:imageId" 
+      <Route
+        path="/project/:id/report"
+        element={
+          <Suspense fallback={<div className="loading-container">Loading report...</div>}>
+            <ProjectReport />
+          </Suspense>
+        }
+      />
+      <Route
+        path="/view/:imageId"
         element={
           <Suspense fallback={<div className="loading-container">Loading image...</div>}>
             <ImageView />
           </Suspense>
-        } 
+        }
       />
       <Route 
         path="/api-keys" 
