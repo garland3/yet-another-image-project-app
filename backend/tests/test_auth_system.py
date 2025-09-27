@@ -4,6 +4,7 @@ Tests middleware, group auth, and security functions.
 """
 
 import pytest
+from types import SimpleNamespace
 from fastapi import Request
 from fastapi.testclient import TestClient
 from unittest.mock import Mock, AsyncMock, patch
@@ -48,7 +49,7 @@ class TestAuthMiddleware:
     @pytest.fixture
     def mock_request(self):
         request = Mock(spec=Request)
-        request.state = Mock()
+        request.state = SimpleNamespace()
         request.headers = {}
         return request
     
@@ -63,8 +64,8 @@ class TestAuthMiddleware:
         """Test auth middleware in debug mode with valid header."""
         mock_request.headers = {"X-User-Id": "test@example.com"}
         
-        with patch.object(settings, 'DEBUG', True):
-            with patch.object(settings, 'MOCK_USER_EMAIL', 'test@example.com'):
+        with patch('middleware.auth.settings.DEBUG', True):
+            with patch('middleware.auth.settings.MOCK_USER_EMAIL', 'test@example.com'):
                 response = await auth_middleware(mock_request, mock_call_next)
         
         assert mock_request.state.user_email == "test@example.com"
@@ -77,8 +78,8 @@ class TestAuthMiddleware:
         """Test auth middleware in debug mode without header uses mock user."""
         mock_request.headers = {}
         
-        with patch.object(settings, 'DEBUG', True):
-            with patch.object(settings, 'MOCK_USER_EMAIL', 'mock@example.com'):
+        with patch('middleware.auth.settings.DEBUG', True):
+            with patch('middleware.auth.settings.MOCK_USER_EMAIL', 'mock@example.com'):
                 response = await auth_middleware(mock_request, mock_call_next)
         
         assert mock_request.state.user_email == "mock@example.com"
@@ -90,8 +91,8 @@ class TestAuthMiddleware:
         """Test auth middleware in production mode with valid header."""
         mock_request.headers = {"x-user-id": "prod@example.com"}
         
-        with patch.object(settings, 'DEBUG', False):
-            with patch.object(settings, 'X_USER_ID_HEADER', 'X-User-Id'):
+        with patch('middleware.auth.settings.DEBUG', False):
+            with patch('middleware.auth.settings.X_USER_ID_HEADER', 'X-User-Id'):
                 response = await auth_middleware(mock_request, mock_call_next)
         
         assert mock_request.state.user_email == "prod@example.com"
@@ -103,10 +104,10 @@ class TestAuthMiddleware:
         """Test auth middleware in production mode with missing header returns 500 when PROXY_SHARED_SECRET is not set."""
         mock_request.headers = {}
         
-        with patch.object(settings, 'DEBUG', False):
-            with patch.object(settings, 'SKIP_HEADER_CHECK', False):
-                with patch.object(settings, 'PROXY_SHARED_SECRET', None):
-                    with patch.object(settings, 'X_USER_ID_HEADER', 'X-User-Id'):
+        with patch('middleware.auth.settings.DEBUG', False):
+            with patch('middleware.auth.settings.SKIP_HEADER_CHECK', False):
+                with patch('middleware.auth.settings.PROXY_SHARED_SECRET', None):
+                    with patch('middleware.auth.settings.X_USER_ID_HEADER', 'X-User-Id'):
                         response = await auth_middleware(mock_request, mock_call_next)
         
         # Should return JSONResponse with 500 when PROXY_SHARED_SECRET is not configured
@@ -122,10 +123,10 @@ class TestAuthMiddleware:
             "x-proxy-secret": "correct-secret"
         }
         
-        with patch.object(settings, 'DEBUG', False):
-            with patch.object(settings, 'PROXY_SHARED_SECRET', 'correct-secret'):
-                with patch.object(settings, 'X_USER_ID_HEADER', 'X-User-Id'):
-                    with patch.object(settings, 'X_PROXY_SECRET_HEADER', 'X-Proxy-Secret'):
+        with patch('middleware.auth.settings.DEBUG', False):
+            with patch('middleware.auth.settings.PROXY_SHARED_SECRET', 'correct-secret'):
+                with patch('middleware.auth.settings.X_USER_ID_HEADER', 'X-User-Id'):
+                    with patch('middleware.auth.settings.X_PROXY_SECRET_HEADER', 'X-Proxy-Secret'):
                         response = await auth_middleware(mock_request, mock_call_next)
         
         assert mock_request.state.user_email == "secure@example.com"
@@ -139,10 +140,10 @@ class TestAuthMiddleware:
             "x-proxy-secret": "wrong-secret"
         }
         
-        with patch.object(settings, 'DEBUG', False):
-            with patch.object(settings, 'SKIP_HEADER_CHECK', False):
-                with patch.object(settings, 'PROXY_SHARED_SECRET', 'correct-secret'):
-                    with patch.object(settings, 'X_PROXY_SECRET_HEADER', 'X-Proxy-Secret'):
+        with patch('middleware.auth.settings.DEBUG', False):
+            with patch('middleware.auth.settings.SKIP_HEADER_CHECK', False):
+                with patch('middleware.auth.settings.PROXY_SHARED_SECRET', 'correct-secret'):
+                    with patch('middleware.auth.settings.X_PROXY_SECRET_HEADER', 'X-Proxy-Secret'):
                         response = await auth_middleware(mock_request, mock_call_next)
         
         assert hasattr(response, 'status_code')
@@ -295,11 +296,11 @@ class TestConfigIntegration:
         """Test that custom header names from config are respected."""
         request = Mock()
         request.headers = {"custom-user-header": "test@example.com"}
-        request.state = Mock()
+        request.state = SimpleNamespace()
         call_next = AsyncMock(return_value=Mock())
         
-        with patch.object(settings, 'DEBUG', False):
-            with patch.object(settings, 'X_USER_ID_HEADER', 'Custom-User-Header'):
+        with patch('middleware.auth.settings.DEBUG', False):
+            with patch('middleware.auth.settings.X_USER_ID_HEADER', 'Custom-User-Header'):
                 import asyncio
                 asyncio.run(auth_middleware(request, call_next))
         
@@ -313,14 +314,14 @@ class TestConfigIntegration:
             "x-user-groups": "admin,users,guests",  # This should be ignored
             "x-proxy-secret": "test-secret"
         }
-        request.state = Mock()
+        request.state = SimpleNamespace()
         call_next = AsyncMock(return_value=Mock())
         
-        with patch.object(settings, 'DEBUG', False):
-            with patch.object(settings, 'SKIP_HEADER_CHECK', False):
-                with patch.object(settings, 'PROXY_SHARED_SECRET', 'test-secret'):
-                    with patch.object(settings, 'X_USER_ID_HEADER', 'X-User-Id'):
-                        with patch.object(settings, 'X_PROXY_SECRET_HEADER', 'X-Proxy-Secret'):
+        with patch('middleware.auth.settings.DEBUG', False):
+            with patch('middleware.auth.settings.SKIP_HEADER_CHECK', False):
+                with patch('middleware.auth.settings.PROXY_SHARED_SECRET', 'test-secret'):
+                    with patch('middleware.auth.settings.X_USER_ID_HEADER', 'X-User-Id'):
+                        with patch('middleware.auth.settings.X_PROXY_SECRET_HEADER', 'X-Proxy-Secret'):
                             import asyncio
                             asyncio.run(auth_middleware(request, call_next))
         
