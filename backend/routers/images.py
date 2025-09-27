@@ -1,6 +1,7 @@
 import uuid
 import io
 import os
+import logging
 from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, File, Form, Query, Body
 from sqlalchemy import update
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -19,6 +20,8 @@ from utils.file_security import get_content_disposition_header
 from utils.cache_manager import get_cache
 import json as _json
 from PIL import Image
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(
     prefix="/api",
@@ -60,6 +63,19 @@ async def upload_image_to_project(
     except Exception:
         # If we cannot get size ahead of time, proceed to stream; S3 client will handle
         file_size = None
+    
+    # Validate that the file is a valid image using PIL
+    try:
+        logger.info("Validating image file", extra={"file_name": file.filename, "content_type": file.content_type, "size": file_size})
+        file.file.seek(0)
+        img = Image.open(file.file)
+        logger.info("Image opened for validation", extra={"format": img.format, "size": img.size})
+        img.verify()  # Verify the image is valid
+        file.file.seek(0)  # Reset position after verification
+        logger.info("Image validation successful")
+    except Exception as e:
+        logger.error("Image validation failed", extra={"file_name": file.filename, "error": str(e)})
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=f"Invalid image file: {str(e)}")
     success = await upload_file_to_s3(
         bucket_name=settings.S3_BUCKET,
         object_name=object_storage_key,
@@ -374,17 +390,12 @@ async def get_image_thumbnail(
                 # Save the resized image to a bytes buffer
                 output_buffer = io.BytesIO()
                 img_format = img.format or 'JPEG'  # Default to JPEG if format is unknown
-                img.save(output_buffer, format=img_format)
+                # Always save thumbnails as JPEG for web compatibility
+                img.save(output_buffer, format='JPEG')
                 output_buffer.seek(0)
                 
-                # Determine the content type based on the image format
-                content_type_map = {
-                    'JPEG': 'image/jpeg',
-                    'PNG': 'image/png',
-                    'GIF': 'image/gif',
-                    'WEBP': 'image/webp'
-                }
-                content_type = content_type_map.get(img_format, 'image/jpeg')
+                # Thumbnails are always JPEG
+                content_type = 'image/jpeg'
                 
                 # Cache the thumbnail (24 hours)
                 thumbnail_filename = f"thumbnail_{db_image.filename}" if db_image.filename else "thumbnail"
