@@ -6,10 +6,12 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI, Request, status, HTTPException
 from fastapi.routing import APIRouter
 from fastapi.staticfiles import StaticFiles
-from fastapi.responses import JSONResponse, FileResponse
+from fastapi.responses import JSONResponse, FileResponse, HTMLResponse
 from pydantic import ValidationError
 
 from core.config import settings
+import swagger_ui_bundle
+from pathlib import Path
 from core.database import create_db_and_tables
 from core.migrations import run_migrations
 from utils.boto3_client import boto3_client, ensure_bucket_exists
@@ -137,7 +139,10 @@ def create_app() -> FastAPI:
     """
     app = FastAPI(
         title=settings.APP_NAME,
-        lifespan=lifespan
+        lifespan=lifespan,
+        docs_url="/docs",
+        redoc_url="/redoc",
+        openapi_url="/openapi.json"
     )
 
     # Add CORS middleware
@@ -190,6 +195,9 @@ def create_app() -> FastAPI:
 
     # Setup static file serving
     setup_static_files(app)
+
+    # Setup local Swagger UI assets (served without external CDNs)
+    setup_local_swagger_ui(app)
     
     return app
 
@@ -272,6 +280,52 @@ def setup_static_files(app: FastAPI):
         else:
             # Frontend not built - return 404 for non-API routes
             raise HTTPException(status_code=404, detail="Frontend not available")
+
+
+def setup_local_swagger_ui(app: FastAPI):
+    """Serve Swagger UI assets locally instead of loading from CDN."""
+    try:
+        dist_path = Path(swagger_ui_bundle.__file__).parent
+        # Mount the swagger ui dist directory
+        app.mount(
+            "/_swagger_static",
+            StaticFiles(directory=str(dist_path)),
+            name="swagger_static",
+        )
+
+        # Override /docs route to serve local assets
+        @app.get("/docs", include_in_schema=False)
+        async def custom_swagger_ui_html():
+            html_content = f"""<!DOCTYPE html>
+<html lang=\"en\">
+    <head>
+        <meta charset=\"UTF-8\" />
+        <title>{settings.APP_NAME} - API Docs</title>
+        <link rel=\"stylesheet\" type=\"text/css\" href=\"/_swagger_static/swagger-ui.css\" />
+        <style>body {{ margin:0; background:#fafafa; }}</style>
+    </head>
+    <body>
+        <div id=\"swagger-ui\"></div>
+        <script src=\"/_swagger_static/swagger-ui-bundle.js\"></script>
+        <script src=\"/_swagger_static/swagger-ui-standalone-preset.js\"></script>
+        <script>
+            window.addEventListener('load', () => {{
+                const ui = SwaggerUIBundle({{
+                    url: '{app.openapi_url}',
+                    dom_id: '#swagger-ui',
+                    presets: [SwaggerUIBundle.presets.apis, SwaggerUIStandalonePreset],
+                    layout: 'StandaloneLayout'
+                }});
+                window.ui = ui;
+            }});
+        </script>
+    </body>
+</html>"""
+            return HTMLResponse(content=html_content, status_code=200)
+    except Exception as e:
+        # If swagger_ui_bundle isn't available, log the error and skip
+        logging.error(f"Failed to set up local Swagger UI: {e}", exc_info=True)
+        return None
 
 
 # Create the app instance

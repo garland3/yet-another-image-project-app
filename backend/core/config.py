@@ -2,6 +2,7 @@ from pydantic_settings import BaseSettings
 from pydantic import field_validator
 from typing import Optional
 import os
+from pathlib import Path
 
 class Settings(BaseSettings):
     APP_NAME: str = "Data Management API"
