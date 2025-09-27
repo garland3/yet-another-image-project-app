@@ -2,6 +2,7 @@ from pydantic_settings import BaseSettings
 from pydantic import field_validator
 from typing import Optional
 import os
+from pathlib import Path
 
 class Settings(BaseSettings):
     APP_NAME: str = "Data Management API"
@@ -68,8 +69,12 @@ class Settings(BaseSettings):
         return v
 
     class Config:
-        # Check for .env in current directory first, then parent directory
-        env_file = [".env", "../.env"]
+        # Resolve env files explicitly relative to this module so backend/.env is always honored
+        _core_dir = Path(__file__).resolve().parent  # backend/core
+        _backend_dir = _core_dir.parent              # backend/
+        _project_root = _backend_dir.parent          # repository root
+        # Order: backend/.env (authoritative for backend), project-root .env (fallback)
+        env_file = [str(_backend_dir / '.env'), str(_project_root / '.env')]
         env_file_encoding = 'utf-8'
         extra = "allow"
     
