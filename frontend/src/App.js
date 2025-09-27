@@ -158,26 +158,13 @@ const ProjectItem = memo(function ProjectItem({ project }) {
         <div className="project-card-header">
           <h3 className="project-card-title">{project.name}</h3>
           <div className="project-card-meta">
-            Project ID: {project.id} | Group: {project.meta_group_id}
+            ID: {project.id} • Group: {project.meta_group_id}
           </div>
         </div>
         <div className="project-card-body">
           <p className="project-card-description">
             {project.description || 'No description provided'}
           </p>
-          <div className="project-card-footer">
-            <div className="project-stats">
-              <div className="stat-item">
-                <span>Project</span>
-              </div>
-              <div className="stat-item">
-                <span>Group: {project.meta_group_id}</span>
-              </div>
-            </div>
-            <div className="btn btn-primary btn-small">
-              View Project &gt;
-            </div>
-          </div>
         </div>
       </Link>
     </div>
