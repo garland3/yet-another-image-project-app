@@ -69,9 +69,10 @@ async def upload_image_to_project(
         logger.info("Validating image file", extra={"file_name": file.filename, "content_type": file.content_type, "size": file_size})
         file.file.seek(0)
         img = Image.open(file.file)
+        logger.info("Image opened for validation", extra={"format": img.format, "size": img.size})
         img.verify()  # Verify the image is valid
         file.file.seek(0)  # Reset position after verification
-        logger.info("Image validation successful", extra={"format": img.format, "size": img.size})
+        logger.info("Image validation successful")
     except Exception as e:
         logger.error("Image validation failed", extra={"file_name": file.filename, "error": str(e)})
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=f"Invalid image file: {str(e)}")

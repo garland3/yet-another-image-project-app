@@ -13,6 +13,11 @@ function ProjectReport() {
   const [generating, setGenerating] = useState(false);
   const [fullWidthImages, setFullWidthImages] = useState(false);
 
+  const getClassLabels = (classifications, classes) => {
+    if (!classifications || classifications.length === 0) return 'None';
+    return classifications.map(c => classes.find(cls => cls.id === c.class_id)?.name || 'Unknown').join(', ');
+  };
+
   // Load project data
   useEffect(() => {
     const loadData = async () => {
@@ -403,7 +408,9 @@ function ProjectReport() {
                         ) : (
                           <img
                             src={fullWidthImages
-                              ? `/api/images/${image.id}/content`
+                              ? (image.content_type === 'image/tiff' 
+                                  ? `/api/images/${image.id}/thumbnail?width=800&height=800`
+                                  : `/api/images/${image.id}/content`)
                               : `/api/images/${image.id}/thumbnail?width=300&height=300`
                             }
                             alt={image.filename || 'Image'}
