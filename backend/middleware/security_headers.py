@@ -14,7 +14,7 @@ from starlette.types import ASGIApp
 from starlette.responses import Response
 from fastapi import Request
 import secrets
-
+import logging
 from core.config import settings
 
 
@@ -56,8 +56,8 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
                 # Store nonce in request state for potential template usage (if needed later)
                 try:
                     request.state.csp_nonce = nonce  # type: ignore[attr-defined]
-                except Exception:
-                    pass
+                except Exception as exc:
+                    logging.warning("Could not set CSP nonce on request state: %s", exc)
                 # Allow jsdelivr for swagger ui assets, and fastapi.tiangolo.com images
                 relaxed_csp = (
                     "default-src 'self'; "
