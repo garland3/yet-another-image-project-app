@@ -424,7 +424,9 @@ function ProjectReport() {
                           <span><strong>Size:</strong> {formatFileSize(image.size_bytes)}</span>
                           <span><strong>Type:</strong> {image.content_type || 'Unknown'}</span>
                           <span><strong>Uploaded:</strong> {new Date(image.created_at).toLocaleString()}</span>
+
                           <span><strong>Class Labels:</strong> {image.classifications && image.classifications.length > 0 ? image.classifications.map(c => classes.find(cls => cls.id === c.class_id)?.name || 'Unknown').join(', ') : 'None'}</span>
+
                           {image.deleted_at && (
                             <span className="deleted-indicator">
                               <strong>DELETED:</strong> {new Date(image.deleted_at).toLocaleString()}
