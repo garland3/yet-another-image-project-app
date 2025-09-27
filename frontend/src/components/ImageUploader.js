@@ -125,7 +125,7 @@ function ImageUploader({ projectId, onUploadComplete, loading, setLoading, setEr
             <input 
               type="file" 
               id="file-input" 
-              accept="image/*" 
+              accept="image/*,image/tiff,.tiff,.tif" 
               multiple 
               style={{ display: 'none' }}
               onChange={handleFileChange}

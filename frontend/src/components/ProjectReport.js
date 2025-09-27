@@ -49,15 +49,21 @@ function ProjectReport() {
               const commentsResponse = await fetch(`/api/images/${image.id}/comments`);
               const comments = commentsResponse.ok ? await commentsResponse.json() : [];
 
+              // Get classifications
+              const classificationsResponse = await fetch(`/api/images/${image.id}/classifications`);
+              const classifications = classificationsResponse.ok ? await classificationsResponse.json() : [];
+
               return {
                 ...image,
-                comments
+                comments,
+                classifications
               };
             } catch (error) {
               console.error(`Failed to load details for image ${image.id}:`, error);
               return {
                 ...image,
-                comments: []
+                comments: [],
+                classifications: []
               };
             }
           })
@@ -418,7 +424,7 @@ function ProjectReport() {
                           <span><strong>Size:</strong> {formatFileSize(image.size_bytes)}</span>
                           <span><strong>Type:</strong> {image.content_type || 'Unknown'}</span>
                           <span><strong>Uploaded:</strong> {new Date(image.created_at).toLocaleString()}</span>
-                          <span><strong>Class Labels:</strong> {classes.map(c => c.name).join(', ') || 'None'}</span>
+                          <span><strong>Class Labels:</strong> {image.classifications && image.classifications.length > 0 ? image.classifications.map(c => classes.find(cls => cls.id === c.class_id)?.name || 'Unknown').join(', ') : 'None'}</span>
                           {image.deleted_at && (
                             <span className="deleted-indicator">
                               <strong>DELETED:</strong> {new Date(image.deleted_at).toLocaleString()}
@@ -427,14 +433,6 @@ function ProjectReport() {
                         </div>
                       </div>
                     </div>
-
-                    {image.classifications && image.classifications.length > 0 && (
-                      <div className="image-classifications">
-                        <strong>Classifications:</strong> {image.classifications.map(c =>
-                          classes.find(cls => cls.id === c.class_id)?.name || 'Unknown'
-                        ).join(', ')}
-                      </div>
-                    )}
 
                     {image.comments && image.comments.length > 0 && (
                       <div className="image-comments">
