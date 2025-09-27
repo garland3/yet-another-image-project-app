@@ -432,7 +432,7 @@ function ProjectReport() {
                           <span><strong>Type:</strong> {image.content_type || 'Unknown'}</span>
                           <span><strong>Uploaded:</strong> {new Date(image.created_at).toLocaleString()}</span>
 
-                          <span><strong>Class Labels:</strong> {image.classifications && image.classifications.length > 0 ? image.classifications.map(c => classes.find(cls => cls.id === c.class_id)?.name || 'Unknown').join(', ') : 'None'}</span>
+                          <span><strong>Class Labels:</strong> {getClassLabels(image.classifications, classes)}</span>
 
                           {image.deleted_at && (
                             <span className="deleted-indicator">
