@@ -322,8 +322,9 @@ def setup_local_swagger_ui(app: FastAPI):
     </body>
 </html>"""
             return HTMLResponse(content=html_content, status_code=200)
-    except Exception:
-        # If swagger_ui_bundle isn't available, skip silently
+    except Exception as e:
+        # If swagger_ui_bundle isn't available, log the error and skip
+        logging.error(f"Failed to set up local Swagger UI: {e}", exc_info=True)
         return None
 
 
