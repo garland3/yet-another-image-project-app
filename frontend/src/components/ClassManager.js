@@ -7,10 +7,11 @@ function ClassManager({ projectId, classes, setClasses, loading, setLoading, set
   // Modal states
   const [showEditClassModal, setShowEditClassModal] = useState(false);
   const [editingClass, setEditingClass] = useState({ id: '', name: '', description: '' });
+  // Local action loading state so we don't flip the entire page's loading flag
+  const [classActionLoading, setClassActionLoading] = useState(false);
 
   // Handle add class
-  const handleAddClass = async (e) => {
-    e.preventDefault();
+  const handleAddClass = async () => {
     
     if (newClass.name.trim() === '') {
       setError('Class name cannot be empty');
@@ -18,7 +19,7 @@ function ClassManager({ projectId, classes, setClasses, loading, setLoading, set
     }
     
     try {
-      setLoading(true);
+      setClassActionLoading(true);
       
       const response = await fetch(`/api/projects/${projectId}/classes`, {
         method: 'POST',
@@ -47,14 +48,14 @@ function ClassManager({ projectId, classes, setClasses, loading, setLoading, set
     } catch (err) {
       setError(`Failed to add class: ${err.message}`);
     } finally {
-      setLoading(false);
+      setClassActionLoading(false);
     }
   };
 
   // Handle edit class
   const handleEditClass = async () => {
     try {
-      setLoading(true);
+      setClassActionLoading(true);
       
       const response = await fetch(`/api/classes/${editingClass.id}`, {
         method: 'PATCH',
@@ -86,7 +87,7 @@ function ClassManager({ projectId, classes, setClasses, loading, setLoading, set
     } catch (err) {
       setError(`Failed to update class: ${err.message}`);
     } finally {
-      setLoading(false);
+      setClassActionLoading(false);
     }
   };
 
@@ -97,7 +98,7 @@ function ClassManager({ projectId, classes, setClasses, loading, setLoading, set
     }
     
     try {
-      setLoading(true);
+      setClassActionLoading(true);
       
       const response = await fetch(`/api/classes/${id}`, {
         method: 'DELETE',
@@ -114,7 +115,7 @@ function ClassManager({ projectId, classes, setClasses, loading, setLoading, set
     } catch (err) {
       setError(`Failed to delete class: ${err.message}`);
     } finally {
-      setLoading(false);
+      setClassActionLoading(false);
     }
   };
 
@@ -125,7 +126,7 @@ function ClassManager({ projectId, classes, setClasses, loading, setLoading, set
       </div>
       <div className="card-content">
         <div id="classes-container">
-          {loading && <p>Loading classes...</p>}
+          {(loading || classActionLoading) && <p>Loading classes...</p>}
           
           {!loading && classes.length === 0 && (
             <p>No classes defined for this project. Add a class to get started.</p>
@@ -166,7 +167,7 @@ function ClassManager({ projectId, classes, setClasses, loading, setLoading, set
           )}
         </div>
         
-        <form id="add-class-form" className="form" onSubmit={handleAddClass}>
+        <div id="add-class-form" className="form">
           <h3>Add Class</h3>
           <div className="form-group">
             <label htmlFor="class-name">Name:</label>
@@ -176,6 +177,7 @@ function ClassManager({ projectId, classes, setClasses, loading, setLoading, set
               name="class-name" 
               value={newClass.name}
               onChange={(e) => setNewClass({...newClass, name: e.target.value})}
+              onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); handleAddClass(); } }}
               required 
             />
           </div>
@@ -187,16 +189,18 @@ function ClassManager({ projectId, classes, setClasses, loading, setLoading, set
               rows="2"
               value={newClass.description}
               onChange={(e) => setNewClass({...newClass, description: e.target.value})}
+              onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleAddClass(); } }}
             ></textarea>
           </div>
           <button 
-            type="submit" 
+            type="button" 
             className="btn btn-primary"
-            disabled={loading}
+            disabled={classActionLoading}
+            onClick={(e) => { e.preventDefault(); handleAddClass(); }}
           >
             Add Class
           </button>
-        </form>
+        </div>
 
         {/* Edit class modal */}
         {showEditClassModal && (
@@ -236,7 +240,7 @@ function ClassManager({ projectId, classes, setClasses, loading, setLoading, set
                   type="button" 
                   className="btn btn-primary"
                   onClick={handleEditClass}
-                  disabled={loading}
+                  disabled={classActionLoading}
                 >
                   Update Class
                 </button>
