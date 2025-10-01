@@ -73,15 +73,22 @@ else:
     except ClientError as e:
         error_code = e.response.get('Error', {}).get('Code')
         error_message = e.response.get('Error', {}).get('Message', str(e))
-        logger.error("S3/MinIO connection test failed", extra={
-            "error_code": error_code,
-            "error_message": error_message,
-            "bucket": settings.S3_BUCKET
-        })
-        if error_code == '403':
+
+        if error_code == '404':
+            logger.info("S3 bucket will be created during startup", extra={
+                "bucket": settings.S3_BUCKET
+            })
+        elif error_code == '403':
+            logger.error("S3/MinIO connection test failed - access denied", extra={
+                "error_code": error_code,
+                "error_message": error_message,
+                "bucket": settings.S3_BUCKET
+            })
             logger.warning("Access denied to S3/MinIO bucket - check credentials")
-        elif error_code == '404':
-            logger.info("Bucket not found - will be created automatically when needed", extra={
+        else:
+            logger.error("S3/MinIO connection test failed", extra={
+                "error_code": error_code,
+                "error_message": error_message,
                 "bucket": settings.S3_BUCKET
             })
     except Exception as e:

@@ -271,3 +271,58 @@ class ImageDeletionEventList(BaseModel):
     total: int
 
 
+# ----------------- ML Analysis Schemas -----------------
+class MLAnnotationBase(BaseModel):
+    annotation_type: str = Field(..., min_length=3, max_length=50)
+    class_name: Optional[str] = None
+    confidence: Optional[float] = Field(None, ge=0, le=1)
+    data: Dict[str, Any]
+    storage_path: Optional[str] = None
+    ordering: Optional[int] = None
+
+class MLAnnotationCreate(MLAnnotationBase):
+    pass
+
+class MLAnnotation(MLAnnotationBase):
+    id: uuid.UUID
+    analysis_id: uuid.UUID
+    created_at: datetime
+
+    model_config = {
+        "from_attributes": True,
+        "populate_by_name": True
+    }
+
+class MLAnalysisBase(BaseModel):
+    model_name: str = Field(..., min_length=2, max_length=255)
+    model_version: str = Field(..., min_length=1, max_length=100)
+    parameters: Optional[Dict[str, Any]] = None
+
+class MLAnalysisCreate(MLAnalysisBase):
+    image_id: uuid.UUID
+
+class MLAnalysis(MLAnalysisBase):
+    id: uuid.UUID
+    image_id: uuid.UUID
+    status: str
+    error_message: Optional[str] = None
+    provenance: Optional[Dict[str, Any]] = None
+    requested_by_id: uuid.UUID
+    external_job_id: Optional[str] = None
+    priority: int
+    created_at: datetime
+    started_at: Optional[datetime] = None
+    completed_at: Optional[datetime] = None
+    updated_at: Optional[datetime] = None
+    annotations: Optional[List[MLAnnotation]] = None
+
+    model_config = {
+        "from_attributes": True,
+        "populate_by_name": True
+    }
+
+class MLAnalysisList(BaseModel):
+    analyses: List[MLAnalysis]
+    total: int
+
+

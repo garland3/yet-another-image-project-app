@@ -68,6 +68,58 @@ Copy `.env.example` to `.env` and configure:
 - `backend/run.sh` - Start backend with PostgreSQL/MinIO
 - `frontend/run.sh` - Start React development server
 
+## Database Migrations (Alembic)
+
+The project now uses Alembic for schema migrations.
+
+### Setup
+Before running any Alembic commands, ensure you're in the `backend/` directory with a virtual environment active (see Backend section above).
+
+### For New Projects
+If starting from scratch with no existing database, run this to create the schema:
+
+```bash
+alembic upgrade head
+```
+
+This applies all migrations and sets up your database based on the current models.
+
+### Common Commands
+Run these from the `backend/` directory (ensure a virtual environment with dependencies is active):
+
+```bash
+alembic revision --autogenerate -m "describe change"   # Create new migration based on model diffs
+alembic upgrade head                                   # Apply latest migrations
+alembic downgrade -1                                   # Roll back last migration
+alembic history --verbose                              # Show migration history
+alembic current                                        # Show current DB revision
+alembic stamp head                                     # Mark DB as up-to-date without applying (use cautiously)
+```
+
+### Initial Adoption
+If you already had a database before Alembic was introduced and the schema matches the initial revision, stamp instead of applying:
+
+```bash
+alembic stamp 20250930_0001_initial
+```
+
+### Autogenerate Tips
+- Ensure all SQLAlchemy models are imported in `core/models.py` and referenced by `Base.metadata`.
+- Review generated migration files before committing—especially dropped/altered columns.
+
+### Troubleshooting
+| Issue | Resolution |
+|-------|------------|
+| Autogenerate misses table | Verify model imported and Base.metadata includes it. |
+| Dialect errors (SQLite vs Postgres) | Use a Postgres URL for accurate types. |
+| Drift between models & DB | Run `alembic upgrade head` then regenerate; add test (see below). |
+
+### Consistency Test
+A test will compare model metadata vs database (after upgrade) to guard against un-migrated changes.
+
+### Helper Script
+See `backend/migrate.sh` for ergonomic shortcuts.
+
 ## Kubernetes Deployment Test
 
 Test deployment on minikube:

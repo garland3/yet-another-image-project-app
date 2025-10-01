@@ -48,6 +48,12 @@ class Settings(BaseSettings):
     # Cache configuration
     CACHE_SIZE_MB: int = 1000
 
+    # ML Analysis settings
+    ML_ANALYSIS_ENABLED: bool = True
+    ML_MAX_ANALYSES_PER_IMAGE: int = 10
+    ML_ALLOWED_MODELS: str = "resnet50_classifier,vgg16,inception_v3,efficientnet_b0"
+    ML_DEFAULT_STATUS: str = "queued"
+
     # Image deletion / retention settings
     IMAGE_DELETE_RETENTION_DAYS: int = 60  # Soft delete retention window (days)
     IMAGE_DELETE_REASON_MIN_CHARS: int = 10  # Minimum characters required for a deletion reason
@@ -55,11 +61,14 @@ class Settings(BaseSettings):
     IMAGE_DELETE_PURGE_INTERVAL_SECONDS: int = 3600  # Background purge interval
     ENABLE_IMAGE_PURGE: bool = True  # Toggle background purge task
 
+    # Alembic migrations
+    USE_ALEMBIC_MIGRATIONS: bool = True  # Use Alembic for database migrations
+
     @field_validator(
-        'DEBUG', 'FAST_TEST_MODE', 'SKIP_HEADER_CHECK', 'S3_USE_SSL', 
-        'SECURITY_NOSNIFF_ENABLED', 'SECURITY_XFO_ENABLED', 
-        'SECURITY_REFERRER_POLICY_ENABLED', 'SECURITY_CSP_ENABLED', 
-        'ENABLE_IMAGE_PURGE', 
+        'DEBUG', 'FAST_TEST_MODE', 'SKIP_HEADER_CHECK', 'S3_USE_SSL',
+        'SECURITY_NOSNIFF_ENABLED', 'SECURITY_XFO_ENABLED',
+        'SECURITY_REFERRER_POLICY_ENABLED', 'SECURITY_CSP_ENABLED',
+        'ENABLE_IMAGE_PURGE', 'USE_ALEMBIC_MIGRATIONS',
         mode='before'
     )
     @classmethod
