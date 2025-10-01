@@ -8,8 +8,8 @@ import ImageMetadata from './components/ImageMetadata';
 import CompactImageClassifications from './components/CompactImageClassifications';
 import ImageComments from './components/ImageComments';
 import ImageDeletionControls from './components/ImageDeletionControls';
-import MLAnalysisPanel from './components/MLAnalysisPanel';
-import OverlayControls from './components/OverlayControls';
+// ML interactive panel & overlay controls removed per temporary requirement
+import MLDebugOutputs from './components/MLDebugOutputs';
 
 function ImageView() {
   const { imageId } = useParams();
@@ -28,11 +28,10 @@ function ImageView() {
   const [currentUser, setCurrentUser] = useState(null);
   const [sidebarWidth, setSidebarWidth] = useState(350);
   const [isResizing, setIsResizing] = useState(false);
-  // ML overlay state (Phase 3 extended)
-  const [selectedAnalysis, setSelectedAnalysis] = useState(null);
-  const [selectedAnnotations, setSelectedAnnotations] = useState([]);
-  const [overlayOptions, setOverlayOptions] = useState({ showBoxes: true, showHeatmap: false, opacity: 0.7, viewMode: 'overlay', bitmapAvailable: false });
-  const [hasAnalyses, setHasAnalyses] = useState(false);
+  // ML interactive overlay state disabled intentionally
+  const selectedAnalysis = null;
+  const selectedAnnotations = [];
+  const overlayOptions = { showBoxes: false, showHeatmap: false, opacity: 0.7 };
 
   // Load image data
   const loadImageData = useCallback(async () => {
@@ -310,28 +309,7 @@ function ImageView() {
                 setError={setError}
               />
 
-              {/* Phase 3: ML Analyses panel (feature appears only if backend feature flag is on; if endpoints 404 it will just show empty) */}
-              <MLAnalysisPanel
-                imageId={imageId}
-                onSelect={({ analysis, annotations }) => {
-                  setSelectedAnalysis(analysis);
-                  setSelectedAnnotations(annotations);
-                  // Detect bitmap annotations presence
-                  const hasBitmap = (annotations || []).some(a => {
-                    const t = (a.annotation_type || '').toLowerCase();
-                    if (['heatmap','segmentation','mask'].includes(t)) return true;
-                    if (a.storage_path) {
-                      return /(\.png|\.jpg|\.jpeg)$/i.test(a.storage_path);
-                    }
-                    return false;
-                  });
-                  setOverlayOptions(o => ({ ...o, bitmapAvailable: hasBitmap }));
-                }}
-                onAnalysesLoaded={(count) => setHasAnalyses(count > 0)}
-              />
-              {hasAnalyses && (
-                <OverlayControls options={overlayOptions} onChange={setOverlayOptions} />
-              )}
+              {/* ML analysis triggering hidden. */}
             </div>
 
             {/* Resizable divider */}
@@ -370,6 +348,12 @@ function ImageView() {
             setImage={setImage}
             refreshProjectImages={loadProjectImages}
           />
+          {/* Debug ML outputs section */}
+          {imageId && (
+            <div style={{ marginTop: '1rem' }}>
+              <MLDebugOutputs imageId={imageId} />
+            </div>
+          )}
         </div>
       </div>
     </div>
