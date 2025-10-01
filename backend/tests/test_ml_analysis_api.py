@@ -3,6 +3,7 @@ import pytest
 from fastapi.testclient import TestClient
 from main import app
 import os
+import hmac, hashlib, time
 
 
 def test_create_list_ml_analysis_flow(client):
@@ -116,3 +117,50 @@ def test_feature_flag_off_returns_404(client, monkeypatch):
         assert resp.status_code == 404
     finally:
         cfg.settings.ML_ANALYSIS_ENABLED = original  # restore
+
+
+def _hmac_headers(body: bytes, secret: str):
+    ts = str(int(time.time()))
+    mac = hmac.new(secret.encode('utf-8'), msg=(ts.encode('utf-8') + b'.' + body), digestmod=hashlib.sha256)
+    return {
+        'X-ML-Timestamp': ts,
+        'X-ML-Signature': 'sha256=' + mac.hexdigest()
+    }
+
+
+def test_phase2_bulk_and_finalize_flow(client, monkeypatch):
+    from core import config as cfg
+    # Ensure secret is set on settings and environment (some code paths may re-read env on reload in future)
+    cfg.settings.ML_CALLBACK_HMAC_SECRET = 'secret123'  # type: ignore
+    os.environ['ML_CALLBACK_HMAC_SECRET'] = 'secret123'
+    cfg.settings.ML_PIPELINE_REQUIRE_HMAC = True  # type: ignore
+
+    # Create project & image & analysis
+    proj = client.post('/api/projects/', json={"name":"P3","description":"d","meta_group_id":"data-scientists"}).json()
+    img = client.post(f"/api/projects/{proj['id']}/images", files={'file': ('f.png', b'\x89PNG\r\n', 'image/png')}, data={'metadata':'{}'}).json()
+    analysis = client.post(f"/api/images/{img['id']}/analyses", json={"image_id": img['id'], "model_name":"resnet50_classifier","model_version":"1","parameters":{}}).json()
+
+    # Presign artifact
+    presign_body = {"artifact_type":"heatmap","filename":"heat.png"}
+    import json as _json
+    headers = _hmac_headers(_json.dumps(presign_body).encode('utf-8'), cfg.settings.ML_CALLBACK_HMAC_SECRET)
+    pre = client.post(f"/api/analyses/{analysis['id']}/artifacts/presign", json=presign_body, headers=headers)
+    assert pre.status_code == 200, pre.text
+
+    # Bulk annotations
+    ann_body = {"annotations":[{"annotation_type":"classification","class_name":"cat","confidence":0.9,"data":{"score":0.9}}]}
+    headers = _hmac_headers(_json.dumps(ann_body).encode('utf-8'), cfg.settings.ML_CALLBACK_HMAC_SECRET)
+    bulk = client.post(f"/api/analyses/{analysis['id']}/annotations:bulk", json=ann_body, headers=headers)
+    assert bulk.status_code == 200, bulk.text
+    assert bulk.json()['total'] == 1
+
+    # Finalize (completed)
+    fin_body = {"status":"completed"}
+    headers = _hmac_headers(_json.dumps(fin_body).encode('utf-8'), cfg.settings.ML_CALLBACK_HMAC_SECRET)
+    fin = client.post(f"/api/analyses/{analysis['id']}/finalize", json=fin_body, headers=headers)
+    assert fin.status_code == 200, fin.text
+    assert fin.json()['status'] == 'completed'
+
+    # Bad HMAC
+    bad = client.post(f"/api/analyses/{analysis['id']}/annotations:bulk", json=ann_body, headers={'X-ML-Timestamp':'0','X-ML-Signature':'sha256=deadbeef'})
+    assert bad.status_code in (401, 404)  # 404 if feature disabled, else 401

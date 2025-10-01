@@ -89,6 +89,24 @@ async def list_ml_annotations(db: AsyncSession, analysis_id: uuid.UUID, skip: in
     )
     return result.scalars().all()
 
+async def bulk_insert_ml_annotations(db: AsyncSession, analysis_id: uuid.UUID, annotations: List[schemas.MLAnnotationCreate]) -> int:
+    """Bulk insert annotations efficiently."""
+    objs = []
+    for ann in annotations:
+        payload = ann.model_dump()
+        objs.append(models.MLAnnotation(
+            analysis_id=analysis_id,
+            annotation_type=payload["annotation_type"],
+            class_name=payload.get("class_name"),
+            confidence=payload.get("confidence"),
+            data=payload["data"],
+            storage_path=payload.get("storage_path"),
+            ordering=payload.get("ordering"),
+        ))
+    db.add_all(objs)
+    await db.commit()
+    return len(objs)
+
 # User CRUD operations
 async def get_user_by_email(db: AsyncSession, email: str) -> Optional[models.User]:
     result = await db.execute(select(models.User).where(models.User.email == email))
