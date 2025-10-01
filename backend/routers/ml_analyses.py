@@ -7,6 +7,10 @@ from core.config import settings
 from core.database import get_db
 from utils.dependencies import get_current_user, get_image_or_403
 import utils.crud as crud
+from datetime import datetime, timezone
+import logging
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api", tags=["ML Analyses"]) 
 
@@ -33,6 +37,13 @@ async def create_ml_analysis(
     if analysis_in.model_name not in allowed:
         raise HTTPException(status_code=400, detail="Model not allowed")
     db_obj = await crud.create_ml_analysis(db, analysis_in, requested_by_id=current_user.id, status=settings.ML_DEFAULT_STATUS)
+    # Audit log
+    logger.info("ML_ANALYSIS_CREATE", extra={
+        "analysis_id": str(db_obj.id),
+        "image_id": str(db_obj.image_id),
+        "model": db_obj.model_name,
+        "requested_by": str(current_user.id)
+    })
     # Reload with annotations empty
     return schemas.MLAnalysis(
         id=db_obj.id,
@@ -133,3 +144,88 @@ async def get_ml_analysis(
         updated_at=db_obj.updated_at,
         annotations=annotations
     )
+
+@router.get("/analyses/{analysis_id}/annotations", response_model=schemas.MLAnnotationList)
+async def list_analysis_annotations(
+    analysis_id: uuid.UUID,
+    skip: int = 0,
+    limit: int = Query(200, le=1000),
+    db: AsyncSession = Depends(get_db),
+    current_user: schemas.User = Depends(get_current_user),
+):
+    if not settings.ML_ANALYSIS_ENABLED:
+        raise HTTPException(status_code=404, detail="ML analysis feature disabled")
+    db_obj = await crud.get_ml_analysis(db, analysis_id)
+    if not db_obj:
+        raise HTTPException(status_code=404, detail="Analysis not found")
+    # Access via image
+    await get_image_or_403(db_obj.image_id, db, current_user)
+    anns = await crud.list_ml_annotations(db, analysis_id, skip, limit)
+    items = [
+        schemas.MLAnnotation(
+            id=a.id,
+            analysis_id=a.analysis_id,
+            annotation_type=a.annotation_type,
+            class_name=a.class_name,
+            confidence=float(a.confidence) if a.confidence is not None else None,
+            data=a.data,
+            storage_path=a.storage_path,
+            ordering=a.ordering,
+            created_at=a.created_at,
+        ) for a in anns
+    ]
+    return schemas.MLAnnotationList(annotations=items, total=len(items))
+
+
+class StatusUpdatePayload(schemas.BaseModel):  # type: ignore[attr-defined]
+    """Minimal payload for status updates (Phase 1)."""
+    status: str
+    error_message: Optional[str] = None
+
+
+VALID_STATUS_TRANSITIONS = {
+    "queued": {"processing", "canceled"},
+    "processing": {"completed", "failed", "canceled"},
+}
+
+
+@router.patch("/analyses/{analysis_id}/status", response_model=schemas.MLAnalysis)
+async def update_ml_analysis_status(
+    analysis_id: uuid.UUID,
+    payload: StatusUpdatePayload,
+    db: AsyncSession = Depends(get_db),
+    current_user: schemas.User = Depends(get_current_user),
+):
+    if not settings.ML_ANALYSIS_ENABLED:
+        raise HTTPException(status_code=404, detail="ML analysis feature disabled")
+    db_obj = await crud.get_ml_analysis(db, analysis_id)
+    if not db_obj:
+        raise HTTPException(status_code=404, detail="Analysis not found")
+    # Access via image
+    await get_image_or_403(db_obj.image_id, db, current_user)
+
+    new_status = payload.status.lower()
+    old_status = (db_obj.status or "").lower()
+    if old_status == new_status:
+        return await get_ml_analysis(analysis_id, db, current_user)  # No-op
+    allowed = VALID_STATUS_TRANSITIONS.get(old_status, set())
+    if new_status not in allowed:
+        raise HTTPException(status_code=409, detail=f"Illegal transition {old_status}->{new_status}")
+
+    # Update timestamps
+    if new_status == "processing" and not db_obj.started_at:
+        db_obj.started_at = datetime.now(timezone.utc)
+    if new_status in {"completed", "failed", "canceled"}:
+        db_obj.completed_at = datetime.now(timezone.utc)
+    db_obj.status = new_status
+    if payload.error_message:
+        db_obj.error_message = payload.error_message
+    await db.commit()
+    await db.refresh(db_obj)
+    logger.info("ML_ANALYSIS_STATUS", extra={
+        "analysis_id": str(db_obj.id),
+        "from": old_status,
+        "to": new_status,
+        "user": str(current_user.id)
+    })
+    return await get_ml_analysis(analysis_id, db, current_user)
