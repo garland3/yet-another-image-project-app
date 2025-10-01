@@ -245,6 +245,25 @@ Reject illegal transitions with 409 Conflict.
 - Show failure badge + tooltip error_message.
 - Offer re-trigger (creates new analysis; older stays archived).
 
+### Implementation Status (Phase 3 - Initial Increment)
+Implemented minimal UI integration:
+1. Added `frontend/src/components/MLAnalysisPanel.js` listing analyses for an image, creation form (model name/version), status badges, and annotation list.
+2. Injected the panel into the image sidebar within `ImageView` below metadata & comments (non-invasive; gracefully handles 404 or empty states).
+3. Kept scope intentionally small (no overlays yet) to ship incremental value and validate API usage patterns.
+
+Deferred remaining Phase 3 items to sub-phases:
+- Overlay rendering (canvas/SVG for boxes, heatmaps) — pending design of annotation type-to-visual mapping.
+- Real-time status updates (currently manual refresh after creation; could add polling or WebSocket in Phase 4).
+- Multi-view comparison UI and opacity controls.
+
+Next recommended Phase 3 steps:
+1. Add lightweight polling (every 5–10s) while any analysis is non-terminal.
+2. Implement bounding box overlay renderer using existing annotation `data` shape.
+3. Lazy-load heatmap images from `storage_path` once artifact presign + upload path finalized.
+4. Add re-trigger button on completed/failed analyses to spawn a new analysis with same parameters.
+
+Rationale for incremental delivery: ensures backend contract stability and reduces large PR risk while providing immediate visibility into analyses.
+
 ---
 ## Phase 4: Advanced & Operational Enhancements
 **Goals**: Mature feature set & observability.
