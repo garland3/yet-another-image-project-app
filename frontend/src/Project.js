@@ -163,7 +163,18 @@ function Project() {
               {project ? (project.description || 'No description provided') : ''}
             </p>
             <div className="project-meta">
-              <span className="project-id">Project ID: {project?.id}</span>
+              <span className="project-id">
+                Project ID: {project?.id}
+                <button
+                  className="copy-id-btn"
+                  onClick={() => {
+                    navigator.clipboard.writeText(project?.id);
+                  }}
+                  title="Copy project ID"
+                >
+                  Copy
+                </button>
+              </span>
               <span className="project-group">Group: {project?.meta_group_id}</span>
               {currentUser && <span className="project-user">{currentUser.email}</span>}
             </div>

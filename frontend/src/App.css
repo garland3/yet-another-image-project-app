@@ -879,6 +879,33 @@ ul li:hover {
   gap: var(--space-1);
 }
 
+.copy-id-btn {
+  margin-left: var(--space-2);
+  padding: 2px 8px;
+  background: transparent;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  font-size: 0.75rem;
+  font-weight: 400;
+  color: var(--gray-400);
+  transition: all var(--transition-fast);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  text-transform: lowercase;
+}
+
+.copy-id-btn:hover {
+  background: rgba(255, 255, 255, 0.1);
+  border-color: rgba(255, 255, 255, 0.3);
+  color: var(--gray-300);
+}
+
+.copy-id-btn:active {
+  transform: scale(0.95);
+}
+
 .project-container {
   flex: 1;
   padding: var(--space-6) var(--space-6) var(--space-8);

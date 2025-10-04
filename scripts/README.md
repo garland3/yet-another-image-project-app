@@ -11,6 +11,7 @@ End-to-end integration test for the ML analysis feature using real YOLOv8 object
 **Quick Start:**
 ```bash
 # Set HMAC secret
+# in the scripts folder
 source ../.env
 
 # Run pipeline on a project (auto-installs dependencies)
