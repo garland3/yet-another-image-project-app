@@ -210,9 +210,18 @@ function ImageView() {
     }
   }, [currentImageIndex, projectImages, navigate, projectId]);
 
-  // Reset transition state when image changes
+  // Reset transition state and ML analysis when image changes
   useEffect(() => {
     setIsTransitioning(false);
+    // Clear ML analysis state when navigating to a new image
+    setSelectedAnalysis(null);
+    setSelectedAnnotations([]);
+    setOverlayOptions(prev => ({
+      ...prev,
+      showBoxes: true,
+      showHeatmap: false,
+      bitmapAvailable: false
+    }));
   }, [imageId]);
 
   // Handle resize functionality
