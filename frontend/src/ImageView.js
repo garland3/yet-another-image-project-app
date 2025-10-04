@@ -8,7 +8,8 @@ import ImageMetadata from './components/ImageMetadata';
 import CompactImageClassifications from './components/CompactImageClassifications';
 import ImageComments from './components/ImageComments';
 import ImageDeletionControls from './components/ImageDeletionControls';
-// ML interactive panel & overlay controls removed per temporary requirement
+import MLAnalysisPanel from './components/MLAnalysisPanel';
+import OverlayControls from './components/OverlayControls';
 import MLDebugOutputs from './components/MLDebugOutputs';
 
 function ImageView() {
@@ -28,10 +29,34 @@ function ImageView() {
   const [currentUser, setCurrentUser] = useState(null);
   const [sidebarWidth, setSidebarWidth] = useState(350);
   const [isResizing, setIsResizing] = useState(false);
-  // ML interactive overlay state disabled intentionally
-  const selectedAnalysis = null;
-  const selectedAnnotations = [];
-  const overlayOptions = { showBoxes: false, showHeatmap: false, opacity: 0.7 };
+
+  // ML Analysis state
+  const [selectedAnalysis, setSelectedAnalysis] = useState(null);
+  const [selectedAnnotations, setSelectedAnnotations] = useState([]);
+  const [overlayOptions, setOverlayOptions] = useState({
+    showBoxes: true,
+    showHeatmap: false,
+    opacity: 0.7,
+    viewMode: 'overlay',
+    bitmapAvailable: false
+  });
+
+  // ML analysis selection handler
+  const handleMLAnalysisSelect = useCallback((data) => {
+    if (data && data.analysis) {
+      setSelectedAnalysis(data.analysis);
+      setSelectedAnnotations(data.annotations || []);
+      // Check if any bitmap artifacts are available (heatmap, segmentation, mask)
+      const hasBitmap = (data.annotations || []).some(a =>
+        a.storage_path && ['heatmap', 'segmentation', 'mask'].includes(a.annotation_type)
+      );
+      setOverlayOptions(prev => ({ ...prev, bitmapAvailable: hasBitmap }));
+    } else {
+      setSelectedAnalysis(null);
+      setSelectedAnnotations([]);
+      setOverlayOptions(prev => ({ ...prev, bitmapAvailable: false }));
+    }
+  }, []);
 
   // Load image data
   const loadImageData = useCallback(async () => {
@@ -309,7 +334,19 @@ function ImageView() {
                 setError={setError}
               />
 
-              {/* ML analysis triggering hidden. */}
+              {/* ML Analysis Panel (read-only, only visible when analyses exist) */}
+              <MLAnalysisPanel
+                imageId={imageId}
+                onSelect={handleMLAnalysisSelect}
+              />
+
+              {/* Overlay controls (only visible when an analysis is selected) */}
+              {selectedAnalysis && (
+                <OverlayControls
+                  options={overlayOptions}
+                  onChange={setOverlayOptions}
+                />
+              )}
             </div>
 
             {/* Resizable divider */}

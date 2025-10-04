@@ -51,7 +51,7 @@ class Settings(BaseSettings):
     # ML Analysis settings
     ML_ANALYSIS_ENABLED: bool = True
     ML_MAX_ANALYSES_PER_IMAGE: int = 10
-    ML_ALLOWED_MODELS: str = "resnet50_classifier,vgg16,inception_v3,efficientnet_b0,demo-model-detcls"
+    ML_ALLOWED_MODELS: str = "resnet50_classifier,vgg16,inception_v3,efficientnet_b0,demo-model-detcls,yolo_v8"
     ML_DEFAULT_STATUS: str = "queued"
     ML_CALLBACK_HMAC_SECRET: Optional[str] = None
     ML_PIPELINE_REQUIRE_HMAC: bool = True

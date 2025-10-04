@@ -19,6 +19,7 @@ from utils.boto3_client import boto3_client, ensure_bucket_exists
 from middleware.cors_debug import add_cors_middleware, debug_exception_middleware
 from middleware.auth import auth_middleware
 from middleware.security_headers import SecurityHeadersMiddleware
+from middleware.body_cache import BodyCacheMiddleware
 from routers import projects, images, users, image_classes, comments, project_metadata, api_keys, ml_analyses
 
 
@@ -159,7 +160,10 @@ def create_app() -> FastAPI:
     # Add CORS middleware
     cors_origins = os.getenv("CORS_ORIGINS", "http://localhost:3000").split(",")
     add_cors_middleware(app, cors_origins)
-    
+
+    # Add body cache middleware (must be early in the stack, before auth)
+    app.add_middleware(BodyCacheMiddleware)
+
     # Add security headers middleware
     app.add_middleware(SecurityHeadersMiddleware)
 

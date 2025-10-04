@@ -2,17 +2,13 @@ import React, { useEffect, useState, useCallback } from 'react';
 
 /**
  * MLAnalysisPanel
- * Phase 3 minimal implementation: lists analyses for an image, lets user create a new one,
- * and view annotation counts. Focuses on surfacing existing backend functionality only.
+ * Phase 3 implementation: Read-only panel for listing ML analyses and annotations.
+ * Users cannot trigger analyses - all analyses are created by external systems (cron, ML pipelines).
  */
 export default function MLAnalysisPanel({ imageId, onSelect, onAnalysesLoaded }) {
   const [analyses, setAnalyses] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
-  // Using fixed model parameters for now (hidden until first analysis exists); could be elevated to a config dialog later.
-  const modelName = 'resnet50_classifier';
-  const modelVersion = '1';
-  const [creating, setCreating] = useState(false);
   const [selected, setSelected] = useState(null);
   const [annotations, setAnnotations] = useState([]);
   const [annLoading, setAnnLoading] = useState(false);
@@ -36,31 +32,6 @@ export default function MLAnalysisPanel({ imageId, onSelect, onAnalysesLoaded })
     }
   }, [imageId, onAnalysesLoaded]);
 
-  const createAnalysis = async () => {
-    if (creating) return;
-    setCreating(true);
-    setError(null);
-    try {
-      const payload = {
-        image_id: imageId,
-        model_name: modelName,
-        model_version: modelVersion,
-        parameters: {}
-      };
-      const resp = await fetch(`/api/images/${imageId}/analyses`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload)
-      });
-      if (!resp.ok) throw new Error(`Create failed: ${resp.status}`);
-      await fetchAnalyses();
-    } catch (e) {
-      setError(e.message);
-    } finally {
-      setCreating(false);
-    }
-  };
-
   const selectAnalysis = useCallback(async (id) => {
     setSelected(id);
     setAnnLoading(true);
@@ -81,6 +52,35 @@ export default function MLAnalysisPanel({ imageId, onSelect, onAnalysesLoaded })
     }
   }, [onSelect]);
 
+  const exportAnalysis = useCallback(async (id, format = 'json') => {
+    try {
+      const resp = await fetch(`/api/analyses/${id}/export?format=${format}`);
+      if (!resp.ok) throw new Error(`Export failed: ${resp.status}`);
+
+      const contentType = resp.headers.get('content-type');
+      const contentDisposition = resp.headers.get('content-disposition');
+
+      // Extract filename from Content-Disposition or generate one
+      let filename = `analysis_export_${Date.now()}.${format}`;
+      if (contentDisposition && contentDisposition.includes('filename=')) {
+        const match = contentDisposition.match(/filename="?([^"]+)"?/);
+        if (match) filename = match[1];
+      }
+
+      const blob = await resp.blob();
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = filename;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(url);
+    } catch (e) {
+      setError(`Export failed: ${e.message}`);
+    }
+  }, []);
+
   // Poll while there are non-terminal analyses
   useEffect(() => {
     const active = analyses.some(a => ['queued','processing'].includes(a.status));
@@ -100,28 +100,15 @@ export default function MLAnalysisPanel({ imageId, onSelect, onAnalysesLoaded })
   const hasAnalyses = analyses.length > 0;
 
   if (!hasAnalyses) {
-    // Show only a minimal unobtrusive launcher button (hide all ML info until user chooses to run)
-    return (
-      <div style={{ marginTop: '1rem' }}>
-        <button
-          className="btn btn-outline btn-small"
-          disabled={creating || loading}
-          onClick={createAnalysis}
-          title="Run an ML analysis on this image"
-          style={{ width: '100%' }}
-        >
-          {creating ? 'Starting…' : 'Run ML Analysis'}
-        </button>
-        {error && <div className="alert alert-error" style={{ marginTop: '0.5rem' }}>{error}</div>}
-      </div>
-    );
+    // No analyses yet - show nothing (analyses are triggered externally)
+    return null;
   }
 
   return (
     <div className="ml-analysis-panel" style={{ border: '1px solid var(--border-color)', borderRadius: 6, padding: '0.75rem', marginTop: '1rem' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <h3 style={{ margin: 0 }}>ML Analyses</h3>
-        <button className="btn btn-primary btn-tiny" onClick={createAnalysis} disabled={creating}>New</button>
+        <span style={{ fontSize: 11, color: 'var(--text-muted, #666)', fontStyle: 'italic' }}>Read-only</span>
       </div>
       {error && <div className="alert alert-error" style={{ margin: '0.5rem 0' }}>{error}</div>}
       {loading ? <div>Loading analyses…</div> : (
@@ -138,7 +125,43 @@ export default function MLAnalysisPanel({ imageId, onSelect, onAnalysesLoaded })
         </ul>
       )}
       <hr style={{ margin: '0.5rem 0' }} />
-      <h4 style={{ margin: '0 0 0.5rem 0', fontSize: 13 }}>Annotations</h4>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
+        <h4 style={{ margin: 0, fontSize: 13 }}>Annotations</h4>
+        {selected && (
+          <div style={{ display: 'flex', gap: 4 }}>
+            <button
+              onClick={() => exportAnalysis(selected, 'json')}
+              style={{
+                fontSize: 10,
+                padding: '2px 6px',
+                background: '#0d6efd',
+                color: 'white',
+                border: 'none',
+                borderRadius: 3,
+                cursor: 'pointer'
+              }}
+              title="Export as JSON"
+            >
+              JSON
+            </button>
+            <button
+              onClick={() => exportAnalysis(selected, 'csv')}
+              style={{
+                fontSize: 10,
+                padding: '2px 6px',
+                background: '#198754',
+                color: 'white',
+                border: 'none',
+                borderRadius: 3,
+                cursor: 'pointer'
+              }}
+              title="Export as CSV"
+            >
+              CSV
+            </button>
+          </div>
+        )}
+      </div>
       {annLoading ? <div>Loading…</div> : (
         <div style={{ maxHeight: 160, overflowY: 'auto', fontSize: 12 }}>
           {annotations.length === 0 && <div style={{ opacity: 0.7 }}>None.</div>}

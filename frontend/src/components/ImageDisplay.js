@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef, useLayoutEffect, useCallback } from 'react';
 import BoundingBoxOverlay from './BoundingBoxOverlay';
+import HeatmapOverlay from './HeatmapOverlay';
 
 // Deleted image placeholder SVG for larger display
 const DELETED_IMAGE_DISPLAY_SVG = 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iODAwIiBoZWlnaHQ9IjYwMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iODAwIiBoZWlnaHQ9IjYwMCIgZmlsbD0iI2ZiZjVmNSIgc3Ryb2tlPSIjZjU5ZTBiIiBzdHJva2Utd2lkdGg9IjQiIHN0cm9rZS1kYXNoYXJyYXk9IjE1LDgiLz48dGV4dCB4PSI1MCUiIHk9IjM1JSIgZm9udC1mYW1pbHk9IkFyaWFsLCBzYW5zLXNlcmlmIiBmb250LXNpemU9IjM2IiBmb250LXdlaWdodD0iNjAwIiB0ZXh0LWFuY2hvcj0ibWlkZGxlIiBkeT0iLjNlbSIgZmlsbD0iI2M0MzAyYiI+SW1hZ2UgRGVsZXRlZDwvdGV4dD48dGV4dCB4PSI1MCUiIHk9IjUwJSIgZm9udC1mYW1pbHk9IkFyaWFsLCBzYW5zLXNlcmlmIiBmb250LXNpemU9IjY0IiB0ZXh0LWFuY2hvcj0ibWlkZGxlIiBkeT0iLjNlbSIgZmlsbD0iI2Y1OWUwYiI+8J+XkeKcgO+4jzwvdGV4dD48dGV4dCB4PSI1MCUiIHk9IjY1JSIgZm9udC1mYW1pbHk9IkFyaWFsLCBzYW5zLXNlcmlmIiBmb250LXNpemU9IjE4IiB0ZXh0LWFuY2hvcj0ibWlkZGxlIiBkeT0iLjNlbSIgZmlsbD0iIzk3OWNhMSI+VGhpcyBpbWFnZSBoYXMgYmVlbiBkZWxldGVkPC90ZXh0Pjx0ZXh0IHg9IjUwJSIgeT0iNzAlIiBmb250LWZhbWlseT0iQXJpYWwsIHNhbnMtc2VyaWYiIGZvbnQtc2l6ZT0iMTQiIHRleHQtYW5jaG9yPSJtaWRkbGUiIGR5PSIuM2VtIiBmaWxsPSIjOTc5Y2ExIj5DaGVjayB0aGUgZGVsZXRpb24gY29udHJvbHMgYmVsb3cgZm9yIG1vcmUgaW5mbzwvdGV4dD48L3N2Zz4=';
@@ -219,49 +220,75 @@ function ImageDisplay({
     return () => window.removeEventListener('resize', measure);
   }, [measure]);
 
+  // Side-by-side mode helper
+  const isSideBySide = overlayOptions?.viewMode === 'side-by-side' && overlayOptions?.bitmapAvailable;
+
+  const renderImageView = (showOverlays = true, containerStyle = {}) => (
+    <div style={{ position: 'relative', ...containerStyle }}>
+      {!image ? (
+        <div className="loading-container">
+          <div className="loading"></div>
+          <p>Loading image...</p>
+        </div>
+      ) : image.deleted_at ? (
+        <img
+          src={DELETED_IMAGE_DISPLAY_SVG}
+          alt="Deleted"
+          className="view-image deleted-image"
+          style={{ transform: `scale(${zoomLevel})`, transformOrigin: 'top left' }}
+          onClick={handleZoomIn}
+          ref={!isSideBySide ? imgRef : null}
+        />
+      ) : (
+        <img
+          src={`/api/images/${imageId}/content`}
+          alt={image.filename || ''}
+          className="view-image"
+          style={{ transform: `scale(${zoomLevel})`, transformOrigin: 'top left' }}
+          onClick={handleZoomIn}
+          onError={(e) => {
+            console.error('Failed to load image with ID: %s', imageId, e);
+            if (!e.target.src.includes('thumbnail')) {
+              e.target.src = `/api/images/${imageId}/thumbnail?width=800&height=600`;
+            }
+          }}
+          ref={!isSideBySide ? imgRef : null}
+        />
+      )}
+      {showOverlays && image && overlayOptions?.showBoxes && annotations?.length > 0 && (
+        <BoundingBoxOverlay
+          annotations={annotations}
+          naturalSize={{ width: image.width, height: image.height }}
+          containerSize={displaySize}
+          opacity={overlayOptions.opacity}
+        />
+      )}
+      {showOverlays && image && overlayOptions?.showHeatmap && annotations?.length > 0 && (
+        <HeatmapOverlay
+          annotations={annotations}
+          containerSize={displaySize}
+          opacity={overlayOptions.opacity}
+        />
+      )}
+    </div>
+  );
+
   return (
     <>
       <div id="image-display" className={isTransitioning ? 'transitioning' : ''} ref={containerRef} style={{ position: 'relative' }}>
-        {!image ? (
-          <div className="loading-container">
-            <div className="loading"></div>
-            <p>Loading image...</p>
+        {isSideBySide ? (
+          <div style={{ display: 'flex', gap: '1rem', width: '100%' }}>
+            <div style={{ flex: 1, position: 'relative' }}>
+              <div style={{ fontSize: 12, fontWeight: 600, marginBottom: '0.25rem', color: '#666' }}>Original</div>
+              {renderImageView(false)}
+            </div>
+            <div style={{ flex: 1, position: 'relative' }}>
+              <div style={{ fontSize: 12, fontWeight: 600, marginBottom: '0.25rem', color: '#666' }}>ML Overlay</div>
+              {renderImageView(true)}
+            </div>
           </div>
-        ) : image.deleted_at ? (
-          <img
-            src={DELETED_IMAGE_DISPLAY_SVG}
-            alt="Deleted"
-            id="main-image"
-            className="view-image deleted-image"
-            style={{ transform: `scale(${zoomLevel})`, transformOrigin: 'top left' }}
-            onClick={handleZoomIn}
-            ref={imgRef}
-          />
         ) : (
-          <img
-            src={`/api/images/${imageId}/content`}
-            alt={image.filename || ''}
-            id="main-image"
-            className="view-image"
-            style={{ transform: `scale(${zoomLevel})`, transformOrigin: 'top left' }}
-            onClick={handleZoomIn}
-            onError={(e) => {
-              console.error('Failed to load image with ID: %s', imageId, e);
-              // Try the thumbnail endpoint as fallback
-              if (!e.target.src.includes('thumbnail')) {
-                e.target.src = `/api/images/${imageId}/thumbnail?width=800&height=600`;
-              }
-            }}
-            ref={imgRef}
-          />
-        )}
-        {image && overlayOptions?.showBoxes && annotations?.length > 0 && (
-          <BoundingBoxOverlay
-            annotations={annotations}
-            naturalSize={{ width: image.width, height: image.height }}
-            containerSize={displaySize}
-            opacity={overlayOptions.opacity}
-          />
+          renderImageView(true)
         )}
       </div>
       

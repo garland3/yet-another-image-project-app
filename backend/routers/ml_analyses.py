@@ -12,7 +12,74 @@ import logging
 
 logger = logging.getLogger(__name__)
 
-router = APIRouter(prefix="/api", tags=["ML Analyses"]) 
+router = APIRouter(prefix="/api", tags=["ML Analyses"])
+
+
+# Dependency to get cached request body
+async def get_raw_body(request: Request) -> bytes:
+    """
+    Get raw request body from cache.
+    The BodyCacheMiddleware caches the body early in the request lifecycle.
+    """
+    if hasattr(request.state, "cached_body"):
+        return request.state.cached_body
+    # Fallback for non-cached requests (shouldn't happen for POST/PATCH/PUT)
+    return await request.body()
+
+
+@router.get("/ml/artifacts/download")
+async def get_artifact_download_url(
+    path: str,
+    db: AsyncSession = Depends(get_db),
+    current_user: schemas.User = Depends(get_current_user),
+):
+    """Get presigned download URL for ML artifact (heatmap, mask, etc.)"""
+    if not settings.ML_ANALYSIS_ENABLED:
+        raise HTTPException(status_code=404, detail="ML analysis feature disabled")
+
+    from utils.boto3_client import get_presigned_download_url, boto3_client
+    from datetime import timedelta
+
+    # Validate path starts with ml_outputs/
+    if not path.startswith("ml_outputs/"):
+        raise HTTPException(status_code=400, detail="Invalid artifact path")
+
+    # Extract analysis_id from path (format: ml_outputs/{analysis_id}/...)
+    try:
+        parts = path.split("/")
+        if len(parts) < 3:
+            raise ValueError("Invalid path format")
+        analysis_id_str = parts[1]
+        import uuid as uuid_lib
+        analysis_id = uuid_lib.UUID(analysis_id_str)
+    except (ValueError, IndexError):
+        raise HTTPException(status_code=400, detail="Invalid analysis ID in path")
+
+    # Verify user has access to the analysis
+    db_obj = await crud.get_ml_analysis(db, analysis_id)
+    if not db_obj:
+        raise HTTPException(status_code=404, detail="Analysis not found")
+
+    # Access check via image
+    await get_image_or_403(db_obj.image_id, db, current_user)
+
+    if boto3_client is None:
+        # Return mock URL for testing
+        logger.warning("S3 client not available, returning mock download URL")
+        return {"url": f"https://example.com/download/{path}?signature=fake"}
+
+    # Generate real presigned download URL
+    expires_delta = timedelta(seconds=settings.ML_PRESIGNED_URL_EXPIRY_SECONDS)
+    download_url = get_presigned_download_url(
+        bucket_name=settings.S3_BUCKET,
+        object_name=path,
+        expires_delta=expires_delta
+    )
+
+    if not download_url:
+        raise HTTPException(status_code=500, detail="Failed to generate presigned download URL")
+
+    return {"url": download_url} 
 
 @router.post("/images/{image_id}/analyses", response_model=schemas.MLAnalysis, status_code=status.HTTP_201_CREATED)
 async def create_ml_analysis(
@@ -265,6 +332,7 @@ async def bulk_upload_annotations(
     request: Request,
     db: AsyncSession = Depends(get_db),
     current_user: schemas.User = Depends(get_current_user),
+    body_bytes: bytes = Depends(get_raw_body),
 ):
     if not settings.ML_ANALYSIS_ENABLED:
         raise HTTPException(status_code=404, detail="ML analysis feature disabled")
@@ -275,9 +343,7 @@ async def bulk_upload_annotations(
     await get_image_or_403(db_obj.image_id, db, current_user)
     if len(payload.annotations) > settings.ML_MAX_BULK_ANNOTATIONS:
         raise HTTPException(status_code=400, detail="Too many annotations in one request")
-    # HMAC verify using the raw original request body instead of re-serializing the parsed model.
-    # Re-serialization can change ordering or add default fields (e.g. 'mode') causing signature mismatches.
-    body_bytes = await request.body()
+    # HMAC verify using the raw original request body
     _verify_pipeline_hmac(request, body_bytes)
     # If mode == replace, we could delete existing first (future). For now always append.
     inserted = await crud.bulk_insert_ml_annotations(db, analysis_id, payload.annotations)
@@ -315,6 +381,7 @@ async def presign_artifact_upload(
     request: Request,
     db: AsyncSession = Depends(get_db),
     current_user: schemas.User = Depends(get_current_user),
+    body_bytes: bytes = Depends(get_raw_body),
 ):
     if not settings.ML_ANALYSIS_ENABLED:
         raise HTTPException(status_code=404, detail="ML analysis feature disabled")
@@ -322,15 +389,45 @@ async def presign_artifact_upload(
     if not db_obj:
         raise HTTPException(status_code=404, detail="Analysis not found")
     await get_image_or_403(db_obj.image_id, db, current_user)
-    # Use raw body for HMAC verification (avoid altering via model_dump which may add defaults / reorder keys)
-    body_bytes = await request.body()
+    # Use raw body for HMAC verification
     _verify_pipeline_hmac(request, body_bytes)
-    # Simple simulated presign (since real S3 client may be disabled in tests)
-    # In production: use boto3_client.generate_presigned_url with PUT method.
+
+    # Generate real presigned upload URL
+    from utils.boto3_client import get_presigned_upload_url, boto3_client
+    from datetime import timedelta
+
     artifact_name = req.filename or f"{req.artifact_type}.bin"
     storage_path = f"ml_outputs/{analysis_id}/{artifact_name}"
-    fake_url = f"https://example.com/upload/{storage_path}?signature=fake"
-    return PresignResponse(upload_url=fake_url, storage_path=storage_path)
+
+    # Determine content type based on artifact type
+    content_type_map = {
+        "heatmap": "image/png",
+        "mask": "image/png",
+        "segmentation": "image/png",
+        "log": "text/plain",
+        "metadata": "application/json"
+    }
+    content_type = content_type_map.get(req.artifact_type, "application/octet-stream")
+
+    if boto3_client is None:
+        # Fallback to fake URL for testing/dev when S3 not available
+        logger.warning("S3 client not available, returning mock presigned URL")
+        fake_url = f"https://example.com/upload/{storage_path}?signature=fake"
+        return PresignResponse(upload_url=fake_url, storage_path=storage_path)
+
+    # Generate real presigned URL
+    expires_delta = timedelta(seconds=settings.ML_PRESIGNED_URL_EXPIRY_SECONDS)
+    upload_url = get_presigned_upload_url(
+        bucket_name=settings.S3_BUCKET,
+        object_name=storage_path,
+        expires_delta=expires_delta,
+        content_type=content_type
+    )
+
+    if not upload_url:
+        raise HTTPException(status_code=500, detail="Failed to generate presigned upload URL")
+
+    return PresignResponse(upload_url=upload_url, storage_path=storage_path)
 
 
 class FinalizeRequest(schemas.BaseModel):  # type: ignore[attr-defined]
@@ -344,6 +441,7 @@ async def finalize_analysis(
     request: Request,
     db: AsyncSession = Depends(get_db),
     current_user: schemas.User = Depends(get_current_user),
+    body_bytes: bytes = Depends(get_raw_body),
 ):
     if not settings.ML_ANALYSIS_ENABLED:
         raise HTTPException(status_code=404, detail="ML analysis feature disabled")
@@ -352,7 +450,6 @@ async def finalize_analysis(
         raise HTTPException(status_code=404, detail="Analysis not found")
     await get_image_or_403(db_obj.image_id, db, current_user)
     # Use raw body for HMAC verification
-    body_bytes = await request.body()
     _verify_pipeline_hmac(request, body_bytes)
     if req.status:
         # Special case: allow pipeline to finalize directly from queued -> completed|failed without requiring an explicit
@@ -378,3 +475,110 @@ async def finalize_analysis(
         # Otherwise reuse the stricter status update logic (which enforces valid transitions)
         return await update_ml_analysis_status(analysis_id, StatusUpdatePayload(status=req.status, error_message=req.error_message), db, current_user)  # type: ignore
     return await get_ml_analysis(analysis_id, db, current_user)
+
+
+@router.get("/analyses/{analysis_id}/export")
+async def export_analysis(
+    analysis_id: uuid.UUID,
+    format: str = Query("json", regex="^(json|csv)$"),
+    db: AsyncSession = Depends(get_db),
+    current_user: schemas.User = Depends(get_current_user),
+):
+    """
+    Export full analysis with metadata, annotations, and artifact references.
+    Supports JSON (full export) and CSV (annotations only).
+    """
+    if not settings.ML_ANALYSIS_ENABLED:
+        raise HTTPException(status_code=404, detail="ML analysis feature disabled")
+
+    db_obj = await crud.get_ml_analysis(db, analysis_id)
+    if not db_obj:
+        raise HTTPException(status_code=404, detail="Analysis not found")
+
+    # Access control via image ownership
+    await get_image_or_403(db_obj.image_id, db, current_user)
+
+    if format == "json":
+        # Full export as JSON
+        from fastapi.responses import JSONResponse
+
+        annotations_data = [
+            {
+                "id": str(a.id),
+                "annotation_type": a.annotation_type,
+                "class_name": a.class_name,
+                "confidence": float(a.confidence) if a.confidence is not None else None,
+                "data": a.data,
+                "storage_path": a.storage_path,
+                "ordering": a.ordering,
+                "created_at": a.created_at.isoformat() if a.created_at else None,
+            }
+            for a in db_obj.annotations
+        ]
+
+        export_data = {
+            "id": str(db_obj.id),
+            "image_id": str(db_obj.image_id),
+            "model_name": db_obj.model_name,
+            "model_version": db_obj.model_version,
+            "status": db_obj.status,
+            "error_message": db_obj.error_message,
+            "parameters": db_obj.parameters,
+            "provenance": db_obj.provenance,
+            "requested_by_id": str(db_obj.requested_by_id),
+            "external_job_id": db_obj.external_job_id,
+            "priority": db_obj.priority,
+            "created_at": db_obj.created_at.isoformat() if db_obj.created_at else None,
+            "started_at": db_obj.started_at.isoformat() if db_obj.started_at else None,
+            "completed_at": db_obj.completed_at.isoformat() if db_obj.completed_at else None,
+            "updated_at": db_obj.updated_at.isoformat() if db_obj.updated_at else None,
+            "annotations": annotations_data,
+            "annotation_count": len(annotations_data),
+        }
+
+        return JSONResponse(content=export_data)
+
+    else:  # CSV format - annotations only
+        from fastapi.responses import StreamingResponse
+        import io
+        import csv
+
+        output = io.StringIO()
+        writer = csv.writer(output)
+
+        # CSV header
+        writer.writerow([
+            "annotation_id",
+            "annotation_type",
+            "class_name",
+            "confidence",
+            "storage_path",
+            "ordering",
+            "data_json",
+            "created_at"
+        ])
+
+        # CSV rows
+        for a in db_obj.annotations:
+            import json
+            writer.writerow([
+                str(a.id),
+                a.annotation_type,
+                a.class_name or "",
+                float(a.confidence) if a.confidence is not None else "",
+                a.storage_path or "",
+                a.ordering or "",
+                json.dumps(a.data) if a.data else "",
+                a.created_at.isoformat() if a.created_at else "",
+            ])
+
+        output.seek(0)
+
+        # Generate filename
+        filename = f"analysis_{db_obj.model_name}_{db_obj.created_at.strftime('%Y%m%d_%H%M%S')}.csv"
+
+        return StreamingResponse(
+            iter([output.getvalue()]),
+            media_type="text/csv",
+            headers={"Content-Disposition": f"attachment; filename={filename}"}
+        )

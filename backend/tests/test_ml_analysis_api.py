@@ -130,10 +130,10 @@ def _hmac_headers(body: bytes, secret: str):
 
 def test_phase2_bulk_and_finalize_flow(client, monkeypatch):
     from core import config as cfg
-    # Ensure secret is set on settings and environment (some code paths may re-read env on reload in future)
-    cfg.settings.ML_CALLBACK_HMAC_SECRET = 'secret123'  # type: ignore
-    os.environ['ML_CALLBACK_HMAC_SECRET'] = 'secret123'
-    cfg.settings.ML_PIPELINE_REQUIRE_HMAC = True  # type: ignore
+    # Patch the settings module directly where it's used
+    secret = 'secret123'
+    monkeypatch.setattr('routers.ml_analyses.settings.ML_CALLBACK_HMAC_SECRET', secret)
+    monkeypatch.setattr('routers.ml_analyses.settings.ML_PIPELINE_REQUIRE_HMAC', True)
 
     # Create project & image & analysis
     proj = client.post('/api/projects/', json={"name":"P3","description":"d","meta_group_id":"data-scientists"}).json()
@@ -143,24 +143,288 @@ def test_phase2_bulk_and_finalize_flow(client, monkeypatch):
     # Presign artifact
     presign_body = {"artifact_type":"heatmap","filename":"heat.png"}
     import json as _json
-    headers = _hmac_headers(_json.dumps(presign_body).encode('utf-8'), cfg.settings.ML_CALLBACK_HMAC_SECRET)
-    pre = client.post(f"/api/analyses/{analysis['id']}/artifacts/presign", json=presign_body, headers=headers)
+    presign_body_bytes = _json.dumps(presign_body).encode('utf-8')
+    headers = _hmac_headers(presign_body_bytes, secret)
+    headers['Content-Type'] = 'application/json'
+    pre = client.post(f"/api/analyses/{analysis['id']}/artifacts/presign", data=presign_body_bytes, headers=headers)
     assert pre.status_code == 200, pre.text
 
     # Bulk annotations
     ann_body = {"annotations":[{"annotation_type":"classification","class_name":"cat","confidence":0.9,"data":{"score":0.9}}]}
-    headers = _hmac_headers(_json.dumps(ann_body).encode('utf-8'), cfg.settings.ML_CALLBACK_HMAC_SECRET)
-    bulk = client.post(f"/api/analyses/{analysis['id']}/annotations:bulk", json=ann_body, headers=headers)
+    ann_body_bytes = _json.dumps(ann_body).encode('utf-8')
+    headers = _hmac_headers(ann_body_bytes, secret)
+    headers['Content-Type'] = 'application/json'
+    bulk = client.post(f"/api/analyses/{analysis['id']}/annotations:bulk", data=ann_body_bytes, headers=headers)
     assert bulk.status_code == 200, bulk.text
     assert bulk.json()['total'] == 1
 
     # Finalize (completed)
     fin_body = {"status":"completed"}
-    headers = _hmac_headers(_json.dumps(fin_body).encode('utf-8'), cfg.settings.ML_CALLBACK_HMAC_SECRET)
-    fin = client.post(f"/api/analyses/{analysis['id']}/finalize", json=fin_body, headers=headers)
+    fin_body_bytes = _json.dumps(fin_body).encode('utf-8')
+    headers = _hmac_headers(fin_body_bytes, secret)
+    headers['Content-Type'] = 'application/json'
+    fin = client.post(f"/api/analyses/{analysis['id']}/finalize", data=fin_body_bytes, headers=headers)
     assert fin.status_code == 200, fin.text
     assert fin.json()['status'] == 'completed'
 
     # Bad HMAC
-    bad = client.post(f"/api/analyses/{analysis['id']}/annotations:bulk", json=ann_body, headers={'X-ML-Timestamp':'0','X-ML-Signature':'sha256=deadbeef'})
+    bad_body_bytes = _json.dumps(ann_body).encode('utf-8')
+    bad = client.post(f"/api/analyses/{analysis['id']}/annotations:bulk", data=bad_body_bytes, headers={'X-ML-Timestamp':'0','X-ML-Signature':'sha256=deadbeef','Content-Type':'application/json'})
     assert bad.status_code in (401, 404)  # 404 if feature disabled, else 401
+
+
+def test_model_allow_list_validation(client):
+    """Test that only allowed models can be used."""
+    # Create project & image
+    proj = client.post('/api/projects/', json={"name":"AllowListTest","description":"d","meta_group_id":"data-scientists"}).json()
+    img = client.post(f"/api/projects/{proj['id']}/images", files={'file': ('f.png', b'\x89PNG\r\n', 'image/png')}, data={'metadata':'{}'}).json()
+
+    # Try creating analysis with allowed model (should succeed)
+    allowed_payload = {
+        "image_id": img['id'],
+        "model_name": "resnet50_classifier",
+        "model_version": "1.0.0",
+        "parameters": {}
+    }
+    resp = client.post(f"/api/images/{img['id']}/analyses", json=allowed_payload)
+    assert resp.status_code == 201, resp.text
+
+    # Try creating analysis with disallowed model (should fail)
+    disallowed_payload = {
+        "image_id": img['id'],
+        "model_name": "fake_model_not_allowed",
+        "model_version": "1.0.0",
+        "parameters": {}
+    }
+    resp = client.post(f"/api/images/{img['id']}/analyses", json=disallowed_payload)
+    assert resp.status_code == 400, resp.text
+    assert "not allowed" in resp.text.lower()
+
+
+def test_per_image_analysis_limit(client, monkeypatch):
+    """Test that per-image analysis limit is enforced."""
+    from core import config as cfg
+    monkeypatch.setattr('routers.ml_analyses.settings.ML_MAX_ANALYSES_PER_IMAGE', 3)
+
+    # Create project & image
+    proj = client.post('/api/projects/', json={"name":"LimitTest","description":"d","meta_group_id":"data-scientists"}).json()
+    img = client.post(f"/api/projects/{proj['id']}/images", files={'file': ('f.png', b'\x89PNG\r\n', 'image/png')}, data={'metadata':'{}'}).json()
+
+    # Create analyses up to limit
+    for i in range(3):
+        payload = {
+            "image_id": img['id'],
+            "model_name": "resnet50_classifier",
+            "model_version": f"1.0.{i}",
+            "parameters": {}
+        }
+        resp = client.post(f"/api/images/{img['id']}/analyses", json=payload)
+        assert resp.status_code == 201, f"Failed on iteration {i}: {resp.text}"
+
+    # Try to create one more (should fail)
+    payload = {
+        "image_id": img['id'],
+        "model_name": "resnet50_classifier",
+        "model_version": "2.0.0",
+        "parameters": {}
+    }
+    resp = client.post(f"/api/images/{img['id']}/analyses", json=payload)
+    assert resp.status_code == 400, resp.text
+    assert "limit" in resp.text.lower()
+
+
+def test_pagination_annotations(client, monkeypatch):
+    """Test pagination of annotations."""
+    from core import config as cfg
+    import json as _json
+
+    secret = 'secret123'; monkeypatch.setattr('routers.ml_analyses.settings.ML_CALLBACK_HMAC_SECRET', secret)
+    monkeypatch.setenv('ML_CALLBACK_HMAC_SECRET', 'secret123')
+    monkeypatch.setattr('routers.ml_analyses.settings.ML_PIPELINE_REQUIRE_HMAC', True)
+
+    # Create project & image & analysis
+    proj = client.post('/api/projects/', json={"name":"PaginationTest","description":"d","meta_group_id":"data-scientists"}).json()
+    img = client.post(f"/api/projects/{proj['id']}/images", files={'file': ('f.png', b'\x89PNG\r\n', 'image/png')}, data={'metadata':'{}'}).json()
+    analysis = client.post(f"/api/images/{img['id']}/analyses", json={"image_id": img['id'], "model_name":"resnet50_classifier","model_version":"1","parameters":{}}).json()
+
+    # Create multiple annotations
+    annotations = []
+    for i in range(10):
+        annotations.append({
+            "annotation_type": "bounding_box",
+            "class_name": f"object_{i}",
+            "confidence": 0.8 + (i * 0.01),
+            "data": {"x_min": i*10, "y_min": i*10, "x_max": (i+1)*10, "y_max": (i+1)*10, "image_width": 1024, "image_height": 768}
+        })
+
+    ann_body = {"annotations": annotations}
+    ann_body_bytes = _json.dumps(ann_body).encode('utf-8')
+    headers = _hmac_headers(ann_body_bytes, secret)
+    headers['Content-Type'] = 'application/json'
+    bulk = client.post(f"/api/analyses/{analysis['id']}/annotations:bulk", data=ann_body_bytes, headers=headers)
+    assert bulk.status_code == 200, bulk.text
+
+    # Test pagination
+    resp = client.get(f"/api/analyses/{analysis['id']}/annotations?skip=0&limit=5")
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data['total'] == 5  # returns min(actual, limit)
+
+    resp = client.get(f"/api/analyses/{analysis['id']}/annotations?skip=5&limit=5")
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data['total'] == 5
+
+
+def test_access_control_other_user_analysis(client):
+    """Test that users cannot access other users' analyses."""
+    # Note: This test assumes we have multi-user support
+    # For now, it just verifies 404 on non-existent analysis
+    fake_analysis_id = uuid.uuid4()
+    resp = client.get(f"/api/analyses/{fake_analysis_id}")
+    assert resp.status_code == 404
+
+
+def test_export_json_format(client, monkeypatch):
+    """Test exporting analysis in JSON format."""
+    from core import config as cfg
+    import json as _json
+
+    secret = 'secret123'; monkeypatch.setattr('routers.ml_analyses.settings.ML_CALLBACK_HMAC_SECRET', secret)
+    monkeypatch.setenv('ML_CALLBACK_HMAC_SECRET', 'secret123')
+    monkeypatch.setattr('routers.ml_analyses.settings.ML_PIPELINE_REQUIRE_HMAC', True)
+
+    # Create project & image & analysis
+    proj = client.post('/api/projects/', json={"name":"ExportTest","description":"d","meta_group_id":"data-scientists"}).json()
+    img = client.post(f"/api/projects/{proj['id']}/images", files={'file': ('f.png', b'\x89PNG\r\n', 'image/png')}, data={'metadata':'{}'}).json()
+    analysis = client.post(f"/api/images/{img['id']}/analyses", json={"image_id": img['id'], "model_name":"yolo_v8","model_version":"1.0","parameters":{"threshold": 0.5}}).json()
+
+    # Add annotations
+    ann_body = {
+        "annotations": [
+            {
+                "annotation_type": "bounding_box",
+                "class_name": "cat",
+                "confidence": 0.95,
+                "data": {"x_min": 10, "y_min": 20, "x_max": 100, "y_max": 200, "image_width": 1024, "image_height": 768}
+            },
+            {
+                "annotation_type": "classification",
+                "class_name": "cat",
+                "confidence": 0.95,
+                "data": {"topk": [{"class": "cat", "confidence": 0.95}]}
+            }
+        ]
+    }
+    ann_body_bytes = _json.dumps(ann_body).encode('utf-8')
+    headers = _hmac_headers(ann_body_bytes, secret)
+    headers['Content-Type'] = 'application/json'
+    bulk = client.post(f"/api/analyses/{analysis['id']}/annotations:bulk", data=ann_body_bytes, headers=headers)
+    assert bulk.status_code == 200
+
+    # Finalize
+    fin_body = {"status": "completed"}
+    fin_body_bytes = _json.dumps(fin_body).encode('utf-8')
+    headers = _hmac_headers(fin_body_bytes, secret)
+    headers['Content-Type'] = 'application/json'
+    client.post(f"/api/analyses/{analysis['id']}/finalize", data=fin_body_bytes, headers=headers)
+
+    # Export as JSON
+    resp = client.get(f"/api/analyses/{analysis['id']}/export?format=json")
+    assert resp.status_code == 200
+    export_data = resp.json()
+
+    # Verify export structure
+    assert export_data['id'] == analysis['id']
+    assert export_data['model_name'] == 'yolo_v8'
+    assert export_data['model_version'] == '1.0'
+    assert export_data['status'] == 'completed'
+    assert export_data['annotation_count'] == 2
+    assert len(export_data['annotations']) == 2
+    assert export_data['parameters']['threshold'] == 0.5
+
+
+def test_export_csv_format(client, monkeypatch):
+    """Test exporting analysis in CSV format."""
+    from core import config as cfg
+    import json as _json
+
+    secret = 'secret123'; monkeypatch.setattr('routers.ml_analyses.settings.ML_CALLBACK_HMAC_SECRET', secret)
+    monkeypatch.setenv('ML_CALLBACK_HMAC_SECRET', 'secret123')
+    monkeypatch.setattr('routers.ml_analyses.settings.ML_PIPELINE_REQUIRE_HMAC', True)
+
+    # Create project & image & analysis
+    proj = client.post('/api/projects/', json={"name":"CSVTest","description":"d","meta_group_id":"data-scientists"}).json()
+    img = client.post(f"/api/projects/{proj['id']}/images", files={'file': ('f.png', b'\x89PNG\r\n', 'image/png')}, data={'metadata':'{}'}).json()
+    analysis = client.post(f"/api/images/{img['id']}/analyses", json={"image_id": img['id'], "model_name":"resnet50_classifier","model_version":"1","parameters":{}}).json()
+
+    # Add annotation
+    ann_body = {
+        "annotations": [
+            {
+                "annotation_type": "classification",
+                "class_name": "dog",
+                "confidence": 0.88,
+                "data": {"score": 0.88}
+            }
+        ]
+    }
+    ann_body_bytes = _json.dumps(ann_body).encode('utf-8')
+    headers = _hmac_headers(ann_body_bytes, secret)
+    headers['Content-Type'] = 'application/json'
+    client.post(f"/api/analyses/{analysis['id']}/annotations:bulk", data=ann_body_bytes, headers=headers)
+
+    # Export as CSV
+    resp = client.get(f"/api/analyses/{analysis['id']}/export?format=csv")
+    assert resp.status_code == 200
+    assert resp.headers['content-type'] == 'text/csv; charset=utf-8'
+    assert 'content-disposition' in resp.headers
+    assert 'attachment' in resp.headers['content-disposition']
+
+    # Verify CSV content
+    csv_content = resp.text
+    lines = csv_content.strip().split('\n')
+    assert len(lines) >= 2  # header + at least one row
+    assert 'annotation_id' in lines[0]
+    assert 'annotation_type' in lines[0]
+    assert 'dog' in csv_content
+
+
+def test_status_state_machine_transitions(client):
+    """Test all valid and invalid status transitions."""
+    # Create project & image & analysis
+    proj = client.post('/api/projects/', json={"name":"StateTest","description":"d","meta_group_id":"data-scientists"}).json()
+    img = client.post(f"/api/projects/{proj['id']}/images", files={'file': ('f.png', b'\x89PNG\r\n', 'image/png')}, data={'metadata':'{}'}).json()
+
+    # Test queued -> processing -> completed
+    a1 = client.post(f"/api/images/{img['id']}/analyses", json={"image_id": img['id'], "model_name":"resnet50_classifier","model_version":"1","parameters":{}}).json()
+    assert a1['status'] == 'queued'
+
+    resp = client.patch(f"/api/analyses/{a1['id']}/status", json={"status": "processing"})
+    assert resp.status_code == 200
+    assert resp.json()['status'] == 'processing'
+
+    resp = client.patch(f"/api/analyses/{a1['id']}/status", json={"status": "completed"})
+    assert resp.status_code == 200
+    assert resp.json()['status'] == 'completed'
+
+    # Test queued -> processing -> failed
+    a2 = client.post(f"/api/images/{img['id']}/analyses", json={"image_id": img['id'], "model_name":"resnet50_classifier","model_version":"2","parameters":{}}).json()
+    client.patch(f"/api/analyses/{a2['id']}/status", json={"status": "processing"})
+    resp = client.patch(f"/api/analyses/{a2['id']}/status", json={"status": "failed", "error_message": "Out of memory"})
+    assert resp.status_code == 200
+    assert resp.json()['status'] == 'failed'
+    assert resp.json()['error_message'] == 'Out of memory'
+
+    # Test queued -> canceled
+    a3 = client.post(f"/api/images/{img['id']}/analyses", json={"image_id": img['id'], "model_name":"resnet50_classifier","model_version":"3","parameters":{}}).json()
+    resp = client.patch(f"/api/analyses/{a3['id']}/status", json={"status": "canceled"})
+    assert resp.status_code == 200
+    assert resp.json()['status'] == 'canceled'
+
+    # Test invalid transition: completed -> queued (should fail with 409)
+    a4 = client.post(f"/api/images/{img['id']}/analyses", json={"image_id": img['id'], "model_name":"resnet50_classifier","model_version":"4","parameters":{}}).json()
+    client.patch(f"/api/analyses/{a4['id']}/status", json={"status": "processing"})
+    client.patch(f"/api/analyses/{a4['id']}/status", json={"status": "completed"})
+    resp = client.patch(f"/api/analyses/{a4['id']}/status", json={"status": "queued"})
+    assert resp.status_code == 409
