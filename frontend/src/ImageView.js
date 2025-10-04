@@ -8,6 +8,8 @@ import ImageMetadata from './components/ImageMetadata';
 import CompactImageClassifications from './components/CompactImageClassifications';
 import ImageComments from './components/ImageComments';
 import ImageDeletionControls from './components/ImageDeletionControls';
+// ML interactive panel & overlay controls removed per temporary requirement
+import MLDebugOutputs from './components/MLDebugOutputs';
 
 function ImageView() {
   const { imageId } = useParams();
@@ -26,6 +28,10 @@ function ImageView() {
   const [currentUser, setCurrentUser] = useState(null);
   const [sidebarWidth, setSidebarWidth] = useState(350);
   const [isResizing, setIsResizing] = useState(false);
+  // ML interactive overlay state disabled intentionally
+  const selectedAnalysis = null;
+  const selectedAnnotations = [];
+  const overlayOptions = { showBoxes: false, showHeatmap: false, opacity: 0.7 };
 
   // Load image data
   const loadImageData = useCallback(async () => {
@@ -302,6 +308,8 @@ function ImageView() {
                 setLoading={setLoading}
                 setError={setError}
               />
+
+              {/* ML analysis triggering hidden. */}
             </div>
 
             {/* Resizable divider */}
@@ -326,6 +334,9 @@ function ImageView() {
                 navigateToNextImage={navigateToNextImage}
                 currentImageIndex={currentImageIndex}
                 projectImages={projectImages}
+                selectedAnalysis={selectedAnalysis}
+                annotations={selectedAnnotations}
+                overlayOptions={overlayOptions}
               />
             </div>
           </div>
@@ -337,6 +348,12 @@ function ImageView() {
             setImage={setImage}
             refreshProjectImages={loadProjectImages}
           />
+          {/* Debug ML outputs section */}
+          {imageId && (
+            <div style={{ marginTop: '1rem' }}>
+              <MLDebugOutputs imageId={imageId} />
+            </div>
+          )}
         </div>
       </div>
     </div>

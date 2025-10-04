@@ -325,4 +325,8 @@ class MLAnalysisList(BaseModel):
     analyses: List[MLAnalysis]
     total: int
 
+class MLAnnotationList(BaseModel):
+    annotations: List[MLAnnotation]
+    total: int
+
 

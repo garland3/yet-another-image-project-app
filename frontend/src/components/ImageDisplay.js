@@ -1,4 +1,5 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef, useLayoutEffect, useCallback } from 'react';
+import BoundingBoxOverlay from './BoundingBoxOverlay';
 
 // Deleted image placeholder SVG for larger display
 const DELETED_IMAGE_DISPLAY_SVG = 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iODAwIiBoZWlnaHQ9IjYwMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iODAwIiBoZWlnaHQ9IjYwMCIgZmlsbD0iI2ZiZjVmNSIgc3Ryb2tlPSIjZjU5ZTBiIiBzdHJva2Utd2lkdGg9IjQiIHN0cm9rZS1kYXNoYXJyYXk9IjE1LDgiLz48dGV4dCB4PSI1MCUiIHk9IjM1JSIgZm9udC1mYW1pbHk9IkFyaWFsLCBzYW5zLXNlcmlmIiBmb250LXNpemU9IjM2IiBmb250LXdlaWdodD0iNjAwIiB0ZXh0LWFuY2hvcj0ibWlkZGxlIiBkeT0iLjNlbSIgZmlsbD0iI2M0MzAyYiI+SW1hZ2UgRGVsZXRlZDwvdGV4dD48dGV4dCB4PSI1MCUiIHk9IjUwJSIgZm9udC1mYW1pbHk9IkFyaWFsLCBzYW5zLXNlcmlmIiBmb250LXNpemU9IjY0IiB0ZXh0LWFuY2hvcj0ibWlkZGxlIiBkeT0iLjNlbSIgZmlsbD0iI2Y1OWUwYiI+8J+XkeKcgO+4jzwvdGV4dD48dGV4dCB4PSI1MCUiIHk9IjY1JSIgZm9udC1mYW1pbHk9IkFyaWFsLCBzYW5zLXNlcmlmIiBmb250LXNpemU9IjE4IiB0ZXh0LWFuY2hvcj0ibWlkZGxlIiBkeT0iLjNlbSIgZmlsbD0iIzk3OWNhMSI+VGhpcyBpbWFnZSBoYXMgYmVlbiBkZWxldGVkPC90ZXh0Pjx0ZXh0IHg9IjUwJSIgeT0iNzAlIiBmb250LWZhbWlseT0iQXJpYWwsIHNhbnMtc2VyaWYiIGZvbnQtc2l6ZT0iMTQiIHRleHQtYW5jaG9yPSJtaWRkbGUiIGR5PSIuM2VtIiBmaWxsPSIjOTc5Y2ExIj5DaGVjayB0aGUgZGVsZXRpb24gY29udHJvbHMgYmVsb3cgZm9yIG1vcmUgaW5mbzwvdGV4dD48L3N2Zz4=';
@@ -13,7 +14,10 @@ function ImageDisplay({
   navigateToPreviousImage,
   navigateToNextImage,
   currentImageIndex,
-  projectImages
+  projectImages,
+  selectedAnalysis,
+  annotations,
+  overlayOptions
 }) {
   const [zoomLevel, setZoomLevel] = useState(1);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
@@ -199,12 +203,25 @@ function ImageDisplay({
     };
   }, []);
 
+  const containerRef = useRef(null);
+  const imgRef = useRef(null);
+  const [displaySize, setDisplaySize] = useState({ width: 0, height: 0 });
+
+  const measure = useCallback(() => {
+    if (imgRef.current) {
+      setDisplaySize({ width: imgRef.current.clientWidth * zoomLevel, height: imgRef.current.clientHeight * zoomLevel });
+    }
+  }, [zoomLevel]);
+
+  useLayoutEffect(() => { measure(); }, [image, zoomLevel, measure, annotations]);
+  useEffect(() => {
+    window.addEventListener('resize', measure);
+    return () => window.removeEventListener('resize', measure);
+  }, [measure]);
+
   return (
     <>
-      <div 
-        id="image-display" 
-        className={isTransitioning ? 'transitioning' : ''}
-      >
+      <div id="image-display" className={isTransitioning ? 'transitioning' : ''} ref={containerRef} style={{ position: 'relative' }}>
         {!image ? (
           <div className="loading-container">
             <div className="loading"></div>
@@ -216,8 +233,9 @@ function ImageDisplay({
             alt="Deleted"
             id="main-image"
             className="view-image deleted-image"
-            style={{ transform: `scale(${zoomLevel})` }}
+            style={{ transform: `scale(${zoomLevel})`, transformOrigin: 'top left' }}
             onClick={handleZoomIn}
+            ref={imgRef}
           />
         ) : (
           <img
@@ -225,7 +243,7 @@ function ImageDisplay({
             alt={image.filename || ''}
             id="main-image"
             className="view-image"
-            style={{ transform: `scale(${zoomLevel})` }}
+            style={{ transform: `scale(${zoomLevel})`, transformOrigin: 'top left' }}
             onClick={handleZoomIn}
             onError={(e) => {
               console.error('Failed to load image with ID: %s', imageId, e);
@@ -234,6 +252,15 @@ function ImageDisplay({
                 e.target.src = `/api/images/${imageId}/thumbnail?width=800&height=600`;
               }
             }}
+            ref={imgRef}
+          />
+        )}
+        {image && overlayOptions?.showBoxes && annotations?.length > 0 && (
+          <BoundingBoxOverlay
+            annotations={annotations}
+            naturalSize={{ width: image.width, height: image.height }}
+            containerSize={displaySize}
+            opacity={overlayOptions.opacity}
           />
         )}
       </div>

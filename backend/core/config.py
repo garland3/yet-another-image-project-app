@@ -1,5 +1,5 @@
 from pydantic_settings import BaseSettings
-from pydantic import field_validator
+from pydantic import field_validator, ConfigDict
 from typing import Optional
 import os
 from pathlib import Path
@@ -51,8 +51,12 @@ class Settings(BaseSettings):
     # ML Analysis settings
     ML_ANALYSIS_ENABLED: bool = True
     ML_MAX_ANALYSES_PER_IMAGE: int = 10
-    ML_ALLOWED_MODELS: str = "resnet50_classifier,vgg16,inception_v3,efficientnet_b0"
+    ML_ALLOWED_MODELS: str = "resnet50_classifier,vgg16,inception_v3,efficientnet_b0,demo-model-detcls"
     ML_DEFAULT_STATUS: str = "queued"
+    ML_CALLBACK_HMAC_SECRET: Optional[str] = None
+    ML_PIPELINE_REQUIRE_HMAC: bool = True
+    ML_MAX_BULK_ANNOTATIONS: int = 5000
+    ML_PRESIGNED_URL_EXPIRY_SECONDS: int = 900
 
     # Image deletion / retention settings
     IMAGE_DELETE_RETENTION_DAYS: int = 60  # Soft delete retention window (days)
@@ -77,11 +81,12 @@ class Settings(BaseSettings):
             v = v.strip()
         return v
 
-    class Config:
-        # Check for .env in current directory first, then parent directory
-        env_file = [".env", "../.env"]
-        env_file_encoding = 'utf-8'
-        extra = "allow"
+    # Pydantic v2 style configuration
+    model_config = ConfigDict(
+        env_file=(".env", "../.env"),
+        env_file_encoding='utf-8',
+        extra='allow'
+    )
     
     @property
     def MOCK_USER_GROUPS(self):
@@ -106,6 +111,16 @@ if os.getenv("MINIO_BUCKET_NAME") and not os.getenv("S3_BUCKET"):
     settings.S3_BUCKET = os.getenv("MINIO_BUCKET_NAME")  # type: ignore[attr-defined]
 if os.getenv("MINIO_USE_SSL") and not os.getenv("S3_USE_SSL"):
     settings.S3_USE_SSL = os.getenv("MINIO_USE_SSL", "False").lower() == "true"  # type: ignore[attr-defined]
+
+# Test/fast-mode convenience: If ML pipeline HMAC is required but no secret supplied,
+# synthesize a deterministic test secret to avoid runtime 500s in early-initialized
+# app contexts (e.g., when TestClient is created before individual tests set it).
+try:
+    if getattr(settings, 'FAST_TEST_MODE', False) and settings.ML_PIPELINE_REQUIRE_HMAC and not settings.ML_CALLBACK_HMAC_SECRET:
+        settings.ML_CALLBACK_HMAC_SECRET = "test-hmac-secret"  # type: ignore[attr-defined]
+except Exception:
+    # Non-fatal; continue with possibly missing secret (will raise at verification time)
+    pass
 
 # If running outside Docker and DATABASE_URL points at the docker hostname 'db',
 # rewrite to localhost using HOST_DB_PORT (default 5433) for local dev.

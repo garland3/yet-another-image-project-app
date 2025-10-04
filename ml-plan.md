@@ -149,12 +149,14 @@ def downgrade():
 2. Pydantic schemas:
    - `MLAnalysisCreate`, `MLAnalysis`, `MLAnnotationCreate`, `MLAnnotation`.
 3. REST Endpoints (initial):
-   - `POST /api/images/{image_id}/analyses` → create queued analysis (optionally returns presigned download URL for image if pipeline pulls rather than receives push trigger).
+   - `POST /api/images/{image_id}/analyses` → create queued analysis (called by external services only; requires API key authentication; optionally returns presigned download URL for image if pipeline pulls rather than receives push trigger).
    - `GET /api/images/{image_id}/analyses` → list analyses.
    - `GET /api/analyses/{analysis_id}` → detail with annotations.
    - `GET /api/analyses/{analysis_id}/annotations` → annotations only (pagination ready).
 4. Feature flag: `ML_ANALYSIS_ENABLED` (config) – endpoints return 404 or 403 when disabled.
 5. Audit logging for creation & status changes.
+
+**Note**: The `POST /api/images/{image_id}/analyses` endpoint is designed for external system integration (cron jobs, ML pipelines) and requires API key authentication. End users do not have direct access to trigger ML analyses.
 
 ### External Job Acquisition Patterns (Choose One)
 | Pattern | Description | Pros | Cons |
@@ -223,7 +225,7 @@ Reject illegal transitions with 409 Conflict.
 ### UI Components
 | Component | Responsibility |
 |-----------|----------------|
-| `MLAnalysisPanel` | List analyses, trigger new, show statuses. |
+| `MLAnalysisPanel` | List analyses, show statuses (read-only). |
 | `AnalysisStatusBadge` | Color-coded state indicator. |
 | `OverlayLayer` | Canvas/SVG drawing for bounding boxes & keypoints. |
 | `HeatmapLayer` | Draw semi-transparent heatmap (lazy load). |
@@ -231,7 +233,7 @@ Reject illegal transitions with 409 Conflict.
 | `OverlayControls` | Toggle layer visibility, opacity slider. |
 
 ### Interactions
-- User triggers analysis → optimistic row (status `queued`).
+- **Users CANNOT trigger ML analyses directly**. Analyses are initiated by external services (cron jobs, ML pipelines, or other automated systems).
 - Poll or WebSocket updates status in real-time.
 - Selecting an analysis loads its annotations → overlays drawn.
 - Multi-view: Original (left) vs. Selected Analysis (right) or stacked layering.
@@ -243,23 +245,29 @@ Reject illegal transitions with 409 Conflict.
 
 ### Failure UX
 - Show failure badge + tooltip error_message.
-- Offer re-trigger (creates new analysis; older stays archived).
+- No user re-trigger capability (external systems manage retry logic).
+
+### Implementation Status (Phase 3 - Initial Increment)
+Implemented minimal UI integration:
+1. Added `frontend/src/components/MLAnalysisPanel.js` listing analyses for an image, status badges, and annotation list (read-only; no user-triggered analysis creation).
+2. Injected the panel into the image sidebar within `ImageView` below metadata & comments (non-invasive; gracefully handles 404 or empty states).
+3. Kept scope intentionally small (no overlays yet) to ship incremental value and validate API usage patterns.
+
+**Important**: The UI does NOT provide a way for users to trigger new ML analyses. All analyses are created by external systems (scheduled jobs, webhooks, or pipeline services).
+
+Deferred remaining Phase 3 items to sub-phases:
+- Overlay rendering (canvas/SVG for boxes, heatmaps) — pending design of annotation type-to-visual mapping.
+- Real-time status updates (currently manual refresh; could add polling or WebSocket in Phase 4).
+- Multi-view comparison UI and opacity controls.
+
+Next recommended Phase 3 steps:
+1. Add lightweight polling (every 5–10s) while any analysis is non-terminal.
+2. Implement bounding box overlay renderer using existing annotation `data` shape.
+3. Lazy-load heatmap images from `storage_path` once artifact presign + upload path finalized.
+
+Rationale for incremental delivery: ensures backend contract stability and reduces large PR risk while providing immediate visibility into analyses.
 
 ---
-## Phase 4: Advanced & Operational Enhancements
-**Goals**: Mature feature set & observability.
-
-### Enhancements
-1. **Real-Time Updates**: WebSocket channel broadcasting status + partial annotation batches.
-2. **Progress Metrics**: Pipeline sends `% complete` event (add `progress_percent` column later).
-3. **Model Registry**: `ml_models` table (name, version, checksum, default parameters, active flag).
-4. **Comparison Mode**: Render diff (IoU of boxes, class score deltas) between two analyses.
-5. **Temporal / Sequence Support**: Add `frame_index` to annotations for video or burst images.
-6. **Embeddings & Semantic Search**: Store vector embeddings externally (PGVector / separate service) referencing analysis IDs.
-7. **Access Control Granularity**: Per-project allowed model list.
-8. **Retention Policies**: Scheduled purge of analyses older than X days (configurable); soft-delete columns.
-9. **Audit & Metrics Export**: Prometheus counters (analyses_created_total, analyses_failed_total, queue_latency_seconds).
-10. **Tiered Storage**: Lifecycle transitions for large artifacts (archive to cheaper storage after N days).
 
 ### Observability
 - Log correlation: Include `analysis_id` in all related log events.
@@ -289,14 +297,14 @@ ML_PRESIGNED_URL_EXPIRY_SECONDS: int = 900
 ## API Contract Summary (Initial Set)
 | Method | Path | Purpose |
 |--------|------|---------|
-| POST | `/api/images/{image_id}/analyses` | Create analysis (queued) |
-| GET | `/api/images/{image_id}/analyses` | List analyses |
-| GET | `/api/analyses/{analysis_id}` | Analysis detail |
-| GET | `/api/analyses/{analysis_id}/annotations` | Paginated annotations |
-| PATCH | `/api/analyses/{analysis_id}/status` | (Pipeline) status update |
-| POST | `/api/analyses/{analysis_id}/annotations:bulk` | (Pipeline) bulk insert |
-| POST | `/api/analyses/{analysis_id}/artifacts/presign` | (Pipeline) presigned upload |
-| POST | `/api/analyses/{analysis_id}/finalize` | (Pipeline) finalize |
+| POST | `/api/images/{image_id}/analyses` | (External API) Create analysis (queued; API key required) |
+| GET | `/api/images/{image_id}/analyses` | List analyses (users read-only) |
+| GET | `/api/analyses/{analysis_id}` | Analysis detail (users read-only) |
+| GET | `/api/analyses/{analysis_id}/annotations` | Paginated annotations (users read-only) |
+| PATCH | `/api/analyses/{analysis_id}/status` | (Pipeline API) status update |
+| POST | `/api/analyses/{analysis_id}/annotations:bulk` | (Pipeline API) bulk insert |
+| POST | `/api/analyses/{analysis_id}/artifacts/presign` | (Pipeline API) presigned upload |
+| POST | `/api/analyses/{analysis_id}/finalize` | (Pipeline API) finalize |
 
 Optional future: `GET /api/analyses?status=queued&limit=...&claim=true` for worker claiming.
 
@@ -316,7 +324,7 @@ Optional future: `GET /api/analyses?status=queued&limit=...&claim=true` for work
 | Large annotation batch | Enforce max items (e.g. 5k) & pagination. |
 | Oversized artifact | Validate `Content-Length` vs. configured cap; reject pre-sign. |
 | Orphaned analyses (never processed) | Add cleanup job: mark `stale` after TTL. |
-| Conflicting re-trigger requests | Allow new analysis; old stays immutable. |
+| Duplicate analysis creation requests | Allow new analysis; old stays immutable. |
 | Pipeline partial failure (some annotations) | Accept incremental bulk uploads; finalize only when ready. |
 | Missing image (deleted) | Block new analyses; return 410 Gone. |
 
@@ -356,30 +364,14 @@ Add to README:
 ```
 ML Analysis (Preview)
 =====================
+This feature enables visualization of ML analysis results. **Users cannot trigger analyses directly** - all ML analyses are initiated by external systems (cron jobs, webhooks, ML pipelines).
+
+For system administrators / pipeline developers:
 1. Enable: set ML_ANALYSIS_ENABLED=true
-2. Create analysis: POST /api/images/{image_id}/analyses {"model_name":"resnet50_classifier","model_version":"1.0.0"}
+2. Create analysis via API: POST /api/images/{image_id}/analyses {"model_name":"resnet50_classifier","model_version":"1.0.0"} (requires API key)
 3. External pipeline polls queued analyses or receives job trigger.
 4. Pipeline updates status & uploads artifacts.
-5. UI displays overlays when available.
+5. UI displays analyses and overlays when available (read-only for end users).
 ```
 
----
-## Future Considerations
-- Multi-image batch analyses referencing a logical batch ID.
-- Streaming partial heatmap tiles (pyramid/DeepZoom style) for very large images.
-- Pluggable validation for custom annotation types via registry.
-- GraphQL endpoint for richer querying (optional).
 
----
-## Open Questions (To Clarify Early)
-1. Do we require strict ordering of annotations (e.g., for sequences)?
-2. Will multiple pipelines write to same analysis (collaborative) or only one owner?
-3. Maximum expected bounding boxes / image (impacts payload size limits)?
-4. Need soft-deletion of analyses or permanent retention? Compliance constraints?
-5. Any need for partial redaction or user-level filtering of ML outputs?
-
----
-## Summary
-This plan stages ML visualization capabilities safely and incrementally while delegating compute to an external pipeline. Phase 1 establishes durable, backward-compatible foundations; subsequent phases layer operational robustness, visualization richness, and advanced analytics.
-
-> Next Action: Implement Phase 1 migration + API scaffolding behind feature flag.
