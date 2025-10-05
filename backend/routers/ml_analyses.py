@@ -2,6 +2,7 @@ import uuid
 from typing import List, Optional, Literal
 from fastapi import APIRouter, Depends, HTTPException, Query, status, Request
 from sqlalchemy.ext.asyncio import AsyncSession
+from pydantic import Field
 from core import schemas
 from core.config import settings
 from core.database import get_db
@@ -378,9 +379,6 @@ async def bulk_upload_annotations(
 
 
 class PresignRequest(schemas.BaseModel):  # type: ignore[attr-defined]
-    from pydantic import Field, field_validator
-    import re
-
     artifact_type: Literal["heatmap", "mask", "segmentation", "log", "metadata"] = Field(
         ...,
         description="Type of artifact to upload"
