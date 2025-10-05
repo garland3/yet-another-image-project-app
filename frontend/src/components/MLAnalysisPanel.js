@@ -5,7 +5,7 @@ import React, { useEffect, useState, useCallback } from 'react';
  * Phase 3 implementation: Read-only panel for listing ML analyses and annotations.
  * Users cannot trigger analyses - all analyses are created by external systems (cron, ML pipelines).
  */
-export default function MLAnalysisPanel({ imageId, onSelect, onAnalysesLoaded }) {
+export default function MLAnalysisPanel({ imageId, onSelect, onAnalysesLoaded, autoSelectLatest = true, onAutoSelectChange }) {
   const [analyses, setAnalyses] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
@@ -97,6 +97,23 @@ export default function MLAnalysisPanel({ imageId, onSelect, onAnalysesLoaded })
 
   useEffect(() => { fetchAnalyses(); }, [fetchAnalyses]);
 
+  // Reset selection when imageId changes
+  useEffect(() => {
+    setSelected(null);
+    setAnnotations([]);
+  }, [imageId]);
+
+  // Auto-select latest analysis when analyses load and autoSelectLatest is enabled
+  useEffect(() => {
+    if (autoSelectLatest && analyses.length > 0 && !selected) {
+      // Find the most recent completed analysis
+      const latestCompleted = analyses.find(a => a.status === 'completed');
+      if (latestCompleted) {
+        selectAnalysis(latestCompleted.id);
+      }
+    }
+  }, [analyses, autoSelectLatest, selected, selectAnalysis]);
+
   const hasAnalyses = analyses.length > 0;
 
   if (!hasAnalyses) {
@@ -106,9 +123,22 @@ export default function MLAnalysisPanel({ imageId, onSelect, onAnalysesLoaded })
 
   return (
     <div className="ml-analysis-panel" style={{ border: '1px solid var(--border-color)', borderRadius: 6, padding: '0.75rem', marginTop: '1rem' }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
         <h3 style={{ margin: 0 }}>ML Analyses</h3>
-        <span style={{ fontSize: 11, color: 'var(--text-muted, #666)', fontStyle: 'italic' }}>Read-only</span>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+          {onAutoSelectChange && (
+            <label style={{ fontSize: 11, display: 'flex', alignItems: 'center', gap: '4px', cursor: 'pointer' }}>
+              <input
+                type="checkbox"
+                checked={autoSelectLatest}
+                onChange={(e) => onAutoSelectChange(e.target.checked)}
+                style={{ cursor: 'pointer' }}
+              />
+              Auto-select
+            </label>
+          )}
+          <span style={{ fontSize: 11, color: 'var(--text-muted, #666)', fontStyle: 'italic' }}>Read-only</span>
+        </div>
       </div>
       {error && <div className="alert alert-error" style={{ margin: '0.5rem 0' }}>{error}</div>}
       {loading ? <div>Loading analyses…</div> : (

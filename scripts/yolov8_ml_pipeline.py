@@ -28,7 +28,7 @@ import numpy as np
 try:
     from ultralytics import YOLO
 except ImportError:
-    print("❌ Error: ultralytics not installed. Run: pip install ultralytics opencv-python")
+    print("X Error: ultralytics not installed. Run: pip install ultralytics opencv-python")
     sys.exit(1)
 
 
@@ -88,13 +88,13 @@ class YOLOv8Pipeline:
     def load_model(self, model_size: str = 'n'):
         """Load YOLOv8 model (n=nano, s=small, m=medium, l=large, x=xlarge)"""
         model_name = f'yolov8{model_size}.pt'
-        print(f"📦 Loading YOLOv8 model: {model_name}")
+        print(f"X Loading YOLOv8 model: {model_name}")
         self.model = YOLO(model_name)
-        print("✅ Model loaded successfully")
+        print("X Model loaded successfully")
 
     def get_project_images(self, project_id: str, limit: int = 10) -> List[Dict[str, Any]]:
         """Fetch images from a project"""
-        print(f"📥 Fetching images from project {project_id}")
+        print(f"X Fetching images from project {project_id}")
 
         url = f"{self.api_base_url}/api/projects/{project_id}/images"
         params = {'skip': 0, 'limit': limit}
@@ -103,12 +103,26 @@ class YOLOv8Pipeline:
         response.raise_for_status()
 
         images = response.json()
-        print(f"✅ Found {len(images)} images")
+        print(f"X Found {len(images)} images")
         return images
+
+    def get_image_analyses(self, image_id: str) -> List[Dict[str, Any]]:
+        """Fetch existing analyses for an image"""
+        url = f"{self.api_base_url}/api/images/{image_id}/analyses"
+
+        try:
+            response = self.session.get(url)
+            response.raise_for_status()
+            data = response.json()
+            # API returns {"analyses": [...], "total": N}
+            return data.get('analyses', [])
+        except Exception as e:
+            print(f"  X  Failed to fetch analyses for image {image_id}: {e}")
+            return []
 
     def download_image(self, image_id: str) -> tuple[np.ndarray, Dict[str, Any]]:
         """Download image from API and return as numpy array"""
-        print(f"  📥 Downloading image {image_id}")
+        print(f"  X Downloading image {image_id}")
 
         # First, get the download info (returns JSON with URL)
         info_url = f"{self.api_base_url}/api/images/{image_id}/download"
@@ -146,7 +160,7 @@ class YOLOv8Pipeline:
             raise ValueError(f"Empty response from {content_url}. Status: {response.status_code}, Headers: {dict(response.headers)}")
 
         content_type = response.headers.get('Content-Type', '')
-        print(f"  📦 Received {len(response.content)} bytes, content-type: {content_type}")
+        print(f"  X Received {len(response.content)} bytes, content-type: {content_type}")
 
         # Check if we got HTML (error page) instead of image
         if 'text/html' in content_type:
@@ -156,12 +170,12 @@ class YOLOv8Pipeline:
         pil_image = Image.open(image_bytes)
         image_array = cv2.cvtColor(np.array(pil_image), cv2.COLOR_RGB2BGR)
 
-        print(f"  ✅ Downloaded {metadata['filename']} ({image_array.shape})")
+        print(f"  X Downloaded {metadata['filename']} ({image_array.shape})")
         return image_array, metadata
 
     def create_analysis(self, image_id: str, model_version: str) -> str:
         """Create ML analysis entry"""
-        print(f"  📝 Creating analysis for image {image_id}")
+        print(f"  X Creating analysis for image {image_id}")
 
         url = f"{self.api_base_url}/api/images/{image_id}/analyses"
         data = {
@@ -184,23 +198,23 @@ class YOLOv8Pipeline:
 
         analysis = response.json()
         analysis_id = analysis['id']
-        print(f"  ✅ Created analysis {analysis_id}")
+        print(f"  X Created analysis {analysis_id}")
         return analysis_id
 
     def update_analysis_status(self, analysis_id: str, status: str):
         """Update analysis status"""
-        print(f"  📝 Updating analysis status to: {status}")
+        print(f"  X Updating analysis status to: {status}")
 
         url = f"{self.api_base_url}/api/analyses/{analysis_id}/status"
         data = {"status": status}
 
         response = self._make_hmac_request('PATCH', url, data)
         response.raise_for_status()
-        print(f"  ✅ Status updated to {status}")
+        print(f"  X Status updated to {status}")
 
     def run_detection(self, image: np.ndarray, conf_threshold: float = 0.25) -> List[Dict[str, Any]]:
         """Run YOLOv8 detection on image"""
-        print(f"  🔍 Running YOLOv8 detection...")
+        print(f"  X Running YOLOv8 detection...")
 
         results = self.model(image, conf=conf_threshold, verbose=False)[0]
 
@@ -224,7 +238,7 @@ class YOLOv8Pipeline:
                 }
             })
 
-        print(f"  ✅ Detected {len(detections)} objects")
+        print(f"  X Detected {len(detections)} objects")
         return detections
 
     def create_visualizations(self, image: np.ndarray, detections: List[Dict[str, Any]]) -> tuple[bytes, bytes]:
@@ -265,7 +279,7 @@ class YOLOv8Pipeline:
 
     def upload_artifact(self, analysis_id: str, artifact_type: str, filename: str, data: bytes):
         """Upload artifact to S3 via presigned URL"""
-        print(f"  📤 Uploading {artifact_type}: {filename}")
+        print(f"  X Uploading {artifact_type}: {filename}")
 
         # Get presigned URL
         url = f"{self.api_base_url}/api/analyses/{analysis_id}/artifacts/presign"
@@ -277,7 +291,7 @@ class YOLOv8Pipeline:
         response = self._make_hmac_request('POST', url, presign_data)
 
         if not response.ok:
-            print(f"  ❌ Presign request failed: {response.status_code}")
+            print(f"  X Presign request failed: {response.status_code}")
             print(f"  Response: {response.text}")
             print(f"  Headers sent: X-ML-Signature={response.request.headers.get('X-ML-Signature')[:16]}...")
             print(f"  HMAC secret (first 16 chars): {self.hmac_secret[:16]}...")
@@ -293,13 +307,13 @@ class YOLOv8Pipeline:
         upload_response = requests.put(upload_url, data=data, headers=headers)
         upload_response.raise_for_status()
 
-        print(f"  ✅ Uploaded to {storage_path}")
+        print(f"  X Uploaded to {storage_path}")
         return storage_path
 
     def submit_annotations(self, analysis_id: str, detections: List[Dict[str, Any]],
                           heatmap_path: str, image_shape: tuple):
         """Submit detection annotations"""
-        print(f"  📝 Submitting {len(detections)} annotations")
+        print(f"  X Submitting {len(detections)} annotations")
 
         annotations = []
 
@@ -333,11 +347,11 @@ class YOLOv8Pipeline:
         response = self._make_hmac_request('POST', url, data)
         response.raise_for_status()
 
-        print(f"  ✅ Submitted {len(annotations)} annotations")
+        print(f"  X Submitted {len(annotations)} annotations")
 
     def finalize_analysis(self, analysis_id: str, status: str = "completed", error_message: str = None):
         """Finalize analysis"""
-        print(f"  ✅ Finalizing analysis as {status}")
+        print(f"  X Finalizing analysis as {status}")
 
         url = f"{self.api_base_url}/api/analyses/{analysis_id}/finalize"
         data = {"status": status}
@@ -346,7 +360,7 @@ class YOLOv8Pipeline:
 
         response = self._make_hmac_request('POST', url, data)
         response.raise_for_status()
-        print(f"  ✅ Analysis finalized")
+        print(f"  X Analysis finalized")
 
     def process_image(self, image_id: str, model_version: str):
         """Process a single image end-to-end"""
@@ -388,10 +402,10 @@ class YOLOv8Pipeline:
             # Finalize
             self.finalize_analysis(analysis_id, "completed")
 
-            print(f"✅ Successfully processed image {image_id}")
+            print(f"X Successfully processed image {image_id}")
 
         except Exception as e:
-            print(f"❌ Error processing image {image_id}: {e}")
+            print(f"X Error processing image {image_id}: {e}")
             if analysis_id:
                 try:
                     self.finalize_analysis(analysis_id, "failed", str(e))
@@ -399,12 +413,13 @@ class YOLOv8Pipeline:
                     pass
             raise
 
-    def run_project_pipeline(self, project_id: str, model_size: str = 'n', limit: int = 10):
+    def run_project_pipeline(self, project_id: str, model_size: str = 'n', limit: int = 10, skip_existing: bool = False):
         """Run pipeline on all images in a project"""
-        print(f"\n🚀 Starting YOLOv8 Pipeline")
+        print(f"\nX Starting YOLOv8 Pipeline")
         print(f"Project ID: {project_id}")
         print(f"Model Size: yolov8{model_size}")
         print(f"Image Limit: {limit}")
+        print(f"Skip Existing: {skip_existing}")
         print(f"{'='*60}\n")
 
         # Load model
@@ -415,26 +430,55 @@ class YOLOv8Pipeline:
         images = self.get_project_images(project_id, limit)
 
         if not images:
-            print("⚠️  No images found in project")
+            print("X  No images found in project")
+            return
+
+        # Filter images if skip_existing is enabled
+        images_to_process = []
+        skipped_count = 0
+
+        if skip_existing:
+            print(f"X Checking for existing analyses...")
+            for image in images:
+                analyses = self.get_image_analyses(image['id'])
+                # Only skip if there's at least one completed analysis
+                completed_analyses = [a for a in analyses if a.get('status') == 'completed']
+                if completed_analyses:
+                    print(f"  X  Skipping {image['id']} (has {len(completed_analyses)} completed analysis/analyses)")
+                    skipped_count += 1
+                else:
+                    if analyses:
+                        non_completed = [a.get('status') for a in analyses]
+                        print(f"  → Including {image['id']} (has analyses but none completed: {non_completed})")
+                    images_to_process.append(image)
+            print(f"X Filtered {len(images)} images → {len(images_to_process)} to process ({skipped_count} skipped)\n")
+        else:
+            images_to_process = images
+
+        if not images_to_process:
+            print("X  No images to process (all have existing analyses)")
             return
 
         # Process each image
         success_count = 0
-        for i, image in enumerate(images, 1):
-            print(f"\n[{i}/{len(images)}] Processing image...")
+        for i, image in enumerate(images_to_process, 1):
+            print(f"\n[{i}/{len(images_to_process)}] Processing image...")
             try:
                 self.process_image(image['id'], model_version)
                 success_count += 1
             except Exception as e:
-                print(f"❌ Failed to process image: {e}")
+                print(f"X Failed to process image: {e}")
 
         # Summary
         print(f"\n{'='*60}")
         print(f"Pipeline Complete!")
         print(f"{'='*60}")
         print(f"Total Images: {len(images)}")
+        if skip_existing:
+            print(f"Skipped (existing): {skipped_count}")
+            print(f"Processed: {len(images_to_process)}")
         print(f"Successful: {success_count}")
-        print(f"Failed: {len(images) - success_count}")
+        print(f"Failed: {len(images_to_process) - success_count}")
 
 
 def main():
@@ -448,13 +492,15 @@ def main():
                        help='YOLOv8 model size (n=nano, s=small, m=medium, l=large, x=xlarge)')
     parser.add_argument('--limit', type=int, default=10,
                        help='Maximum number of images to process (default: 10)')
+    parser.add_argument('--skip-existing', action='store_true',
+                       help='Skip images that already have ML analysis results')
 
     args = parser.parse_args()
 
     # Get HMAC secret from args or environment
     hmac_secret = args.hmac_secret or os.environ.get('ML_CALLBACK_HMAC_SECRET')
     if not hmac_secret:
-        print("❌ Error: HMAC secret required. Set ML_CALLBACK_HMAC_SECRET or use --hmac-secret")
+        print("X Error: HMAC secret required. Set ML_CALLBACK_HMAC_SECRET or use --hmac-secret")
         sys.exit(1)
 
     # Get API key from args or environment
@@ -462,7 +508,7 @@ def main():
 
     # Run pipeline
     pipeline = YOLOv8Pipeline(args.api_url, hmac_secret, api_key)
-    pipeline.run_project_pipeline(args.project_id, args.model_size, args.limit)
+    pipeline.run_project_pipeline(args.project_id, args.model_size, args.limit, args.skip_existing)
 
 
 if __name__ == '__main__':

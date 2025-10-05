@@ -30,15 +30,29 @@ function ImageView() {
   const [sidebarWidth, setSidebarWidth] = useState(350);
   const [isResizing, setIsResizing] = useState(false);
 
-  // ML Analysis state
+  // ML Analysis state - restore from localStorage if available
   const [selectedAnalysis, setSelectedAnalysis] = useState(null);
   const [selectedAnnotations, setSelectedAnnotations] = useState([]);
-  const [overlayOptions, setOverlayOptions] = useState({
-    showBoxes: true,
-    showHeatmap: false,
-    opacity: 0.7,
-    viewMode: 'overlay',
-    bitmapAvailable: false
+  const [overlayOptions, setOverlayOptions] = useState(() => {
+    const saved = localStorage.getItem('mlOverlayOptions');
+    if (saved) {
+      try {
+        return { ...JSON.parse(saved), bitmapAvailable: false };
+      } catch (e) {
+        console.error('Failed to parse saved overlay options:', e);
+      }
+    }
+    return {
+      showBoxes: true,
+      showHeatmap: false,
+      opacity: 0.7,
+      viewMode: 'overlay',
+      bitmapAvailable: false
+    };
+  });
+  const [autoSelectLatest, setAutoSelectLatest] = useState(() => {
+    const saved = localStorage.getItem('mlAutoSelectLatest');
+    return saved === 'true' || saved === null; // Default to true
   });
 
   // ML analysis selection handler
@@ -210,19 +224,28 @@ function ImageView() {
     }
   }, [currentImageIndex, projectImages, navigate, projectId]);
 
-  // Reset transition state and ML analysis when image changes
+  // Reset transition state when image changes (but keep ML settings)
   useEffect(() => {
     setIsTransitioning(false);
-    // Clear ML analysis state when navigating to a new image
+    // Clear selected analysis so MLAnalysisPanel can auto-select latest if enabled
     setSelectedAnalysis(null);
     setSelectedAnnotations([]);
     setOverlayOptions(prev => ({
       ...prev,
-      showBoxes: true,
-      showHeatmap: false,
       bitmapAvailable: false
     }));
   }, [imageId]);
+
+  // Save overlay options to localStorage when they change
+  useEffect(() => {
+    const { bitmapAvailable, ...persistentOptions } = overlayOptions;
+    localStorage.setItem('mlOverlayOptions', JSON.stringify(persistentOptions));
+  }, [overlayOptions]);
+
+  // Save auto-select preference to localStorage
+  useEffect(() => {
+    localStorage.setItem('mlAutoSelectLatest', autoSelectLatest.toString());
+  }, [autoSelectLatest]);
 
   // Handle resize functionality
   const handleMouseDown = useCallback(() => {
@@ -344,10 +367,15 @@ function ImageView() {
               />
 
               {/* ML Analysis Panel (read-only, only visible when analyses exist) */}
-              <MLAnalysisPanel
-                imageId={imageId}
-                onSelect={handleMLAnalysisSelect}
-              />
+              {image && (
+                <MLAnalysisPanel
+                  key={imageId}
+                  imageId={imageId}
+                  onSelect={handleMLAnalysisSelect}
+                  autoSelectLatest={autoSelectLatest}
+                  onAutoSelectChange={setAutoSelectLatest}
+                />
+              )}
 
               {/* Overlay controls (only visible when an analysis is selected) */}
               {selectedAnalysis && (

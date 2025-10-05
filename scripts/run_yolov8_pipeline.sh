@@ -19,15 +19,15 @@ say() {
 }
 
 error() {
-    echo -e "${RED}[yolov8-pipeline]${NC} ❌ $*" >&2
+    echo -e "${RED}[yolov8-pipeline]${NC} X $*" >&2
 }
 
 success() {
-    echo -e "${GREEN}[yolov8-pipeline]${NC} ✅ $*"
+    echo -e "${GREEN}[yolov8-pipeline]${NC} X $*"
 }
 
 warn() {
-    echo -e "${YELLOW}[yolov8-pipeline]${NC} ⚠️  $*"
+    echo -e "${YELLOW}[yolov8-pipeline]${NC} X $*"
 }
 
 usage() {
@@ -45,6 +45,7 @@ Options:
     --model-size SIZE   YOLOv8 model size: n|s|m|l|x (default: n)
                         n=nano (fastest), s=small, m=medium, l=large, x=xlarge
     --limit N           Maximum images to process (default: 10)
+    --skip-existing     Skip images that already have ML analysis results
     --install-deps      Install ML dependencies before running
     --help              Show this help message
 
@@ -71,6 +72,7 @@ API_URL="http://localhost:8000"
 API_KEY="${API_KEY:-}"
 MODEL_SIZE="n"
 LIMIT=10
+SKIP_EXISTING=false
 INSTALL_DEPS=false
 
 while [[ $# -gt 0 ]]; do
@@ -94,6 +96,10 @@ while [[ $# -gt 0 ]]; do
         --limit)
             LIMIT="$2"
             shift 2
+            ;;
+        --skip-existing)
+            SKIP_EXISTING=true
+            shift
             ;;
         --install-deps)
             INSTALL_DEPS=true
@@ -223,6 +229,7 @@ CMD=(
 )
 
 [[ -n "$API_KEY" ]] && CMD+=("--api-key" "$API_KEY")
+[[ "$SKIP_EXISTING" == true ]] && CMD+=("--skip-existing")
 
 # Run pipeline
 say "Starting pipeline..."
@@ -237,7 +244,7 @@ echo ""
 if [[ $EXIT_CODE -eq 0 ]]; then
     success "Pipeline completed successfully!"
     echo ""
-    echo "📊 View results in the web UI:"
+    echo "X View results in the web UI:"
     echo "   1. Navigate to your project: $API_URL"
     echo "   2. Open any processed image"
     echo "   3. Check the 'ML Analyses' panel in the sidebar"

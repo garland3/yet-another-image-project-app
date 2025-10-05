@@ -214,6 +214,11 @@ function ImageDisplay({
     }
   }, [zoomLevel]);
 
+  // Reset display size when imageId changes to prevent stale dimensions
+  useEffect(() => {
+    setDisplaySize({ width: 0, height: 0 });
+  }, [imageId]);
+
   useLayoutEffect(() => { measure(); }, [image, zoomLevel, measure, annotations]);
   useEffect(() => {
     window.addEventListener('resize', measure);
@@ -246,6 +251,7 @@ function ImageDisplay({
           className="view-image"
           style={{ transform: `scale(${zoomLevel})`, transformOrigin: 'top left' }}
           onClick={handleZoomIn}
+          onLoad={measure}
           onError={(e) => {
             console.error('Failed to load image with ID: %s', imageId, e);
             if (!e.target.src.includes('thumbnail')) {
