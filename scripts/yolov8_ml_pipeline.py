@@ -170,7 +170,10 @@ class YOLOv8Pipeline:
         pil_image = Image.open(image_bytes)
         image_array = cv2.cvtColor(np.array(pil_image), cv2.COLOR_RGB2BGR)
 
-        print(f"  X Downloaded {metadata['filename']} ({image_array.shape})")
+        print(f"  X Downloaded {metadata['filename']}")
+        print(f"  DEBUG: Image shape (HxWxC): {image_array.shape}")
+        print(f"  DEBUG: Image dimensions - Height: {image_array.shape[0]}, Width: {image_array.shape[1]}")
+
         return image_array, metadata
 
     def create_analysis(self, image_id: str, model_version: str) -> str:
@@ -317,13 +320,27 @@ class YOLOv8Pipeline:
 
         annotations = []
 
+        # Get image dimensions (height, width, channels)
+        image_height, image_width = image_shape[0], image_shape[1]
+
+        print(f"  DEBUG: Image shape for annotations: {image_shape}")
+        print(f"  DEBUG: Embedding dimensions in bbox data - Width: {image_width}, Height: {image_height}")
+
         # Add bounding box annotations
         for i, det in enumerate(detections):
+            # Include image dimensions in bbox data for proper scaling on frontend
+            bbox_data = det['bbox'].copy()
+            bbox_data['image_width'] = image_width
+            bbox_data['image_height'] = image_height
+
+            if i == 0:  # Log first bbox as sample
+                print(f"  DEBUG: Sample bbox data: {bbox_data}")
+
             annotations.append({
                 "annotation_type": "bounding_box",
                 "class_name": det['class_name'],
                 "confidence": det['confidence'],
-                "data": det['bbox'],
+                "data": bbox_data,
                 "ordering": i
             })
 
@@ -331,8 +348,8 @@ class YOLOv8Pipeline:
         annotations.append({
             "annotation_type": "heatmap",
             "data": {
-                "width": image_shape[1],
-                "height": image_shape[0]
+                "width": image_width,
+                "height": image_height
             },
             "storage_path": heatmap_path,
             "ordering": len(detections)

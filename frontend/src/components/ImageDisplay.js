@@ -210,16 +210,36 @@ function ImageDisplay({
 
   const measure = useCallback(() => {
     if (imgRef.current) {
-      setDisplaySize({ width: imgRef.current.clientWidth * zoomLevel, height: imgRef.current.clientHeight * zoomLevel });
+      // getBoundingClientRect gives us the actual displayed size after CSS transform
+      // But we want the pre-transform size since the overlay is positioned relative to the container
+      // Use offsetWidth/offsetHeight for the layout dimensions (pre-transform)
+      const measuredSize = {
+        width: imgRef.current.offsetWidth,
+        height: imgRef.current.offsetHeight
+      };
+
+      console.log('[ImageDisplay] Measured display size:', {
+        displaySize: measuredSize,
+        naturalWidth: imgRef.current.naturalWidth,
+        naturalHeight: imgRef.current.naturalHeight,
+        offsetWidth: imgRef.current.offsetWidth,
+        offsetHeight: imgRef.current.offsetHeight,
+        clientWidth: imgRef.current.clientWidth,
+        clientHeight: imgRef.current.clientHeight,
+        zoomLevel,
+        imageId
+      });
+
+      setDisplaySize(measuredSize);
     }
-  }, [zoomLevel]);
+  }, [zoomLevel, imageId]);
 
   // Reset display size when imageId changes to prevent stale dimensions
   useEffect(() => {
     setDisplaySize({ width: 0, height: 0 });
   }, [imageId]);
 
-  useLayoutEffect(() => { measure(); }, [image, zoomLevel, measure, annotations]);
+  useLayoutEffect(() => { measure(); }, [image, measure, annotations]);
   useEffect(() => {
     window.addEventListener('resize', measure);
     return () => window.removeEventListener('resize', measure);
@@ -261,20 +281,32 @@ function ImageDisplay({
           ref={!isSideBySide ? imgRef : null}
         />
       )}
-      {showOverlays && image && overlayOptions?.showBoxes && annotations?.length > 0 && (
-        <BoundingBoxOverlay
-          annotations={annotations}
-          naturalSize={{ width: image.width, height: image.height }}
-          containerSize={displaySize}
-          opacity={overlayOptions.opacity}
-        />
-      )}
-      {showOverlays && image && overlayOptions?.showHeatmap && annotations?.length > 0 && (
-        <HeatmapOverlay
-          annotations={annotations}
-          containerSize={displaySize}
-          opacity={overlayOptions.opacity}
-        />
+      {showOverlays && image && overlayOptions?.showBoxes && annotations?.length > 0 && displaySize.width > 0 && (() => {
+        console.log('[ImageDisplay] Rendering BoundingBoxOverlay:', {
+          imageMetadata: { width: image.width, height: image.height },
+          displaySize,
+          zoomLevel,
+          annotationCount: annotations.length
+        });
+        return (
+          <div style={{ transform: `scale(${zoomLevel})`, transformOrigin: 'top left', position: 'absolute', top: 0, left: 0 }}>
+            <BoundingBoxOverlay
+              annotations={annotations}
+              naturalSize={{ width: image.width, height: image.height }}
+              containerSize={displaySize}
+              opacity={overlayOptions.opacity}
+            />
+          </div>
+        );
+      })()}
+      {showOverlays && image && overlayOptions?.showHeatmap && annotations?.length > 0 && displaySize.width > 0 && (
+        <div style={{ transform: `scale(${zoomLevel})`, transformOrigin: 'top left', position: 'absolute', top: 0, left: 0 }}>
+          <HeatmapOverlay
+            annotations={annotations}
+            containerSize={displaySize}
+            opacity={overlayOptions.opacity}
+          />
+        </div>
       )}
     </div>
   );

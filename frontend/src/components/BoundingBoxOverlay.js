@@ -13,12 +13,26 @@ import React, { useMemo } from 'react';
  */
 export default function BoundingBoxOverlay({ annotations, naturalSize, containerSize, opacity }) {
   const boxes = useMemo(() => {
+    console.log('[BoundingBoxOverlay] Rendering with:', {
+      naturalSize,
+      containerSize,
+      annotationCount: annotations?.length || 0
+    });
+
     return (annotations || [])
       .filter(a => a.annotation_type === 'bounding_box' && a.data)
-      .map(a => {
+      .map((a, idx) => {
         const d = a.data || {}; // Defensive
         const iw = d.image_width || naturalSize.width || containerSize.width;
         const ih = d.image_height || naturalSize.height || containerSize.height;
+
+        console.log(`[BoundingBoxOverlay] Box ${idx}:`, {
+          bbox_data: d,
+          resolved_image_dims: { width: iw, height: ih },
+          naturalSize,
+          containerSize
+        });
+
         if (!iw || !ih) return null;
         const xMin = d.x_min ?? d.left ?? 0;
         const yMin = d.y_min ?? d.top ?? 0;
@@ -28,6 +42,18 @@ export default function BoundingBoxOverlay({ annotations, naturalSize, container
         const h = Math.max(0, yMax - yMin);
         const scaleX = containerSize.width / iw;
         const scaleY = containerSize.height / ih;
+
+        console.log(`[BoundingBoxOverlay] Box ${idx} scaling:`, {
+          original_coords: { xMin, yMin, xMax, yMax, w, h },
+          scales: { scaleX, scaleY },
+          scaled_coords: {
+            left: xMin * scaleX,
+            top: yMin * scaleY,
+            width: w * scaleX,
+            height: h * scaleY
+          }
+        });
+
         return {
           id: a.id,
             class_name: a.class_name,
