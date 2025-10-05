@@ -1,6 +1,5 @@
 import uuid
-import re
-from sqlalchemy import select, update, delete, and_, text, or_, cast, String
+from sqlalchemy import select, update, delete, and_, text
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 from core import models, schemas
@@ -31,6 +30,115 @@ def log_db_operation(operation: str, table: str, record_id: uuid.UUID, user_emai
         "additional_info": additional_info or {}
     }
     logger.info("DB_OPERATION", extra=log_data)
+
+# ----------------- ML Analysis CRUD -----------------
+async def create_ml_analysis(db: AsyncSession, analysis: schemas.MLAnalysisCreate, requested_by_id: uuid.UUID, status: str = "queued") -> models.MLAnalysis:
+    payload = analysis.model_dump()
+    db_obj = models.MLAnalysis(
+        image_id=payload["image_id"],
+        model_name=payload["model_name"],
+        model_version=payload["model_version"],
+        parameters=payload.get("parameters"),
+        status=status,
+        requested_by_id=requested_by_id,
+    )
+    db.add(db_obj)
+    await db.commit()
+    await db.refresh(db_obj)
+    return db_obj
+
+async def get_ml_analysis(db: AsyncSession, analysis_id: uuid.UUID) -> Optional[models.MLAnalysis]:
+    result = await db.execute(
+        select(models.MLAnalysis)
+        .where(models.MLAnalysis.id == analysis_id)
+        .options(selectinload(models.MLAnalysis.annotations))
+    )
+    return result.scalars().first()
+
+async def get_ml_analysis_for_update(db: AsyncSession, analysis_id: uuid.UUID) -> Optional[models.MLAnalysis]:
+    """Get ML analysis with row-level lock for concurrent-safe updates."""
+    result = await db.execute(
+        select(models.MLAnalysis)
+        .where(models.MLAnalysis.id == analysis_id)
+        .with_for_update()
+    )
+    return result.scalars().first()
+
+async def list_ml_analyses_for_image(db: AsyncSession, image_id: uuid.UUID, skip: int = 0, limit: int = 100) -> List[models.MLAnalysis]:
+    result = await db.execute(
+        select(models.MLAnalysis)
+        .where(models.MLAnalysis.image_id == image_id)
+        .order_by(models.MLAnalysis.created_at.desc())
+        .offset(skip).limit(limit)
+    )
+    return result.scalars().all()
+
+async def count_ml_analyses_for_image(db: AsyncSession, image_id: uuid.UUID) -> int:
+    """Count total ML analyses for an image."""
+    from sqlalchemy import func
+    result = await db.execute(
+        select(func.count()).select_from(models.MLAnalysis).where(models.MLAnalysis.image_id == image_id)
+    )
+    return result.scalar_one()
+
+async def create_ml_annotation(db: AsyncSession, analysis_id: uuid.UUID, annotation: schemas.MLAnnotationCreate) -> models.MLAnnotation:
+    payload = annotation.model_dump()
+    db_obj = models.MLAnnotation(
+        analysis_id=analysis_id,
+        annotation_type=payload["annotation_type"],
+        class_name=payload.get("class_name"),
+        confidence=payload.get("confidence"),
+        data=payload["data"],
+        storage_path=payload.get("storage_path"),
+        ordering=payload.get("ordering"),
+    )
+    db.add(db_obj)
+    await db.commit()
+    await db.refresh(db_obj)
+    return db_obj
+
+async def list_ml_annotations(db: AsyncSession, analysis_id: uuid.UUID, skip: int = 0, limit: int = 500) -> List[models.MLAnnotation]:
+    result = await db.execute(
+        select(models.MLAnnotation)
+        .where(models.MLAnnotation.analysis_id == analysis_id)
+        .order_by(models.MLAnnotation.created_at.asc(), models.MLAnnotation.id.asc())
+        .offset(skip).limit(limit)
+    )
+    return result.scalars().all()
+
+async def count_ml_annotations(db: AsyncSession, analysis_id: uuid.UUID) -> int:
+    """Count total annotations for an analysis."""
+    from sqlalchemy import func
+    result = await db.execute(
+        select(func.count()).select_from(models.MLAnnotation).where(models.MLAnnotation.analysis_id == analysis_id)
+    )
+    return result.scalar_one()
+
+async def bulk_insert_ml_annotations(db: AsyncSession, analysis_id: uuid.UUID, annotations: List[schemas.MLAnnotationCreate]) -> int:
+    """Bulk insert annotations efficiently with chunking to prevent memory issues."""
+    CHUNK_SIZE = 500  # Process in chunks to avoid memory/timeout issues
+    total_inserted = 0
+
+    for i in range(0, len(annotations), CHUNK_SIZE):
+        chunk = annotations[i:i + CHUNK_SIZE]
+        objs = []
+        for ann in chunk:
+            payload = ann.model_dump()
+            objs.append(models.MLAnnotation(
+                analysis_id=analysis_id,
+                annotation_type=payload["annotation_type"],
+                class_name=payload.get("class_name"),
+                confidence=payload.get("confidence"),
+                data=payload["data"],
+                storage_path=payload.get("storage_path"),
+                ordering=payload.get("ordering"),
+            ))
+        db.add_all(objs)
+        await db.flush()  # Flush each chunk but don't commit yet
+        total_inserted += len(objs)
+
+    await db.commit()  # Single commit at the end
+    return total_inserted
 
 # User CRUD operations
 async def get_user_by_email(db: AsyncSession, email: str) -> Optional[models.User]:
@@ -174,18 +282,13 @@ async def get_data_instances_for_project(db: AsyncSession, project_id: uuid.UUID
         elif search_field == 'uploaded_by':
             query = query.where(models.DataInstance.uploaded_by_user_id.ilike(search_value_lower))
         elif search_field == 'metadata':
-            # Search across all metadata values using safe SQLAlchemy cast
-            query = query.where(cast(models.DataInstance.metadata_, String).ilike(search_value_lower))
+            # Search across all metadata values using JSON text search
+            # This uses PostgreSQL's jsonb operators
+            query = query.where(text("metadata::text ILIKE :search_value")).params(search_value=search_value_lower)
         else:
-            # Search specific metadata key using JSON path with input validation
-            # Only allow alphanumeric characters, underscores, and hyphens for security
-            if re.match(r'^[a-zA-Z0-9_-]+$', search_field):
-                # Use SQLAlchemy's JSON path operator safely
-                query = query.where(models.DataInstance.metadata_[search_field].astext.ilike(search_value_lower))
-            else:
-                # Invalid key format, skip filtering for security
-                safe_search_field = search_field.replace('\n', '').replace('\r', '') if search_field else 'None'
-                logger.warning(f"Invalid metadata key format rejected: {safe_search_field}")
+            # Search specific metadata key using JSON path
+            # This searches for the specific key in the metadata JSON
+            query = query.where(text("metadata ->> :key ILIKE :search_value")).params(key=search_field, search_value=search_value_lower)
     
     query = query.offset(skip).limit(limit)
     result = await db.execute(query)
@@ -306,8 +409,9 @@ async def mark_image_storage_deleted(db: AsyncSession, image: models.DataInstanc
 
 async def create_data_instance(db: AsyncSession, data_instance: schemas.DataInstanceCreate, created_by: Optional[str] = None) -> models.DataInstance:
     create_data = data_instance.model_dump()
-    if "metadata" in create_data:
-         create_data["metadata_"] = create_data.pop("metadata")
+    # Rename Pydantic field name to SQLAlchemy attribute name
+    if "metadata_" in create_data:
+         create_data["metadata_json"] = create_data.pop("metadata_")
     db_data_instance = models.DataInstance(**create_data)
     db.add(db_data_instance)
     await db.commit()

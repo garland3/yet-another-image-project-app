@@ -20,20 +20,20 @@ def to_data_instance_schema(db_image: models.DataInstance) -> schemas.DataInstan
     """
     # Convert metadata_ to dict format expected by the schema
     metadata_dict = {}
-    if db_image.metadata_:
+    if db_image.metadata_json:
         # If it's already a dict, use it directly
-        if isinstance(db_image.metadata_, dict):
-            metadata_dict = db_image.metadata_
+        if isinstance(db_image.metadata_json, dict):
+            metadata_dict = db_image.metadata_json
         # If it's a string, try to parse it as JSON
-        elif isinstance(db_image.metadata_, str):
+        elif isinstance(db_image.metadata_json, str):
             try:
                 import json
-                metadata_dict = json.loads(db_image.metadata_)
+                metadata_dict = json.loads(db_image.metadata_json)
             except (json.JSONDecodeError, TypeError):
                 metadata_dict = {}
         # If it's some other type with attributes, convert to dict
-        elif hasattr(db_image.metadata_, '__dict__'):
-            metadata_dict = {k: v for k, v in db_image.metadata_.__dict__.items() 
+        elif hasattr(db_image.metadata_json, '__dict__'):
+            metadata_dict = {k: v for k, v in db_image.metadata_json.__dict__.items() 
                            if not k.startswith('_')}
     
     # Build schema matching core.schemas.DataInstance fields including deletion metadata

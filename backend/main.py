@@ -13,12 +13,14 @@ from core.config import settings
 import swagger_ui_bundle
 from pathlib import Path
 from core.database import create_db_and_tables
-from core.migrations import run_migrations
+from core.migrations import run_migrations  # legacy no-op
+from core.config import settings as _app_settings
 from utils.boto3_client import boto3_client, ensure_bucket_exists
 from middleware.cors_debug import add_cors_middleware, debug_exception_middleware
 from middleware.auth import auth_middleware
 from middleware.security_headers import SecurityHeadersMiddleware
-from routers import projects, images, users, image_classes, comments, project_metadata, api_keys
+from middleware.body_cache import BodyCacheMiddleware
+from routers import projects, images, users, image_classes, comments, project_metadata, api_keys, ml_analyses
 
 
 """
@@ -88,12 +90,22 @@ async def lifespan(app: FastAPI):
     if settings.FAST_TEST_MODE:
         logger.info("FAST_TEST_MODE enabled: skipping DB create/migrate and S3 bucket checks.")
     else:
-        logger.info("Creating database tables if they don't exist...")
-        await create_db_and_tables()
-        logger.info("Database tables checked/created.")
-        
-        # Run migrations to set up new tables and migrate existing data
-        await run_migrations()
+        if _app_settings.USE_ALEMBIC_MIGRATIONS:
+            # Run Alembic programmatically (upgrade head)
+            try:
+                from alembic import command
+                from alembic.config import Config
+                alembic_cfg = Config(os.path.join(os.path.dirname(__file__), 'alembic.ini'))
+                logger.info("Running Alembic migrations (upgrade head)...")
+                command.upgrade(alembic_cfg, 'head')
+                logger.info("Alembic migrations complete.")
+            except Exception as e:
+                logger.exception("Alembic migration failed; aborting startup")
+                raise
+        else:
+            logger.info("USE_ALEMBIC_MIGRATIONS disabled: fallback create_all path")
+            await create_db_and_tables()
+            await run_migrations()
         logger.info(f"Checking/Creating S3 bucket: {settings.S3_BUCKET}")
         if boto3_client:
             bucket_exists = ensure_bucket_exists(boto3_client, settings.S3_BUCKET)
@@ -148,7 +160,10 @@ def create_app() -> FastAPI:
     # Add CORS middleware
     cors_origins = os.getenv("CORS_ORIGINS", "http://localhost:3000").split(",")
     add_cors_middleware(app, cors_origins)
-    
+
+    # Add body cache middleware (must be early in the stack, before auth)
+    app.add_middleware(BodyCacheMiddleware)
+
     # Add security headers middleware
     app.add_middleware(SecurityHeadersMiddleware)
 
@@ -183,6 +198,7 @@ def create_app() -> FastAPI:
     api_router.include_router(comments.router)
     api_router.include_router(project_metadata.router)
     api_router.include_router(api_keys.router)
+    api_router.include_router(ml_analyses.router)
 
     # Add health check endpoint (no auth required)
     @app.get("/api/health")

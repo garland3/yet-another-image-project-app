@@ -66,4 +66,24 @@ claude mcp add --transport http context7 https://mcp.context7.com/mcp
 echo "--- Installation Complete ---"
 echo "Remember to configure API keys and restart your shell for changes to take effect."
 
+# --- Setting up CLI aliases ---
+echo "--- Setting up CLI aliases ---"
+ALIAS_COMMAND="alias dclaude='claude --dangerously-skip-permissions'"
+
+# Add alias to common shell configuration files
+for shell_config in ~/.bashrc ~/.zshrc ~/.profile; do
+  if [ -f "$shell_config" ]; then
+    if ! grep -q "alias dclaude=" "$shell_config"; then
+      echo "" >> "$shell_config"
+      echo "# Claude CLI shortcut" >> "$shell_config"
+      echo "$ALIAS_COMMAND" >> "$shell_config"
+      echo "Added dclaude alias to $shell_config"
+    else
+      echo "dclaude alias already exists in $shell_config"
+    fi
+  fi
+done
+
+echo "Alias 'dclaude' has been added. Restart your terminal or run 'source ~/.bashrc' (or appropriate shell config) to use it."
+
 

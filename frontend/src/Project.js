@@ -43,7 +43,8 @@ function Project() {
       const imagesData = await imagesResponse.json();
       setImages(imagesData);
     }
-  }, [includeDeleted, deletedOnly]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   useEffect(() => {
     // Fetch the current user
@@ -106,14 +107,16 @@ function Project() {
     };
 
     fetchProjectData();
-  }, [id, fetchImages]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [id]);
 
   // Refetch when deletion visibility changes
   useEffect(() => {
     if (project) {
       fetchImages(project.id, { includeDeleted, deletedOnly });
     }
-  }, [includeDeleted, deletedOnly, project, fetchImages]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [includeDeleted, deletedOnly, project?.id]);
 
   // Handle image upload completion
   const handleUploadComplete = (newImages) => {
@@ -160,17 +163,20 @@ function Project() {
               {project ? (project.description || 'No description provided') : ''}
             </p>
             <div className="project-meta">
-              <span className="project-id">Project ID: {project?.id}</span>
+              <span className="project-id">
+                Project ID: {project?.id}
+                <button
+                  className="copy-id-btn"
+                  onClick={() => {
+                    navigator.clipboard.writeText(project?.id);
+                  }}
+                  title="Copy project ID"
+                >
+                  Copy
+                </button>
+              </span>
               <span className="project-group">Group: {project?.meta_group_id}</span>
               {currentUser && <span className="project-user">{currentUser.email}</span>}
-            </div>
-            <div className="project-actions">
-              <button
-                className="btn btn-secondary"
-                onClick={() => navigate(`/project/${id}/report`)}
-              >
-                Generate Report
-              </button>
             </div>
           </div>
         </div>

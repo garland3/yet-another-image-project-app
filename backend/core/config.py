@@ -1,5 +1,5 @@
 from pydantic_settings import BaseSettings
-from pydantic import field_validator
+from pydantic import field_validator, ConfigDict
 from typing import Optional
 import os
 from pathlib import Path
@@ -48,6 +48,16 @@ class Settings(BaseSettings):
     # Cache configuration
     CACHE_SIZE_MB: int = 1000
 
+    # ML Analysis settings
+    ML_ANALYSIS_ENABLED: bool = True
+    ML_MAX_ANALYSES_PER_IMAGE: int = 10
+    ML_ALLOWED_MODELS: str = "resnet50_classifier,vgg16,inception_v3,efficientnet_b0,demo-model-detcls,yolo_v8"
+    ML_DEFAULT_STATUS: str = "queued"
+    ML_CALLBACK_HMAC_SECRET: Optional[str] = None
+    ML_PIPELINE_REQUIRE_HMAC: bool = True
+    ML_MAX_BULK_ANNOTATIONS: int = 1000  # Lowered from 5000 to prevent memory/timeout issues
+    ML_PRESIGNED_URL_EXPIRY_SECONDS: int = 3600  # 1 hour to allow slow uploads of large artifacts
+
     # Image deletion / retention settings
     IMAGE_DELETE_RETENTION_DAYS: int = 60  # Soft delete retention window (days)
     IMAGE_DELETE_REASON_MIN_CHARS: int = 10  # Minimum characters required for a deletion reason
@@ -55,11 +65,14 @@ class Settings(BaseSettings):
     IMAGE_DELETE_PURGE_INTERVAL_SECONDS: int = 3600  # Background purge interval
     ENABLE_IMAGE_PURGE: bool = True  # Toggle background purge task
 
+    # Alembic migrations
+    USE_ALEMBIC_MIGRATIONS: bool = True  # Use Alembic for database migrations
+
     @field_validator(
-        'DEBUG', 'FAST_TEST_MODE', 'SKIP_HEADER_CHECK', 'S3_USE_SSL', 
-        'SECURITY_NOSNIFF_ENABLED', 'SECURITY_XFO_ENABLED', 
-        'SECURITY_REFERRER_POLICY_ENABLED', 'SECURITY_CSP_ENABLED', 
-        'ENABLE_IMAGE_PURGE', 
+        'DEBUG', 'FAST_TEST_MODE', 'SKIP_HEADER_CHECK', 'S3_USE_SSL',
+        'SECURITY_NOSNIFF_ENABLED', 'SECURITY_XFO_ENABLED',
+        'SECURITY_REFERRER_POLICY_ENABLED', 'SECURITY_CSP_ENABLED',
+        'ENABLE_IMAGE_PURGE', 'USE_ALEMBIC_MIGRATIONS',
         mode='before'
     )
     @classmethod
@@ -68,11 +81,12 @@ class Settings(BaseSettings):
             v = v.strip()
         return v
 
-    class Config:
-        # Check for .env in current directory first, then parent directory
-        env_file = [".env", "../.env"]
-        env_file_encoding = 'utf-8'
-        extra = "allow"
+    # Pydantic v2 style configuration
+    model_config = ConfigDict(
+        env_file=(".env", "../.env"),
+        env_file_encoding='utf-8',
+        extra='allow'
+    )
     
     @property
     def MOCK_USER_GROUPS(self):
@@ -97,6 +111,9 @@ if os.getenv("MINIO_BUCKET_NAME") and not os.getenv("S3_BUCKET"):
     settings.S3_BUCKET = os.getenv("MINIO_BUCKET_NAME")  # type: ignore[attr-defined]
 if os.getenv("MINIO_USE_SSL") and not os.getenv("S3_USE_SSL"):
     settings.S3_USE_SSL = os.getenv("MINIO_USE_SSL", "False").lower() == "true"  # type: ignore[attr-defined]
+
+# NOTE: HMAC secret must be configured explicitly in tests via conftest.py
+# Do not auto-initialize to avoid masking configuration issues
 
 # If running outside Docker and DATABASE_URL points at the docker hostname 'db',
 # rewrite to localhost using HOST_DB_PORT (default 5433) for local dev.

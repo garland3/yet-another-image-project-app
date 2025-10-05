@@ -1,5 +1,5 @@
 import uuid
-from sqlalchemy import Column, String, Text, ForeignKey, DateTime, JSON, BigInteger, Boolean, UniqueConstraint
+from sqlalchemy import Column, String, Text, ForeignKey, DateTime, JSON, BigInteger, Boolean, UniqueConstraint, Numeric, Integer, Float
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
@@ -45,7 +45,7 @@ class DataInstance(Base):
     object_storage_key = Column(String(1024), nullable=False, unique=True)
     content_type = Column(String(100), nullable=True)
     size_bytes = Column(BigInteger, nullable=True)
-    metadata_ = Column("metadata", JSON, nullable=True)
+    metadata_json = Column("metadata", JSON, nullable=True)  # Clear naming to avoid confusion
     # Keep the original column for backward compatibility, but add a new foreign key
     uploaded_by_user_id = Column(String(255), nullable=False)
     uploader_id = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=True)
@@ -66,6 +66,7 @@ class DataInstance(Base):
     uploader = relationship("User", back_populates="uploaded_images", foreign_keys=[uploader_id])
     comments = relationship("ImageComment", back_populates="image", cascade="all, delete-orphan")
     classifications = relationship("ImageClassification", back_populates="image", cascade="all, delete-orphan")
+    ml_analyses = relationship("MLAnalysis", back_populates="image", cascade="all, delete-orphan")
 
 
 class ImageDeletionEvent(Base):
@@ -163,5 +164,48 @@ class ApiKey(Base):
     
     # Relationships
     user = relationship("User", back_populates="api_keys")
+
+
+class MLAnalysis(Base):
+    """Represents one ML analysis job for a given image and model."""
+    __tablename__ = "ml_analyses"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    image_id = Column(UUID(as_uuid=True), ForeignKey("data_instances.id", ondelete="CASCADE"), nullable=False, index=True)
+    model_name = Column(String(255), nullable=False, index=True)
+    model_version = Column(String(100), nullable=False)
+    status = Column(String(40), nullable=False, index=True, default="queued")  # queued, processing, completed, failed
+    error_message = Column(Text, nullable=True)
+    parameters = Column(JSON, nullable=True)
+    provenance = Column(JSON, nullable=True)
+    requested_by_id = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False)
+    external_job_id = Column(String(255), nullable=True, unique=True)
+    priority = Column(Integer, nullable=False, default=0)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    started_at = Column(DateTime(timezone=True), nullable=True)
+    completed_at = Column(DateTime(timezone=True), nullable=True)
+    updated_at = Column(DateTime(timezone=True), onupdate=func.now())
+
+    # Relationships
+    image = relationship("DataInstance", back_populates="ml_analyses")
+    requested_by = relationship("User")
+    annotations = relationship("MLAnnotation", back_populates="analysis", cascade="all, delete-orphan")
+
+
+class MLAnnotation(Base):
+    """Individual annotation output for an analysis (box, classification, heatmap ref, etc.)."""
+    __tablename__ = "ml_annotations"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    analysis_id = Column(UUID(as_uuid=True), ForeignKey("ml_analyses.id", ondelete="CASCADE"), nullable=False, index=True)
+    annotation_type = Column(String(50), nullable=False, index=True)  # classification, bounding_box, heatmap, segmentation
+    class_name = Column(String(255), nullable=True)
+    confidence = Column(Float, nullable=True)  # Confidence score 0.0-1.0
+    data = Column(JSON, nullable=False)  # dynamic payload: coordinates, arrays, etc.
+    storage_path = Column(String(1024), nullable=True)  # pointer to artifact in object storage
+    ordering = Column(Integer, nullable=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+
+    analysis = relationship("MLAnalysis", back_populates="annotations")
 
 

@@ -8,6 +8,9 @@ import ImageMetadata from './components/ImageMetadata';
 import CompactImageClassifications from './components/CompactImageClassifications';
 import ImageComments from './components/ImageComments';
 import ImageDeletionControls from './components/ImageDeletionControls';
+import MLAnalysisPanel from './components/MLAnalysisPanel';
+import OverlayControls from './components/OverlayControls';
+import MLDebugOutputs from './components/MLDebugOutputs';
 
 function ImageView() {
   const { imageId } = useParams();
@@ -26,6 +29,54 @@ function ImageView() {
   const [currentUser, setCurrentUser] = useState(null);
   const [sidebarWidth, setSidebarWidth] = useState(350);
   const [isResizing, setIsResizing] = useState(false);
+
+  // Navigation settings - restore from localStorage
+  const [skipDeletedImages, setSkipDeletedImages] = useState(() => {
+    const saved = localStorage.getItem('skipDeletedImages');
+    return saved !== null ? JSON.parse(saved) : true; // Default to true (skip deleted)
+  });
+
+  // ML Analysis state - restore from localStorage if available
+  const [selectedAnalysis, setSelectedAnalysis] = useState(null);
+  const [selectedAnnotations, setSelectedAnnotations] = useState([]);
+  const [overlayOptions, setOverlayOptions] = useState(() => {
+    const saved = localStorage.getItem('mlOverlayOptions');
+    if (saved) {
+      try {
+        return { ...JSON.parse(saved), bitmapAvailable: false };
+      } catch (e) {
+        console.error('Failed to parse saved overlay options:', e);
+      }
+    }
+    return {
+      showBoxes: true,
+      showHeatmap: false,
+      opacity: 0.7,
+      viewMode: 'overlay',
+      bitmapAvailable: false
+    };
+  });
+  const [autoSelectLatest, setAutoSelectLatest] = useState(() => {
+    const saved = localStorage.getItem('mlAutoSelectLatest');
+    return saved === 'true' || saved === null; // Default to true
+  });
+
+  // ML analysis selection handler
+  const handleMLAnalysisSelect = useCallback((data) => {
+    if (data && data.analysis) {
+      setSelectedAnalysis(data.analysis);
+      setSelectedAnnotations(data.annotations || []);
+      // Check if any bitmap artifacts are available (heatmap, segmentation, mask)
+      const hasBitmap = (data.annotations || []).some(a =>
+        a.storage_path && ['heatmap', 'segmentation', 'mask'].includes(a.annotation_type)
+      );
+      setOverlayOptions(prev => ({ ...prev, bitmapAvailable: hasBitmap }));
+    } else {
+      setSelectedAnalysis(null);
+      setSelectedAnnotations([]);
+      setOverlayOptions(prev => ({ ...prev, bitmapAvailable: false }));
+    }
+  }, []);
 
   // Load image data
   const loadImageData = useCallback(async () => {
@@ -75,18 +126,18 @@ function ImageView() {
     try {
       console.log('Fetching images for project:', projectId);
       const response = await fetch(`/api/projects/${projectId}/images?include_deleted=true`);
-      
+
       if (!response.ok) {
         throw new Error(`HTTP error! Status: ${response.status}`);
       }
-      
+
       const images = await response.json();
-      
+
       if (!Array.isArray(images)) {
         console.error('Server response is not an array:', images);
         throw new Error('Invalid server response: expected an array of images');
       }
-      
+
       // Sort images by date (newest first) to match the gallery default sorting
       // Use spread operator to avoid mutating the original array
       const sortedImages = [...images].sort((a, b) => {
@@ -98,12 +149,17 @@ function ImageView() {
       // Find the index of the current image in the sorted array
       const index = sortedImages.findIndex(img => img.id === imageId);
       setCurrentImageIndex(index);
-      
+
     } catch (error) {
       console.error('Error loading project images:', error);
       setError('Failed to load project images for navigation. Please try again later.');
     }
   }, [projectId, imageId]);
+
+  // Save skip deleted preference to localStorage
+  useEffect(() => {
+    localStorage.setItem('skipDeletedImages', JSON.stringify(skipDeletedImages));
+  }, [skipDeletedImages]);
 
   // Load classes for the project
   const loadClasses = useCallback(async () => {
@@ -159,30 +215,66 @@ function ImageView() {
 
   // Navigate to previous image with transition
   const navigateToPreviousImage = useCallback(() => {
-    if (currentImageIndex > 0) {
+    let targetIndex = currentImageIndex - 1;
+
+    // Skip deleted images if option is enabled
+    if (skipDeletedImages) {
+      while (targetIndex >= 0 && projectImages[targetIndex]?.deleted_at) {
+        targetIndex--;
+      }
+    }
+
+    if (targetIndex >= 0) {
       setIsTransitioning(true);
       setTimeout(() => {
-        const prevImage = projectImages[currentImageIndex - 1];
+        const prevImage = projectImages[targetIndex];
         navigate(`/view/${prevImage.id}?project=${projectId}`);
       }, 300);
     }
-  }, [currentImageIndex, projectImages, navigate, projectId]);
+  }, [currentImageIndex, projectImages, navigate, projectId, skipDeletedImages]);
 
   // Navigate to next image with transition
   const navigateToNextImage = useCallback(() => {
-    if (currentImageIndex < projectImages.length - 1) {
+    let targetIndex = currentImageIndex + 1;
+
+    // Skip deleted images if option is enabled
+    if (skipDeletedImages) {
+      while (targetIndex < projectImages.length && projectImages[targetIndex]?.deleted_at) {
+        targetIndex++;
+      }
+    }
+
+    if (targetIndex < projectImages.length) {
       setIsTransitioning(true);
       setTimeout(() => {
-        const nextImage = projectImages[currentImageIndex + 1];
+        const nextImage = projectImages[targetIndex];
         navigate(`/view/${nextImage.id}?project=${projectId}`);
       }, 300);
     }
-  }, [currentImageIndex, projectImages, navigate, projectId]);
+  }, [currentImageIndex, projectImages, navigate, projectId, skipDeletedImages]);
 
-  // Reset transition state when image changes
+  // Reset transition state when image changes (but keep ML settings)
   useEffect(() => {
     setIsTransitioning(false);
+    // Clear selected analysis so MLAnalysisPanel can auto-select latest if enabled
+    setSelectedAnalysis(null);
+    setSelectedAnnotations([]);
+    setOverlayOptions(prev => ({
+      ...prev,
+      bitmapAvailable: false
+    }));
   }, [imageId]);
+
+  // Save overlay options to localStorage when they change
+  useEffect(() => {
+    const { bitmapAvailable, ...persistentOptions } = overlayOptions;
+    localStorage.setItem('mlOverlayOptions', JSON.stringify(persistentOptions));
+  }, [overlayOptions]);
+
+  // Save auto-select preference to localStorage
+  useEffect(() => {
+    localStorage.setItem('mlAutoSelectLatest', autoSelectLatest.toString());
+  }, [autoSelectLatest]);
 
   // Handle resize functionality
   const handleMouseDown = useCallback(() => {
@@ -302,6 +394,25 @@ function ImageView() {
                 setLoading={setLoading}
                 setError={setError}
               />
+
+              {/* ML Analysis Panel (read-only, only visible when analyses exist) */}
+              {image && (
+                <MLAnalysisPanel
+                  key={imageId}
+                  imageId={imageId}
+                  onSelect={handleMLAnalysisSelect}
+                  autoSelectLatest={autoSelectLatest}
+                  onAutoSelectChange={setAutoSelectLatest}
+                />
+              )}
+
+              {/* Overlay controls (only visible when an analysis is selected) */}
+              {selectedAnalysis && (
+                <OverlayControls
+                  options={overlayOptions}
+                  onChange={setOverlayOptions}
+                />
+              )}
             </div>
 
             {/* Resizable divider */}
@@ -326,6 +437,9 @@ function ImageView() {
                 navigateToNextImage={navigateToNextImage}
                 currentImageIndex={currentImageIndex}
                 projectImages={projectImages}
+                selectedAnalysis={selectedAnalysis}
+                annotations={selectedAnnotations}
+                overlayOptions={overlayOptions}
               />
             </div>
           </div>
@@ -337,6 +451,47 @@ function ImageView() {
             setImage={setImage}
             refreshProjectImages={loadProjectImages}
           />
+
+          {/* Navigation settings */}
+          <div style={{
+            marginTop: '1rem',
+            padding: '0.75rem',
+            background: 'var(--bg-secondary, #f8f9fa)',
+            borderRadius: '6px',
+            border: '1px solid var(--border-color, #dee2e6)'
+          }}>
+            <label style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '0.5rem',
+              fontSize: '0.9rem',
+              cursor: 'pointer',
+              userSelect: 'none'
+            }}>
+              <input
+                type="checkbox"
+                checked={skipDeletedImages}
+                onChange={(e) => setSkipDeletedImages(e.target.checked)}
+                style={{ cursor: 'pointer' }}
+              />
+              <span>Skip deleted images when navigating (arrow keys)</span>
+            </label>
+            <div style={{
+              marginTop: '0.5rem',
+              fontSize: '0.85rem',
+              color: 'var(--text-muted, #6c757d)',
+              paddingLeft: '1.5rem'
+            }}>
+              When enabled, arrow key navigation will automatically skip over soft-deleted images.
+            </div>
+          </div>
+
+          {/* Debug ML outputs section */}
+          {imageId && (
+            <div style={{ marginTop: '1rem' }}>
+              <MLDebugOutputs imageId={imageId} />
+            </div>
+          )}
         </div>
       </div>
     </div>
