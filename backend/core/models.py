@@ -1,5 +1,5 @@
 import uuid
-from sqlalchemy import Column, String, Text, ForeignKey, DateTime, JSON, BigInteger, Boolean, UniqueConstraint, Numeric, Integer
+from sqlalchemy import Column, String, Text, ForeignKey, DateTime, JSON, BigInteger, Boolean, UniqueConstraint, Numeric, Integer, Float
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
@@ -45,7 +45,7 @@ class DataInstance(Base):
     object_storage_key = Column(String(1024), nullable=False, unique=True)
     content_type = Column(String(100), nullable=True)
     size_bytes = Column(BigInteger, nullable=True)
-    metadata_ = Column("metadata", JSON, nullable=True)
+    metadata_json = Column("metadata", JSON, nullable=True)  # Clear naming to avoid confusion
     # Keep the original column for backward compatibility, but add a new foreign key
     uploaded_by_user_id = Column(String(255), nullable=False)
     uploader_id = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=True)
@@ -66,6 +66,7 @@ class DataInstance(Base):
     uploader = relationship("User", back_populates="uploaded_images", foreign_keys=[uploader_id])
     comments = relationship("ImageComment", back_populates="image", cascade="all, delete-orphan")
     classifications = relationship("ImageClassification", back_populates="image", cascade="all, delete-orphan")
+    ml_analyses = relationship("MLAnalysis", back_populates="image", cascade="all, delete-orphan")
 
 
 class ImageDeletionEvent(Base):
@@ -186,7 +187,7 @@ class MLAnalysis(Base):
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
 
     # Relationships
-    image = relationship("DataInstance", backref="ml_analyses")
+    image = relationship("DataInstance", back_populates="ml_analyses")
     requested_by = relationship("User")
     annotations = relationship("MLAnnotation", back_populates="analysis", cascade="all, delete-orphan")
 

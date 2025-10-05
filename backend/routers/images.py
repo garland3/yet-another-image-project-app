@@ -524,14 +524,14 @@ async def update_image_metadata(
         )
     
     # Update the metadata
-    current_metadata = db_image.metadata_ or {}
+    current_metadata = db_image.metadata_json or {}
     current_metadata[metadata.key] = metadata.value
     
     # Update the database
     await db.execute(
         update(models.DataInstance)
         .where(models.DataInstance.id == image_id)
-        .values(metadata_=current_metadata)
+        .values(metadata_json=current_metadata)
     )
     await db.commit()
     
@@ -586,7 +586,7 @@ async def delete_image_metadata(
         )
     
     # Update the metadata
-    current_metadata = db_image.metadata_ or {}
+    current_metadata = db_image.metadata_json or {}
     if key in current_metadata:
         del current_metadata[key]
     
@@ -594,7 +594,7 @@ async def delete_image_metadata(
     await db.execute(
         update(models.DataInstance)
         .where(models.DataInstance.id == image_id)
-        .values(metadata_=current_metadata)
+        .values(metadata_json=current_metadata)
     )
     await db.commit()
     

@@ -421,8 +421,16 @@ async def presign_artifact_upload(
     # Generate real presigned upload URL
     from utils.boto3_client import get_presigned_upload_url, boto3_client
     from datetime import timedelta
+    import os
 
     artifact_name = req.filename or f"{req.artifact_type}.bin"
+
+    # Additional path traversal protection (pattern validation in Pydantic should prevent this, but defense in depth)
+    if '..' in artifact_name or '/' in artifact_name or '\\' in artifact_name:
+        raise HTTPException(status_code=400, detail="Invalid filename: path traversal not allowed")
+
+    # Normalize path to prevent any path traversal attacks
+    artifact_name = os.path.basename(artifact_name)
     storage_path = f"ml_outputs/{analysis_id}/{artifact_name}"
 
     # Determine content type based on artifact type

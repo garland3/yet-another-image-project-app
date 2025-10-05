@@ -17,6 +17,7 @@ os.environ["S3_SECRET_KEY"] = "test-secret"
 os.environ["S3_BUCKET"] = "test-bucket"
 os.environ["SKIP_HEADER_CHECK"] = "true"
 os.environ["DEBUG"] = "true"
+os.environ["ML_CALLBACK_HMAC_SECRET"] = "test-hmac-secret-12345"  # Set explicitly for tests
 
 from main import app
 from core.database import Base, get_db

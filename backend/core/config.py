@@ -55,7 +55,7 @@ class Settings(BaseSettings):
     ML_DEFAULT_STATUS: str = "queued"
     ML_CALLBACK_HMAC_SECRET: Optional[str] = None
     ML_PIPELINE_REQUIRE_HMAC: bool = True
-    ML_MAX_BULK_ANNOTATIONS: int = 5000
+    ML_MAX_BULK_ANNOTATIONS: int = 1000  # Lowered from 5000 to prevent memory/timeout issues
     ML_PRESIGNED_URL_EXPIRY_SECONDS: int = 3600  # 1 hour to allow slow uploads of large artifacts
 
     # Image deletion / retention settings
@@ -112,15 +112,8 @@ if os.getenv("MINIO_BUCKET_NAME") and not os.getenv("S3_BUCKET"):
 if os.getenv("MINIO_USE_SSL") and not os.getenv("S3_USE_SSL"):
     settings.S3_USE_SSL = os.getenv("MINIO_USE_SSL", "False").lower() == "true"  # type: ignore[attr-defined]
 
-# Test/fast-mode convenience: If ML pipeline HMAC is required but no secret supplied,
-# synthesize a deterministic test secret to avoid runtime 500s in early-initialized
-# app contexts (e.g., when TestClient is created before individual tests set it).
-try:
-    if getattr(settings, 'FAST_TEST_MODE', False) and settings.ML_PIPELINE_REQUIRE_HMAC and not settings.ML_CALLBACK_HMAC_SECRET:
-        settings.ML_CALLBACK_HMAC_SECRET = "test-hmac-secret"  # type: ignore[attr-defined]
-except Exception:
-    # Non-fatal; continue with possibly missing secret (will raise at verification time)
-    pass
+# NOTE: HMAC secret must be configured explicitly in tests via conftest.py
+# Do not auto-initialize to avoid masking configuration issues
 
 # If running outside Docker and DATABASE_URL points at the docker hostname 'db',
 # rewrite to localhost using HOST_DB_PORT (default 5433) for local dev.

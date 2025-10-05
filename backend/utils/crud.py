@@ -115,22 +115,30 @@ async def count_ml_annotations(db: AsyncSession, analysis_id: uuid.UUID) -> int:
     return result.scalar_one()
 
 async def bulk_insert_ml_annotations(db: AsyncSession, analysis_id: uuid.UUID, annotations: List[schemas.MLAnnotationCreate]) -> int:
-    """Bulk insert annotations efficiently."""
-    objs = []
-    for ann in annotations:
-        payload = ann.model_dump()
-        objs.append(models.MLAnnotation(
-            analysis_id=analysis_id,
-            annotation_type=payload["annotation_type"],
-            class_name=payload.get("class_name"),
-            confidence=payload.get("confidence"),
-            data=payload["data"],
-            storage_path=payload.get("storage_path"),
-            ordering=payload.get("ordering"),
-        ))
-    db.add_all(objs)
-    await db.commit()
-    return len(objs)
+    """Bulk insert annotations efficiently with chunking to prevent memory issues."""
+    CHUNK_SIZE = 500  # Process in chunks to avoid memory/timeout issues
+    total_inserted = 0
+
+    for i in range(0, len(annotations), CHUNK_SIZE):
+        chunk = annotations[i:i + CHUNK_SIZE]
+        objs = []
+        for ann in chunk:
+            payload = ann.model_dump()
+            objs.append(models.MLAnnotation(
+                analysis_id=analysis_id,
+                annotation_type=payload["annotation_type"],
+                class_name=payload.get("class_name"),
+                confidence=payload.get("confidence"),
+                data=payload["data"],
+                storage_path=payload.get("storage_path"),
+                ordering=payload.get("ordering"),
+            ))
+        db.add_all(objs)
+        await db.flush()  # Flush each chunk but don't commit yet
+        total_inserted += len(objs)
+
+    await db.commit()  # Single commit at the end
+    return total_inserted
 
 # User CRUD operations
 async def get_user_by_email(db: AsyncSession, email: str) -> Optional[models.User]:
