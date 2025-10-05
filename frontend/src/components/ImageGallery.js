@@ -31,33 +31,21 @@ function ImageGallery({ projectId, images, loading, onImageUpdated, refreshProje
       
       switch (searchField) {
         case 'filename':
-          const filename = (image.filename || '').toLowerCase();
-          // Support wildcard search with * (with ReDoS protection)
-          if (searchLower.includes('*')) {
-            // Escape all regex special characters except *
-            const escapeRegExp = (str) => str.replace(/[-[\]/{}()+?.\\^$|]/g, '\\$&');
-            const safePattern = escapeRegExp(searchLower).replace(/\\\*/g, '.*');
-            // Add anchors and limit regex complexity to prevent ReDoS
-            const regex = new RegExp('^' + safePattern + '$', 'i');
-            return regex.test(filename);
-          }
-          return filename.includes(searchLower);
+          return (image.filename || '').toLowerCase().includes(searchLower);
         case 'content_type':
           return (image.content_type || '').toLowerCase().includes(searchLower);
         case 'uploaded_by':
           return (image.uploaded_by_user_id || '').toLowerCase().includes(searchLower);
         case 'metadata':
           // Search across all metadata values
-          const metadata = image.metadata || image.metadata_;
-          if (!metadata) return false;
-          return Object.values(metadata).some(value =>
+          if (!image.metadata_) return false;
+          return Object.values(image.metadata_).some(value => 
             String(value).toLowerCase().includes(searchLower)
           );
         default:
           // Search specific metadata key
-          const metadataObj = image.metadata || image.metadata_;
-          if (!metadataObj || !metadataObj[searchField]) return false;
-          return String(metadataObj[searchField]).toLowerCase().includes(searchLower);
+          if (!image.metadata_ || !image.metadata_[searchField]) return false;
+          return String(image.metadata_[searchField]).toLowerCase().includes(searchLower);
       }
     })
     .sort((a, b) => {
@@ -89,22 +77,19 @@ function ImageGallery({ projectId, images, loading, onImageUpdated, refreshProje
   useEffect(() => {
     const keys = new Set();
     images.forEach(image => {
-      // Check both 'metadata' and 'metadata_' field names
-      const metadata = image.metadata || image.metadata_;
-      if (metadata && typeof metadata === 'object') {
-        Object.keys(metadata).forEach(key => keys.add(key));
+      if (image.metadata_) {
+        Object.keys(image.metadata_).forEach(key => keys.add(key));
       }
     });
-    const sortedKeys = Array.from(keys).sort();
-    setAvailableMetadataKeys(sortedKeys);
+    setAvailableMetadataKeys(Array.from(keys).sort());
   }, [images]);
   
   // Fetch images when search parameters change
   useEffect(() => {
     if (refreshProjectImages) {
       refreshProjectImages({
-        searchField: searchValue ? searchField : null,
-        searchValue: searchValue || null
+        searchField: searchField,
+        searchValue: searchValue
       });
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -181,32 +166,22 @@ function ImageGallery({ projectId, images, loading, onImageUpdated, refreshProje
         
         <div className="gallery-controls">
           <div className="search-control">
-            <select
-              value={searchField}
+            <select 
+              value={searchField} 
               onChange={(e) => setSearchField(e.target.value)}
               className="search-field-select"
             >
-              <optgroup label="Basic Search">
-                <option value="filename">Filename</option>
-                <option value="content_type">Content Type</option>
-                <option value="uploaded_by">Uploaded By</option>
-                <option value="metadata">All Metadata</option>
-              </optgroup>
-              {availableMetadataKeys.length > 0 && (
-                <optgroup label="Custom Metadata Keys">
-                  {availableMetadataKeys.map(key => (
-                    <option key={key} value={key}>{key}</option>
-                  ))}
-                </optgroup>
-              )}
+              <option value="filename">Filename</option>
+              <option value="content_type">Content Type</option>
+              <option value="uploaded_by">Uploaded By</option>
+              <option value="metadata">All Metadata</option>
+              {availableMetadataKeys.map(key => (
+                <option key={key} value={key}>{key}</option>
+              ))}
             </select>
             <input
               type="text"
-              placeholder={
-                availableMetadataKeys.includes(searchField)
-                  ? `Search ${searchField} values...`
-                  : `Search by ${searchField}...`
-              }
+              placeholder={`Search by ${searchField}...`}
               value={searchValue}
               onChange={(e) => setSearchValue(e.target.value)}
               className="search-input"

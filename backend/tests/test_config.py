@@ -100,8 +100,9 @@ class TestSettings:
                     "POSTGRES_SERVER": "localhost",
                     "DATABASE_URL": "sqlite+aiosqlite:///:memory:",
                 })
-                assert hasattr(s, 'Config')
-                assert s.Config.env_file == [".env", "../.env"]
+                # Pydantic v2 exposes configuration via model_config instead of Config class
+                assert hasattr(s, 'model_config')
+                assert s.model_config.get('env_file') == (".env", "../.env")
 
     def test_field_validators_exist(self):
         """Test that field validators are properly set up"""
@@ -151,4 +152,5 @@ class TestSettings:
     def test_extra_config_allowed(self):
         """Test that extra configuration is allowed"""
         settings = Settings(_env_file=None)
-        assert settings.Config.extra == "allow"
+        # In Pydantic v2 the extra handling lives in model_config
+        assert settings.model_config.get('extra') == 'allow'

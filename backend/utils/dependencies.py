@@ -4,7 +4,9 @@ from typing import Optional, List
 from sqlalchemy.ext.asyncio import AsyncSession
 import uuid
 import hashlib
+import hmac
 import secrets
+import logging
 from core.config import settings
 from core.schemas import User, UserCreate
 from core.database import get_db
@@ -12,6 +14,7 @@ from core.group_auth_helper import is_user_in_group
 import utils.crud as crud
 from core import models
 
+logger = logging.getLogger(__name__)
 security = HTTPBearer(auto_error=False)
 
 # Function to get a user's accessible groups
@@ -240,6 +243,54 @@ async def get_current_user(
         status_code=status.HTTP_401_UNAUTHORIZED,
         detail="Authentication required. Provide API key or ensure proxy auth headers are present.",
     )
+
+
+def verify_hmac_signature(secret: str, body: bytes, timestamp: str, signature_header: str, skew_seconds: int = 300) -> bool:
+    """Verify an HMAC SHA256 signature of the form 'sha256=hex'.
+    Includes basic replay protection via timestamp skew check (UTC seconds epoch or ISO8601)."""
+    import time, datetime as _dt
+    try:
+        if timestamp.isdigit():
+            ts = int(timestamp)
+        else:
+            # attempt parse iso8601
+            ts = int(_dt.datetime.fromisoformat(timestamp.replace('Z','+00:00')).timestamp())
+        now = int(time.time())
+        if abs(now - ts) > skew_seconds:
+            return False
+        if not signature_header.startswith('sha256='):
+            return False
+        provided = signature_header.split('=',1)[1]
+        mac = hmac.new(secret.encode('utf-8'), msg=(timestamp.encode('utf-8') + b'.' + body), digestmod=hashlib.sha256)
+        expected = mac.hexdigest()
+        return hmac.compare_digest(provided, expected)
+    except Exception:
+        return False
+
+def verify_hmac_signature_flexible(secret: str, body: bytes, timestamp: str, signature_header: str, skew_seconds: int = 300) -> bool:
+    """Attempt HMAC verification using the raw body first; if that fails and body appears to be JSON,
+    re-serialize the JSON with canonical formatting (sorted keys, consistent separators) and retry.
+    This provides robustness against minor serialization differences (spacing, key ordering) between client and server.
+
+    Security note: The canonical JSON re-serialization uses sorted keys to prevent semantic ambiguity.
+    This ensures that different JSON representations with the same semantic meaning are treated consistently.
+    """
+    if verify_hmac_signature(secret, body, timestamp, signature_header, skew_seconds=skew_seconds):
+        return True
+    # Try canonical JSON re-dump if body decodes to JSON
+    try:
+        import json
+        obj = json.loads(body.decode('utf-8'))
+        # Use sorted keys for canonical representation to prevent semantic ambiguity
+        alt = json.dumps(obj, sort_keys=True, separators=(',', ':')).encode('utf-8')
+        if verify_hmac_signature(secret, alt, timestamp, signature_header, skew_seconds=skew_seconds):
+            return True
+    except Exception as e:
+        # Alternate HMAC signature verification failed - this is expected when body format differs
+        logger.debug(
+            f"Alternate HMAC signature verification failed due to exception: {e}"
+        )
+    return False
 
 async def requires_group_membership(
     required_group_id: str,

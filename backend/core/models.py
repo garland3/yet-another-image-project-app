@@ -1,5 +1,5 @@
 import uuid
-from sqlalchemy import Column, String, Text, ForeignKey, DateTime, JSON, BigInteger, Boolean, UniqueConstraint
+from sqlalchemy import Column, String, Text, ForeignKey, DateTime, JSON, BigInteger, Boolean, UniqueConstraint, Numeric, Integer
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
@@ -163,5 +163,48 @@ class ApiKey(Base):
     
     # Relationships
     user = relationship("User", back_populates="api_keys")
+
+
+class MLAnalysis(Base):
+    """Represents one ML analysis job for a given image and model."""
+    __tablename__ = "ml_analyses"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    image_id = Column(UUID(as_uuid=True), ForeignKey("data_instances.id", ondelete="CASCADE"), nullable=False, index=True)
+    model_name = Column(String(255), nullable=False, index=True)
+    model_version = Column(String(100), nullable=False)
+    status = Column(String(40), nullable=False, index=True, default="queued")  # queued, processing, completed, failed
+    error_message = Column(Text, nullable=True)
+    parameters = Column(JSON, nullable=True)
+    provenance = Column(JSON, nullable=True)
+    requested_by_id = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False)
+    external_job_id = Column(String(255), nullable=True, unique=True)
+    priority = Column(Integer, nullable=False, default=0)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    started_at = Column(DateTime(timezone=True), nullable=True)
+    completed_at = Column(DateTime(timezone=True), nullable=True)
+    updated_at = Column(DateTime(timezone=True), onupdate=func.now())
+
+    # Relationships
+    image = relationship("DataInstance", backref="ml_analyses")
+    requested_by = relationship("User")
+    annotations = relationship("MLAnnotation", back_populates="analysis", cascade="all, delete-orphan")
+
+
+class MLAnnotation(Base):
+    """Individual annotation output for an analysis (box, classification, heatmap ref, etc.)."""
+    __tablename__ = "ml_annotations"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    analysis_id = Column(UUID(as_uuid=True), ForeignKey("ml_analyses.id", ondelete="CASCADE"), nullable=False, index=True)
+    annotation_type = Column(String(50), nullable=False, index=True)  # classification, bounding_box, heatmap, segmentation
+    class_name = Column(String(255), nullable=True)
+    confidence = Column(Numeric(5, 4), nullable=True)
+    data = Column(JSON, nullable=False)  # dynamic payload: coordinates, arrays, etc.
+    storage_path = Column(String(1024), nullable=True)  # pointer to artifact in object storage
+    ordering = Column(Integer, nullable=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+
+    analysis = relationship("MLAnalysis", back_populates="annotations")
 
 
