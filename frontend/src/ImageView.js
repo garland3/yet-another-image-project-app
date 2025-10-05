@@ -30,6 +30,12 @@ function ImageView() {
   const [sidebarWidth, setSidebarWidth] = useState(350);
   const [isResizing, setIsResizing] = useState(false);
 
+  // Navigation settings - restore from localStorage
+  const [skipDeletedImages, setSkipDeletedImages] = useState(() => {
+    const saved = localStorage.getItem('skipDeletedImages');
+    return saved !== null ? JSON.parse(saved) : true; // Default to true (skip deleted)
+  });
+
   // ML Analysis state - restore from localStorage if available
   const [selectedAnalysis, setSelectedAnalysis] = useState(null);
   const [selectedAnnotations, setSelectedAnnotations] = useState([]);
@@ -120,18 +126,18 @@ function ImageView() {
     try {
       console.log('Fetching images for project:', projectId);
       const response = await fetch(`/api/projects/${projectId}/images?include_deleted=true`);
-      
+
       if (!response.ok) {
         throw new Error(`HTTP error! Status: ${response.status}`);
       }
-      
+
       const images = await response.json();
-      
+
       if (!Array.isArray(images)) {
         console.error('Server response is not an array:', images);
         throw new Error('Invalid server response: expected an array of images');
       }
-      
+
       // Sort images by date (newest first) to match the gallery default sorting
       // Use spread operator to avoid mutating the original array
       const sortedImages = [...images].sort((a, b) => {
@@ -143,12 +149,17 @@ function ImageView() {
       // Find the index of the current image in the sorted array
       const index = sortedImages.findIndex(img => img.id === imageId);
       setCurrentImageIndex(index);
-      
+
     } catch (error) {
       console.error('Error loading project images:', error);
       setError('Failed to load project images for navigation. Please try again later.');
     }
   }, [projectId, imageId]);
+
+  // Save skip deleted preference to localStorage
+  useEffect(() => {
+    localStorage.setItem('skipDeletedImages', JSON.stringify(skipDeletedImages));
+  }, [skipDeletedImages]);
 
   // Load classes for the project
   const loadClasses = useCallback(async () => {
@@ -204,25 +215,43 @@ function ImageView() {
 
   // Navigate to previous image with transition
   const navigateToPreviousImage = useCallback(() => {
-    if (currentImageIndex > 0) {
+    let targetIndex = currentImageIndex - 1;
+
+    // Skip deleted images if option is enabled
+    if (skipDeletedImages) {
+      while (targetIndex >= 0 && projectImages[targetIndex]?.deleted_at) {
+        targetIndex--;
+      }
+    }
+
+    if (targetIndex >= 0) {
       setIsTransitioning(true);
       setTimeout(() => {
-        const prevImage = projectImages[currentImageIndex - 1];
+        const prevImage = projectImages[targetIndex];
         navigate(`/view/${prevImage.id}?project=${projectId}`);
       }, 300);
     }
-  }, [currentImageIndex, projectImages, navigate, projectId]);
+  }, [currentImageIndex, projectImages, navigate, projectId, skipDeletedImages]);
 
   // Navigate to next image with transition
   const navigateToNextImage = useCallback(() => {
-    if (currentImageIndex < projectImages.length - 1) {
+    let targetIndex = currentImageIndex + 1;
+
+    // Skip deleted images if option is enabled
+    if (skipDeletedImages) {
+      while (targetIndex < projectImages.length && projectImages[targetIndex]?.deleted_at) {
+        targetIndex++;
+      }
+    }
+
+    if (targetIndex < projectImages.length) {
       setIsTransitioning(true);
       setTimeout(() => {
-        const nextImage = projectImages[currentImageIndex + 1];
+        const nextImage = projectImages[targetIndex];
         navigate(`/view/${nextImage.id}?project=${projectId}`);
       }, 300);
     }
-  }, [currentImageIndex, projectImages, navigate, projectId]);
+  }, [currentImageIndex, projectImages, navigate, projectId, skipDeletedImages]);
 
   // Reset transition state when image changes (but keep ML settings)
   useEffect(() => {
@@ -422,6 +451,41 @@ function ImageView() {
             setImage={setImage}
             refreshProjectImages={loadProjectImages}
           />
+
+          {/* Navigation settings */}
+          <div style={{
+            marginTop: '1rem',
+            padding: '0.75rem',
+            background: 'var(--bg-secondary, #f8f9fa)',
+            borderRadius: '6px',
+            border: '1px solid var(--border-color, #dee2e6)'
+          }}>
+            <label style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '0.5rem',
+              fontSize: '0.9rem',
+              cursor: 'pointer',
+              userSelect: 'none'
+            }}>
+              <input
+                type="checkbox"
+                checked={skipDeletedImages}
+                onChange={(e) => setSkipDeletedImages(e.target.checked)}
+                style={{ cursor: 'pointer' }}
+              />
+              <span>Skip deleted images when navigating (arrow keys)</span>
+            </label>
+            <div style={{
+              marginTop: '0.5rem',
+              fontSize: '0.85rem',
+              color: 'var(--text-muted, #6c757d)',
+              paddingLeft: '1.5rem'
+            }}>
+              When enabled, arrow key navigation will automatically skip over soft-deleted images.
+            </div>
+          </div>
+
           {/* Debug ML outputs section */}
           {imageId && (
             <div style={{ marginTop: '1rem' }}>
