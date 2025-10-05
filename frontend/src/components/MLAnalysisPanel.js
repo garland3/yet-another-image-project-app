@@ -16,6 +16,7 @@ export default function MLAnalysisPanel({ imageId, onSelect, onAnalysesLoaded, a
   const fetchAnalyses = useCallback(async () => {
     if (!imageId) return;
     setLoading(true);
+    setError(null); // Clear previous errors
     try {
       const resp = await fetch(`/api/images/${imageId}/analyses`);
       if (!resp.ok) throw new Error(`List analyses failed: ${resp.status}`);
@@ -36,6 +37,7 @@ export default function MLAnalysisPanel({ imageId, onSelect, onAnalysesLoaded, a
     setSelected(id);
     setAnnLoading(true);
     setAnnotations([]);
+    setError(null); // Clear previous errors
     try {
       const resp = await fetch(`/api/analyses/${id}`);
       if (!resp.ok) throw new Error(`Detail fetch failed: ${resp.status}`);
@@ -53,6 +55,7 @@ export default function MLAnalysisPanel({ imageId, onSelect, onAnalysesLoaded, a
   }, [onSelect]);
 
   const exportAnalysis = useCallback(async (id, format = 'json') => {
+    setError(null); // Clear previous errors
     try {
       const resp = await fetch(`/api/analyses/${id}/export?format=${format}`);
       if (!resp.ok) throw new Error(`Export failed: ${resp.status}`);

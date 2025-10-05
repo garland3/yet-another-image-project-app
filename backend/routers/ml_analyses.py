@@ -1,5 +1,5 @@
 import uuid
-from typing import List, Optional
+from typing import List, Optional, Literal
 from fastapi import APIRouter, Depends, HTTPException, Query, status, Request
 from sqlalchemy.ext.asyncio import AsyncSession
 from core import schemas
@@ -271,7 +271,9 @@ async def update_ml_analysis_status(
 ):
     if not settings.ML_ANALYSIS_ENABLED:
         raise HTTPException(status_code=404, detail="ML analysis feature disabled")
-    db_obj = await crud.get_ml_analysis(db, analysis_id)
+
+    # Use row-level locking to prevent race conditions in concurrent status updates
+    db_obj = await crud.get_ml_analysis_for_update(db, analysis_id)
     if not db_obj:
         raise HTTPException(status_code=404, detail="Analysis not found")
     # Access via image
@@ -376,8 +378,19 @@ async def bulk_upload_annotations(
 
 
 class PresignRequest(schemas.BaseModel):  # type: ignore[attr-defined]
-    artifact_type: str
-    filename: Optional[str] = None
+    from pydantic import Field, field_validator
+    import re
+
+    artifact_type: Literal["heatmap", "mask", "segmentation", "log", "metadata"] = Field(
+        ...,
+        description="Type of artifact to upload"
+    )
+    filename: Optional[str] = Field(
+        None,
+        max_length=255,
+        pattern=r'^[a-zA-Z0-9_\-\.]+$',
+        description="Filename (alphanumeric, dash, underscore, dot only)"
+    )
 
 class PresignResponse(schemas.BaseModel):  # type: ignore[attr-defined]
     upload_url: str
@@ -491,7 +504,7 @@ async def finalize_analysis(
 @router.get("/analyses/{analysis_id}/export")
 async def export_analysis(
     analysis_id: uuid.UUID,
-    format: str = Query("json", regex="^(json|csv)$"),
+    format: Literal["json", "csv"] = Query("json"),
     db: AsyncSession = Depends(get_db),
     current_user: schemas.User = Depends(get_current_user),
 ):

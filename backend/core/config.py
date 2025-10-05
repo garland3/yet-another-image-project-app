@@ -56,7 +56,7 @@ class Settings(BaseSettings):
     ML_CALLBACK_HMAC_SECRET: Optional[str] = None
     ML_PIPELINE_REQUIRE_HMAC: bool = True
     ML_MAX_BULK_ANNOTATIONS: int = 5000
-    ML_PRESIGNED_URL_EXPIRY_SECONDS: int = 900
+    ML_PRESIGNED_URL_EXPIRY_SECONDS: int = 3600  # 1 hour to allow slow uploads of large artifacts
 
     # Image deletion / retention settings
     IMAGE_DELETE_RETENTION_DAYS: int = 60  # Soft delete retention window (days)

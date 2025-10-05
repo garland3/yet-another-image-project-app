@@ -294,8 +294,19 @@ class MLAnnotation(MLAnnotationBase):
     }
 
 class MLAnalysisBase(BaseModel):
-    model_name: str = Field(..., min_length=2, max_length=255)
-    model_version: str = Field(..., min_length=1, max_length=100)
+    model_name: str = Field(
+        ...,
+        min_length=2,
+        max_length=255,
+        pattern=r'^[a-zA-Z0-9_\-]+$',
+        description="Model name (alphanumeric, dash, underscore only)"
+    )
+    model_version: str = Field(
+        ...,
+        min_length=1,
+        max_length=100,
+        description="Model version identifier"
+    )
     parameters: Optional[Dict[str, Any]] = None
 
 class MLAnalysisCreate(MLAnalysisBase):

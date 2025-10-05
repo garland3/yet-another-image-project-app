@@ -55,6 +55,15 @@ async def get_ml_analysis(db: AsyncSession, analysis_id: uuid.UUID) -> Optional[
     )
     return result.scalars().first()
 
+async def get_ml_analysis_for_update(db: AsyncSession, analysis_id: uuid.UUID) -> Optional[models.MLAnalysis]:
+    """Get ML analysis with row-level lock for concurrent-safe updates."""
+    result = await db.execute(
+        select(models.MLAnalysis)
+        .where(models.MLAnalysis.id == analysis_id)
+        .with_for_update()
+    )
+    return result.scalars().first()
+
 async def list_ml_analyses_for_image(db: AsyncSession, image_id: uuid.UUID, skip: int = 0, limit: int = 100) -> List[models.MLAnalysis]:
     result = await db.execute(
         select(models.MLAnalysis)
