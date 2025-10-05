@@ -284,11 +284,11 @@ async def get_data_instances_for_project(db: AsyncSession, project_id: uuid.UUID
         elif search_field == 'metadata':
             # Search across all metadata values using JSON text search
             # This uses PostgreSQL's jsonb operators
-            query = query.where(text("metadata_::text ILIKE :search_value")).params(search_value=search_value_lower)
+            query = query.where(text("metadata::text ILIKE :search_value")).params(search_value=search_value_lower)
         else:
             # Search specific metadata key using JSON path
             # This searches for the specific key in the metadata JSON
-            query = query.where(text("metadata_ ->> :key ILIKE :search_value")).params(key=search_field, search_value=search_value_lower)
+            query = query.where(text("metadata ->> :key ILIKE :search_value")).params(key=search_field, search_value=search_value_lower)
     
     query = query.offset(skip).limit(limit)
     result = await db.execute(query)
@@ -409,8 +409,9 @@ async def mark_image_storage_deleted(db: AsyncSession, image: models.DataInstanc
 
 async def create_data_instance(db: AsyncSession, data_instance: schemas.DataInstanceCreate, created_by: Optional[str] = None) -> models.DataInstance:
     create_data = data_instance.model_dump()
-    if "metadata" in create_data:
-         create_data["metadata_"] = create_data.pop("metadata")
+    # Rename Pydantic field name to SQLAlchemy attribute name
+    if "metadata_" in create_data:
+         create_data["metadata_json"] = create_data.pop("metadata_")
     db_data_instance = models.DataInstance(**create_data)
     db.add(db_data_instance)
     await db.commit()

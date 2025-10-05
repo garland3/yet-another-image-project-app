@@ -268,12 +268,14 @@ def test_pagination_annotations(client, monkeypatch):
     resp = client.get(f"/api/analyses/{analysis['id']}/annotations?skip=0&limit=5")
     assert resp.status_code == 200
     data = resp.json()
-    assert data['total'] == 5  # returns min(actual, limit)
+    assert data['total'] == 10  # Total count should be actual total, not limited count
+    assert len(data['annotations']) == 5  # But annotations array should be limited
 
     resp = client.get(f"/api/analyses/{analysis['id']}/annotations?skip=5&limit=5")
     assert resp.status_code == 200
     data = resp.json()
-    assert data['total'] == 5
+    assert data['total'] == 10  # Total count remains the same
+    assert len(data['annotations']) == 5  # Second page also has 5 items
 
 
 def test_access_control_other_user_analysis(client):
