@@ -269,8 +269,11 @@ def verify_hmac_signature(secret: str, body: bytes, timestamp: str, signature_he
 
 def verify_hmac_signature_flexible(secret: str, body: bytes, timestamp: str, signature_header: str, skew_seconds: int = 300) -> bool:
     """Attempt HMAC verification using the raw body first; if that fails and body appears to be JSON,
-    re-serialize the JSON with default json.dumps formatting (which may include spaces) and retry.
-    This provides robustness against minor serialization differences (spacing) between client and server.
+    re-serialize the JSON with canonical formatting (sorted keys, consistent separators) and retry.
+    This provides robustness against minor serialization differences (spacing, key ordering) between client and server.
+
+    Security note: The canonical JSON re-serialization uses sorted keys to prevent semantic ambiguity.
+    This ensures that different JSON representations with the same semantic meaning are treated consistently.
     """
     if verify_hmac_signature(secret, body, timestamp, signature_header, skew_seconds=skew_seconds):
         return True
@@ -278,7 +281,8 @@ def verify_hmac_signature_flexible(secret: str, body: bytes, timestamp: str, sig
     try:
         import json
         obj = json.loads(body.decode('utf-8'))
-        alt = json.dumps(obj).encode('utf-8')  # default separators may add spaces
+        # Use sorted keys for canonical representation to prevent semantic ambiguity
+        alt = json.dumps(obj, sort_keys=True, separators=(',', ':')).encode('utf-8')
         if verify_hmac_signature(secret, alt, timestamp, signature_header, skew_seconds=skew_seconds):
             return True
     except Exception as e:

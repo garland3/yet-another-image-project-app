@@ -218,17 +218,19 @@ function ImageDisplay({
         height: imgRef.current.offsetHeight
       };
 
-      console.log('[ImageDisplay] Measured display size:', {
-        displaySize: measuredSize,
-        naturalWidth: imgRef.current.naturalWidth,
-        naturalHeight: imgRef.current.naturalHeight,
-        offsetWidth: imgRef.current.offsetWidth,
-        offsetHeight: imgRef.current.offsetHeight,
-        clientWidth: imgRef.current.clientWidth,
-        clientHeight: imgRef.current.clientHeight,
-        zoomLevel,
-        imageId
-      });
+      if (process.env.NODE_ENV === 'development') {
+        console.log('[ImageDisplay] Measured display size:', {
+          displaySize: measuredSize,
+          naturalWidth: imgRef.current.naturalWidth,
+          naturalHeight: imgRef.current.naturalHeight,
+          offsetWidth: imgRef.current.offsetWidth,
+          offsetHeight: imgRef.current.offsetHeight,
+          clientWidth: imgRef.current.clientWidth,
+          clientHeight: imgRef.current.clientHeight,
+          zoomLevel,
+          imageId
+        });
+      }
 
       setDisplaySize(measuredSize);
     }
