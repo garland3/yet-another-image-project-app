@@ -150,6 +150,7 @@ async def list_ml_analyses(
         raise HTTPException(status_code=404, detail="ML analysis feature disabled")
     await get_image_or_403(image_id, db, current_user)
     objs = await crud.list_ml_analyses_for_image(db, image_id, skip, limit)
+    total_count = await crud.count_ml_analyses_for_image(db, image_id)
     # Convert to schemas (annotations excluded for list for performance)
     analyses = [
         schemas.MLAnalysis(
@@ -171,7 +172,7 @@ async def list_ml_analyses(
             annotations=[]
         ) for o in objs
     ]
-    return schemas.MLAnalysisList(analyses=analyses, total=len(analyses))
+    return schemas.MLAnalysisList(analyses=analyses, total=total_count)
 
 @router.get("/analyses/{analysis_id}", response_model=schemas.MLAnalysis)
 async def get_ml_analysis(
@@ -235,6 +236,7 @@ async def list_analysis_annotations(
     # Access via image
     await get_image_or_403(db_obj.image_id, db, current_user)
     anns = await crud.list_ml_annotations(db, analysis_id, skip, limit)
+    total_count = await crud.count_ml_annotations(db, analysis_id)
     items = [
         schemas.MLAnnotation(
             id=a.id,
@@ -248,7 +250,7 @@ async def list_analysis_annotations(
             created_at=a.created_at,
         ) for a in anns
     ]
-    return schemas.MLAnnotationList(annotations=items, total=len(items))
+    return schemas.MLAnnotationList(annotations=items, total=total_count)
 
 
 class StatusUpdatePayload(schemas.BaseModel):  # type: ignore[attr-defined]
@@ -286,7 +288,9 @@ async def update_ml_analysis_status(
     sanitized_old_status = sanitize_for_log(old_status)
     sanitized_new_status = sanitize_for_log(new_status)
     if old_status == new_status:
-        return await get_ml_analysis(analysis_id, db, current_user)  # No-op
+        # No-op: status hasn't changed, but keep lock until commit
+        await db.commit()  # Release lock
+        return await get_ml_analysis(analysis_id, db, current_user)
     allowed = VALID_STATUS_TRANSITIONS.get(old_status, set())
     if new_status not in allowed:
         raise HTTPException(status_code=409, detail=f"Illegal transition {old_status}->{new_status}")
@@ -360,6 +364,7 @@ async def bulk_upload_annotations(
     # If mode == replace, we could delete existing first (future). For now always append.
     inserted = await crud.bulk_insert_ml_annotations(db, analysis_id, payload.annotations)
     anns = await crud.list_ml_annotations(db, analysis_id)
+    total_count = await crud.count_ml_annotations(db, analysis_id)
     items = [
         schemas.MLAnnotation(
             id=a.id,
@@ -375,7 +380,7 @@ async def bulk_upload_annotations(
     ]
     safe_analysis_id = sanitize_for_log(str(analysis_id))
     logger.info("ML_BULK_ANNOTATIONS", extra={"analysis_id": safe_analysis_id, "count": inserted})
-    return schemas.MLAnnotationList(annotations=items, total=len(items))
+    return schemas.MLAnnotationList(annotations=items, total=total_count)
 
 
 class PresignRequest(schemas.BaseModel):  # type: ignore[attr-defined]

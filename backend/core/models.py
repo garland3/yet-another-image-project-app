@@ -199,7 +199,7 @@ class MLAnnotation(Base):
     analysis_id = Column(UUID(as_uuid=True), ForeignKey("ml_analyses.id", ondelete="CASCADE"), nullable=False, index=True)
     annotation_type = Column(String(50), nullable=False, index=True)  # classification, bounding_box, heatmap, segmentation
     class_name = Column(String(255), nullable=True)
-    confidence = Column(Numeric(5, 4), nullable=True)
+    confidence = Column(Float, nullable=True)  # Confidence score 0.0-1.0
     data = Column(JSON, nullable=False)  # dynamic payload: coordinates, arrays, etc.
     storage_path = Column(String(1024), nullable=True)  # pointer to artifact in object storage
     ordering = Column(Integer, nullable=True)

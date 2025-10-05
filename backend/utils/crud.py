@@ -73,6 +73,14 @@ async def list_ml_analyses_for_image(db: AsyncSession, image_id: uuid.UUID, skip
     )
     return result.scalars().all()
 
+async def count_ml_analyses_for_image(db: AsyncSession, image_id: uuid.UUID) -> int:
+    """Count total ML analyses for an image."""
+    from sqlalchemy import func
+    result = await db.execute(
+        select(func.count()).select_from(models.MLAnalysis).where(models.MLAnalysis.image_id == image_id)
+    )
+    return result.scalar_one()
+
 async def create_ml_annotation(db: AsyncSession, analysis_id: uuid.UUID, annotation: schemas.MLAnnotationCreate) -> models.MLAnnotation:
     payload = annotation.model_dump()
     db_obj = models.MLAnnotation(
@@ -97,6 +105,14 @@ async def list_ml_annotations(db: AsyncSession, analysis_id: uuid.UUID, skip: in
         .offset(skip).limit(limit)
     )
     return result.scalars().all()
+
+async def count_ml_annotations(db: AsyncSession, analysis_id: uuid.UUID) -> int:
+    """Count total annotations for an analysis."""
+    from sqlalchemy import func
+    result = await db.execute(
+        select(func.count()).select_from(models.MLAnnotation).where(models.MLAnnotation.analysis_id == analysis_id)
+    )
+    return result.scalar_one()
 
 async def bulk_insert_ml_annotations(db: AsyncSession, analysis_id: uuid.UUID, annotations: List[schemas.MLAnnotationCreate]) -> int:
     """Bulk insert annotations efficiently."""
