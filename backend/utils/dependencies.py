@@ -6,6 +6,7 @@ import uuid
 import hashlib
 import hmac
 import secrets
+import logging
 from core.config import settings
 from core.schemas import User, UserCreate
 from core.database import get_db
@@ -13,6 +14,7 @@ from core.group_auth_helper import is_user_in_group
 import utils.crud as crud
 from core import models
 
+logger = logging.getLogger(__name__)
 security = HTTPBearer(auto_error=False)
 
 # Function to get a user's accessible groups
@@ -279,8 +281,11 @@ def verify_hmac_signature_flexible(secret: str, body: bytes, timestamp: str, sig
         alt = json.dumps(obj).encode('utf-8')  # default separators may add spaces
         if verify_hmac_signature(secret, alt, timestamp, signature_header, skew_seconds=skew_seconds):
             return True
-    except Exception:
-        pass
+    except Exception as e:
+        # Alternate HMAC signature verification failed - this is expected when body format differs
+        logger.debug(
+            f"Alternate HMAC signature verification failed due to exception: {e}"
+        )
     return False
 
 async def requires_group_membership(

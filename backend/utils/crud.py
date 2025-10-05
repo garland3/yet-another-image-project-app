@@ -1,5 +1,5 @@
 import uuid
-from sqlalchemy import select, update, delete, and_, text, or_
+from sqlalchemy import select, update, delete, and_, text
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 from core import models, schemas

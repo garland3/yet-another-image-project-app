@@ -33,7 +33,8 @@ def test_valid_hmac_signature_accepted(client, monkeypatch):
     from core import config as cfg
     import os
 
-    secret = 'test_secret_123'; monkeypatch.setattr('routers.ml_analyses.settings.ML_CALLBACK_HMAC_SECRET', secret)
+    secret = 'test_secret_123'
+    monkeypatch.setattr('routers.ml_analyses.settings.ML_CALLBACK_HMAC_SECRET', secret)
     monkeypatch.setenv('ML_CALLBACK_HMAC_SECRET', 'test_secret_123')
     monkeypatch.setattr('routers.ml_analyses.settings.ML_PIPELINE_REQUIRE_HMAC', True)
 
@@ -57,7 +58,8 @@ def test_invalid_hmac_signature_rejected(client, monkeypatch):
     from core import config as cfg
     import os
 
-    secret = 'test_secret_123'; monkeypatch.setattr('routers.ml_analyses.settings.ML_CALLBACK_HMAC_SECRET', secret)
+    secret = 'test_secret_123'
+    monkeypatch.setattr('routers.ml_analyses.settings.ML_CALLBACK_HMAC_SECRET', secret)
     monkeypatch.setenv('ML_CALLBACK_HMAC_SECRET', 'test_secret_123')
     monkeypatch.setattr('routers.ml_analyses.settings.ML_PIPELINE_REQUIRE_HMAC', True)
 
@@ -84,7 +86,8 @@ def test_missing_hmac_headers_rejected(client, monkeypatch):
     from core import config as cfg
     import os
 
-    secret = 'test_secret_123'; monkeypatch.setattr('routers.ml_analyses.settings.ML_CALLBACK_HMAC_SECRET', secret)
+    secret = 'test_secret_123'
+    monkeypatch.setattr('routers.ml_analyses.settings.ML_CALLBACK_HMAC_SECRET', secret)
     monkeypatch.setenv('ML_CALLBACK_HMAC_SECRET', 'test_secret_123')
     monkeypatch.setattr('routers.ml_analyses.settings.ML_PIPELINE_REQUIRE_HMAC', True)
 
@@ -106,7 +109,8 @@ def test_timestamp_replay_protection_old_timestamp(client, monkeypatch):
     from core import config as cfg
     import os
 
-    secret = 'test_secret_123'; monkeypatch.setattr('routers.ml_analyses.settings.ML_CALLBACK_HMAC_SECRET', secret)
+    secret = 'test_secret_123'
+    monkeypatch.setattr('routers.ml_analyses.settings.ML_CALLBACK_HMAC_SECRET', secret)
     monkeypatch.setenv('ML_CALLBACK_HMAC_SECRET', 'test_secret_123')
     monkeypatch.setattr('routers.ml_analyses.settings.ML_PIPELINE_REQUIRE_HMAC', True)
 
@@ -131,7 +135,8 @@ def test_timestamp_skew_tolerance(client, monkeypatch):
     from core import config as cfg
     import os
 
-    secret = 'test_secret_123'; monkeypatch.setattr('routers.ml_analyses.settings.ML_CALLBACK_HMAC_SECRET', secret)
+    secret = 'test_secret_123'
+    monkeypatch.setattr('routers.ml_analyses.settings.ML_CALLBACK_HMAC_SECRET', secret)
     monkeypatch.setenv('ML_CALLBACK_HMAC_SECRET', 'test_secret_123')
     monkeypatch.setattr('routers.ml_analyses.settings.ML_PIPELINE_REQUIRE_HMAC', True)
 
@@ -156,7 +161,8 @@ def test_hmac_on_presign_endpoint(client, monkeypatch):
     from core import config as cfg
     import os
 
-    secret = 'test_secret_456'; monkeypatch.setattr('routers.ml_analyses.settings.ML_CALLBACK_HMAC_SECRET', secret)
+    secret = 'test_secret_456'
+    monkeypatch.setattr('routers.ml_analyses.settings.ML_CALLBACK_HMAC_SECRET', secret)
     monkeypatch.setenv('ML_CALLBACK_HMAC_SECRET', 'test_secret_456')
     monkeypatch.setattr('routers.ml_analyses.settings.ML_PIPELINE_REQUIRE_HMAC', True)
 
@@ -190,7 +196,8 @@ def test_hmac_on_finalize_endpoint(client, monkeypatch):
     from core import config as cfg
     import os
 
-    secret = 'test_secret_789'; monkeypatch.setattr('routers.ml_analyses.settings.ML_CALLBACK_HMAC_SECRET', secret)
+    secret = 'test_secret_789'
+    monkeypatch.setattr('routers.ml_analyses.settings.ML_CALLBACK_HMAC_SECRET', secret)
     monkeypatch.setenv('ML_CALLBACK_HMAC_SECRET', 'test_secret_789')
     monkeypatch.setattr('routers.ml_analyses.settings.ML_PIPELINE_REQUIRE_HMAC', True)
 
@@ -222,7 +229,8 @@ def test_hmac_disabled_allows_requests(client, monkeypatch):
     from core import config as cfg
     import os
 
-    secret = 'test_secret'; monkeypatch.setattr('routers.ml_analyses.settings.ML_CALLBACK_HMAC_SECRET', secret)
+    secret = 'test_secret'
+    monkeypatch.setattr('routers.ml_analyses.settings.ML_CALLBACK_HMAC_SECRET', secret)
     monkeypatch.setenv('ML_CALLBACK_HMAC_SECRET', 'test_secret')
     monkeypatch.setattr('routers.ml_analyses.settings.ML_PIPELINE_REQUIRE_HMAC', False)  # Disable HMAC requirement
 

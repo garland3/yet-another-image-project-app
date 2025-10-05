@@ -12,6 +12,12 @@ import logging
 
 logger = logging.getLogger(__name__)
 
+def sanitize_for_log(value: str) -> str:
+    """Remove newlines and carriage returns from user input for safe logging."""
+    if not isinstance(value, str):
+        value = str(value)
+    return value.replace('\r', '').replace('\n', '')
+
 router = APIRouter(prefix="/api", tags=["ML Analyses"])
 
 
@@ -108,8 +114,8 @@ async def create_ml_analysis(
     logger.info("ML_ANALYSIS_CREATE", extra={
         "analysis_id": str(db_obj.id),
         "image_id": str(db_obj.image_id),
-        "model": db_obj.model_name,
-        "requested_by": str(current_user.id)
+        "model": sanitize_for_log(db_obj.model_name),
+        "requested_by": sanitize_for_log(str(current_user.id))
     })
     # Reload with annotations empty
     return schemas.MLAnalysis(
@@ -273,6 +279,9 @@ async def update_ml_analysis_status(
 
     new_status = payload.status.lower()
     old_status = (db_obj.status or "").lower()
+    # Sanitize status values before logging to avoid log injection
+    sanitized_old_status = sanitize_for_log(old_status)
+    sanitized_new_status = sanitize_for_log(new_status)
     if old_status == new_status:
         return await get_ml_analysis(analysis_id, db, current_user)  # No-op
     allowed = VALID_STATUS_TRANSITIONS.get(old_status, set())
@@ -291,9 +300,9 @@ async def update_ml_analysis_status(
     await db.refresh(db_obj)
     logger.info("ML_ANALYSIS_STATUS", extra={
         "analysis_id": str(db_obj.id),
-        "from": old_status,
-        "to": new_status,
-        "user": str(current_user.id)
+        "from": sanitized_old_status,
+        "to": sanitized_new_status,
+        "user": sanitize_for_log(str(current_user.id))
     })
     return await get_ml_analysis(analysis_id, db, current_user)
 
@@ -361,7 +370,8 @@ async def bulk_upload_annotations(
             created_at=a.created_at,
         ) for a in anns
     ]
-    logger.info("ML_BULK_ANNOTATIONS", extra={"analysis_id": str(analysis_id), "count": inserted})
+    safe_analysis_id = sanitize_for_log(str(analysis_id))
+    logger.info("ML_BULK_ANNOTATIONS", extra={"analysis_id": safe_analysis_id, "count": inserted})
     return schemas.MLAnnotationList(annotations=items, total=len(items))
 
 
@@ -465,11 +475,12 @@ async def finalize_analysis(
                 db_obj.error_message = req.error_message
             await db.commit()
             await db.refresh(db_obj)
+            sanitized_user_id = sanitize_for_log(str(current_user.id))
             logger.info("ML_ANALYSIS_STATUS", extra={
                 "analysis_id": str(db_obj.id),
                 "from": "queued",
-                "to": normalized_new,
-                "user": str(current_user.id)
+                "to": sanitize_for_log(normalized_new),
+                "user": sanitized_user_id
             })
             return db_obj  # Fast path return
         # Otherwise reuse the stricter status update logic (which enforces valid transitions)

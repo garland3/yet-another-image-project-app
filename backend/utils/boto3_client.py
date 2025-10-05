@@ -8,6 +8,12 @@ import io
 
 logger = logging.getLogger(__name__)
 
+def sanitize_for_log(val: str) -> str:
+    """Remove log injection characters from user-sourced input."""
+    if not isinstance(val, str):
+        val = str(val)
+    return val.replace('\r\n', '').replace('\n', '').replace('\r', '')
+
 if getattr(settings, 'FAST_TEST_MODE', False):
     boto3_client = None
     logger.info("FAST_TEST_MODE: Skipping real S3 client initialization.")
@@ -247,8 +253,8 @@ def get_presigned_download_url(bucket_name: str, object_name: str, expires_delta
             ExpiresIn=expires_in
         )
         logger.debug("Generated presigned URL", extra={
-            "object_name": object_name,
-            "bucket": bucket_name,
+            "object_name": sanitize_for_log(object_name),
+            "bucket": sanitize_for_log(bucket_name),
             "expires_in": expires_in
         })
         return url
@@ -256,16 +262,16 @@ def get_presigned_download_url(bucket_name: str, object_name: str, expires_delta
         error_code = e.response.get('Error', {}).get('Code')
         error_message = e.response.get('Error', {}).get('Message', str(e))
         logger.error("S3 error generating presigned URL", extra={
-            "object_name": object_name,
-            "bucket": bucket_name,
+            "object_name": sanitize_for_log(object_name),
+            "bucket": sanitize_for_log(bucket_name),
             "error_code": error_code,
             "error_message": error_message
         })
         return None
     except Exception as e:
         logger.error("Unexpected error generating presigned URL", extra={
-            "object_name": object_name,
-            "bucket": bucket_name,
+            "object_name": sanitize_for_log(object_name),
+            "bucket": sanitize_for_log(bucket_name),
             "error": str(e),
             "error_type": type(e).__name__
         })
@@ -292,8 +298,8 @@ def get_presigned_upload_url(bucket_name: str, object_name: str, expires_delta: 
             HttpMethod='PUT'
         )
         logger.debug("Generated presigned upload URL", extra={
-            "object_name": object_name,
-            "bucket": bucket_name,
+            "object_name": sanitize_for_log(object_name),
+            "bucket": sanitize_for_log(bucket_name),
             "expires_in": expires_in,
             "content_type": content_type
         })
@@ -302,16 +308,16 @@ def get_presigned_upload_url(bucket_name: str, object_name: str, expires_delta: 
         error_code = e.response.get('Error', {}).get('Code')
         error_message = e.response.get('Error', {}).get('Message', str(e))
         logger.error("S3 error generating presigned upload URL", extra={
-            "object_name": object_name,
-            "bucket": bucket_name,
+            "object_name": sanitize_for_log(object_name),
+            "bucket": sanitize_for_log(bucket_name),
             "error_code": error_code,
             "error_message": error_message
         })
         return None
     except Exception as e:
         logger.error("Unexpected error generating presigned upload URL", extra={
-            "object_name": object_name,
-            "bucket": bucket_name,
+            "object_name": sanitize_for_log(object_name),
+            "bucket": sanitize_for_log(bucket_name),
             "error": str(e),
             "error_type": type(e).__name__
         })
@@ -326,28 +332,28 @@ def delete_file_from_s3(bucket_name: str, object_name: str) -> bool:
     try:
         boto3_client.delete_object(Bucket=bucket_name, Key=object_name)
         logger.info("Deleted object from bucket", extra={
-            "object_name": object_name,
-            "bucket": bucket_name
+            "object_name": sanitize_for_log(object_name),
+            "bucket": sanitize_for_log(bucket_name)
         })
         return True
     except ClientError as e:
         error_code = e.response.get('Error', {}).get('Code')
         if error_code in ('NoSuchKey', '404'):
             logger.info("Object already missing when attempting delete", extra={
-                "object_name": object_name,
-                "bucket": bucket_name
+                "object_name": sanitize_for_log(object_name),
+                "bucket": sanitize_for_log(bucket_name)
             })
             return True
         logger.error("S3 error deleting object", extra={
-            "object_name": object_name,
-            "bucket": bucket_name,
+            "object_name": sanitize_for_log(object_name),
+            "bucket": sanitize_for_log(bucket_name),
             "error": str(e)
         })
         return False
     except Exception as e:
         logger.error("Unexpected error deleting object", extra={
-            "object_name": object_name,
-            "bucket": bucket_name,
+            "object_name": sanitize_for_log(object_name),
+            "bucket": sanitize_for_log(bucket_name),
             "error": str(e),
             "error_type": type(e).__name__
         })

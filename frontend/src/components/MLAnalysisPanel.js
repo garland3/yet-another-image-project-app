@@ -57,7 +57,6 @@ export default function MLAnalysisPanel({ imageId, onSelect, onAnalysesLoaded, a
       const resp = await fetch(`/api/analyses/${id}/export?format=${format}`);
       if (!resp.ok) throw new Error(`Export failed: ${resp.status}`);
 
-      const contentType = resp.headers.get('content-type');
       const contentDisposition = resp.headers.get('content-disposition');
 
       // Extract filename from Content-Disposition or generate one
