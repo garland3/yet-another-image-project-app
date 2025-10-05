@@ -86,7 +86,7 @@ function ImageGallery({ projectId, images, loading, onImageUpdated, refreshProje
   
   // Fetch images when search parameters change
   useEffect(() => {
-    if (refreshProjectImages && searchValue) {
+    if (refreshProjectImages) {
       refreshProjectImages({
         searchField: searchField,
         searchValue: searchValue

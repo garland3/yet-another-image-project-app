@@ -131,7 +131,7 @@ if [[ -z "$PROJECT_ID" ]]; then
 fi
 
 # Validate model size
-if [[ ! "$MODEL_SIZE" =~ ^[nsmkx]$ ]]; then
+if [[ ! "$MODEL_SIZE" =~ ^[nsmlx]$ ]]; then
     error "Invalid model size: $MODEL_SIZE (must be n|s|m|l|x)"
     exit 1
 fi
