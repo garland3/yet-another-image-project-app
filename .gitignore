@@ -207,3 +207,4 @@ yarn-error.log*
 # Runtime data
 pids
 logs
+yolov8n.pt

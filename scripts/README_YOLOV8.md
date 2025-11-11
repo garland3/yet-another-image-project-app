@@ -15,6 +15,19 @@ This simulates a real external ML pipeline and validates the entire integration.
 
 ## Requirements
 
+### System Dependencies
+
+The following system libraries are required for OpenCV (automatically checked by the script):
+
+```bash
+sudo apt-get update
+sudo apt-get install -y libgl1-mesa-glx libglib2.0-0
+```
+
+These are needed for OpenCV's image processing capabilities.
+
+### Software Requirements
+
 - Python 3.8+
 - ML dependencies (auto-installed with `--install-deps` flag)
 - Running backend API (with ML_ANALYSIS_ENABLED=true)
@@ -146,6 +159,16 @@ YOLOv8 can detect 80 object classes from the COCO dataset:
 source .env
 # or
 export ML_CALLBACK_HMAC_SECRET='your-secret-here'
+```
+
+### Missing System Libraries
+```
+❌ Missing required system libraries for OpenCV
+```
+**Solution:** Install system dependencies:
+```bash
+sudo apt-get update
+sudo apt-get install -y libgl1-mesa-glx libglib2.0-0
 ```
 
 ### ultralytics Not Found

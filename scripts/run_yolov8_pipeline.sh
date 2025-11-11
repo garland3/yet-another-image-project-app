@@ -169,14 +169,14 @@ echo "HMAC Secret:   ${ML_CALLBACK_HMAC_SECRET:0:8}... (set)"
 [[ -n "$API_KEY" ]] && echo "API Key:       ${API_KEY:0:8}... (set)"
 echo ""
 
-# Check for active virtual environment or use backend's .venv
+# Check for active virtual environment or use root .venv
 if [[ -n "${VIRTUAL_ENV:-}" ]]; then
     say "Using active virtual environment: $VIRTUAL_ENV"
-    PYTHON_CMD="python"
-elif [[ -f "$PROJECT_ROOT/backend/.venv/bin/python" ]]; then
-    say "Activating backend virtual environment..."
-    source "$PROJECT_ROOT/backend/.venv/bin/activate"
-    PYTHON_CMD="python"
+    PYTHON_CMD="$VIRTUAL_ENV/bin/python"
+elif [[ -f "$PROJECT_ROOT/.venv/bin/python" ]]; then
+    say "Activating root virtual environment..."
+    source "$PROJECT_ROOT/.venv/bin/activate"
+    PYTHON_CMD="$VIRTUAL_ENV/bin/python"
 elif command -v python3 >/dev/null 2>&1; then
     PYTHON_CMD="python3"
 else
@@ -186,13 +186,44 @@ fi
 
 say "Using Python: $($PYTHON_CMD --version)"
 
+# Check system dependencies for OpenCV
+say "Checking system dependencies..."
+MISSING_DEPS=()
+
+# Check for OpenGL library (required by opencv-python)
+if ! ldconfig -p | grep -q "libGL.so.1"; then
+    MISSING_DEPS+=("libgl1-mesa-glx")
+fi
+
+# Check for GLib (required by opencv-python)
+if ! ldconfig -p | grep -q "libglib-2.0.so.0"; then
+    MISSING_DEPS+=("libglib2.0-0")
+fi
+
+if [[ ${#MISSING_DEPS[@]} -gt 0 ]]; then
+    error "Missing required system libraries for OpenCV"
+    echo ""
+    echo "The following packages are required:"
+    for dep in "${MISSING_DEPS[@]}"; do
+        echo "  - $dep"
+    done
+    echo ""
+    echo "Install them with:"
+    echo "  sudo apt-get update"
+    echo "  sudo apt-get install -y ${MISSING_DEPS[*]}"
+    echo ""
+    exit 1
+fi
+
 # Install dependencies if requested
 if [[ "$INSTALL_DEPS" == true ]]; then
     say "Installing ML dependencies..."
 
-    # Use uv if available (backend uses it), otherwise fall back to pip
+    # Use uv with the active python, or pip from virtual environment
     if command -v uv >/dev/null 2>&1; then
-        uv pip install -q -r "$SCRIPT_DIR/ml_requirements.txt"
+        uv pip install --python "$PYTHON_CMD" -q -r "$SCRIPT_DIR/ml_requirements.txt"
+    elif [[ -n "${VIRTUAL_ENV:-}" ]] && [[ -x "$VIRTUAL_ENV/bin/pip" ]]; then
+        "$VIRTUAL_ENV/bin/pip" install -q -r "$SCRIPT_DIR/ml_requirements.txt"
     elif command -v pip >/dev/null 2>&1; then
         pip install -q -r "$SCRIPT_DIR/ml_requirements.txt"
     elif command -v pip3 >/dev/null 2>&1; then
