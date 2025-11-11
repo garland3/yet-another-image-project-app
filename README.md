@@ -20,30 +20,39 @@ docker run -p 8000:8000 image-project-manager
 Access at http://localhost:8000
 
 ### Development
+```
+docker compose up -d postgres minio
+uv venv .venv
+source .venv/bin/activate
+uv pip install -r requirements
+cd backend
+uvicorn main:app --host 0.0.0.0 --port 8000 --reload
 
-```bash
-# Install dependencies and start services
-./start.sh
 
-# Or start components separately:
-# ./install.sh
-# cd backend && ./run.sh    # Terminal 1 - Backend + DB
-# cd frontend && ./run.sh   # Terminal 2 - Frontend
+# in mbackend. 
+alembic upgrade head
+--
+
+cd frontend
+npm install
+npm run dev
 ```
 
-Backend: http://localhost:8000
+Backend: http://localhost:8000 (API Docs: http://localhost:8000/docs)
 Frontend: http://localhost:3000
+
+**Important:** Database migrations are NOT run automatically. You must run them manually (see Database Migrations section below).
 
 ## Backend
 
 the backend uses uv for package managment. 
 
 ```
-cd backend
 pip install uv
 uv venv .venv
 source .venv/bin/activate
 uv pip install -r requirements.txt
+cd backend
 ```
 
 ## Features
@@ -64,26 +73,74 @@ Copy `.env.example` to `.env` and configure:
 
 ## Scripts
 
-- `./install.sh` - Install all dependencies
-- `./start.sh` - Start development environment
+### Main Scripts
+
+- `./start.sh` - Unified startup script (handles install + startup)
+  - `./start.sh` - Full stack (backend + frontend)
+  - `./start.sh -b` - Backend only
+  - `./start.sh -f` - Frontend only
+  - `./start.sh -i` - Install dependencies only
+  - `./start.sh -m` - Run migrations before starting
+  - `./start.sh -c` - Clean containers/volumes before starting
+  - `./start.sh --skip-install` - Skip dependency installation (fast restart)
+  - `./start.sh --help` - Show all options
+
+### Legacy Scripts (Deprecated)
+
+- `./install.sh` - Install all dependencies (use `./start.sh -i` instead)
+- `./startup.sh` - Start services (use `./start.sh` instead)
+
+### Component Scripts
+
 - `backend/run.sh` - Start backend with PostgreSQL/MinIO
 - `frontend/run.sh` - Start React development server
 
 ## Database Migrations (Alembic)
 
-The project now uses Alembic for schema migrations.
+The project uses Alembic for schema migrations. **Migrations are NOT run automatically on app startup** - you must run them manually for safety and control.
+
+### Running Migrations
+
+**Option 1: Using the unified start script (recommended)**
+```bash
+# Run migrations and start backend
+./start.sh -m -b
+```
+
+**Option 2: Manually from backend directory**
+```bash
+cd backend
+source .venv/bin/activate
+alembic upgrade head
+```
 
 ### Setup
-Before running any Alembic commands, ensure you're in the `backend/` directory with a virtual environment active (see Backend section above).
+Before running any Alembic commands manually, ensure you're in the `backend/` directory with a virtual environment active (see Backend section above).
 
 ### For New Projects
-If starting from scratch with no existing database, run this to create the schema:
+If starting from scratch with no existing database, run migrations to create the schema:
 
 ```bash
+# Using start script
+./start.sh -m -b
+
+# OR manually
+cd backend
+source .venv/bin/activate
 alembic upgrade head
 ```
 
 This applies all migrations and sets up your database based on the current models.
+
+### Why Migrations are Manual
+
+Migrations are **deliberately NOT automatic** to prevent:
+- Accidental schema changes in production
+- Race conditions with multiple app instances
+- Unexpected downtime during deployments
+- Loss of control over when schema changes occur
+
+Always run migrations as a separate, intentional step before deploying or starting your application.
 
 ### Common Commands
 Run these from the `backend/` directory (ensure a virtual environment with dependencies is active):

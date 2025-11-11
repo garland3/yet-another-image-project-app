@@ -4,21 +4,23 @@
 # DEPRECATED: This script is deprecated
 # =============================================================================
 # Please use the unified start.sh script instead:
-#   ./start.sh -i          # Install dependencies only
-#   ./start.sh             # Install dependencies and start services
+#   ./start.sh             # Start all services
+#   ./start.sh -b          # Start backend only
+#   ./start.sh -f          # Start frontend only
 #
 # This wrapper is provided for backward compatibility and will be removed
 # in a future version.
 # =============================================================================
 
 echo "========================================================================"
-echo "⚠️  WARNING: install.sh is DEPRECATED"
+echo "⚠️  WARNING: startup.sh is DEPRECATED"
 echo "========================================================================"
 echo ""
 echo "Please use the unified start.sh script instead:"
 echo ""
-echo "  ./start.sh -i              # Install dependencies only (equivalent)"
-echo "  ./start.sh                 # Install and start all services"
+echo "  ./start.sh                 # Start all services (default)"
+echo "  ./start.sh -b              # Start backend only"
+echo "  ./start.sh -f              # Start frontend only"
 echo "  ./start.sh --help          # See all available options"
 echo ""
 echo "This script will continue in 5 seconds..."
@@ -27,5 +29,14 @@ echo ""
 
 sleep 5
 
+# Parse arguments and forward to new unified script
+ARGS=""
+while getopts "fb" opt; do
+  case $opt in
+    f) ARGS="$ARGS -f" ;;
+    b) ARGS="$ARGS -b" ;;
+  esac
+done
+
 # Forward to new unified script
-exec "$(dirname "${BASH_SOURCE[0]}")/start.sh" --install-only
+exec "$(dirname "${BASH_SOURCE[0]}")/start.sh" $ARGS
