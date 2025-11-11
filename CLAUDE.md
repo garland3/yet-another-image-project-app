@@ -273,13 +273,40 @@ Common cache key patterns are in the respective router files.
 - Mock S3 operations in tests using `unittest.mock`
 - Authentication is bypassed in tests via `SKIP_HEADER_CHECK=true`
 
-## Docker Deployment
+## Production Deployment
+
+### Reverse Proxy Setup
+
+Production deployments require a reverse proxy (nginx, Apache) for authentication. The application uses header-based authentication:
+
+- **Documentation:** `docs/production/proxy-setup.md` - Complete setup guide
+- **Nginx Example:** `docs/production/nginx-example.conf` - Production-ready configuration
+
+Key requirements:
+- Reverse proxy authenticates users (OAuth2, SAML, LDAP, etc.)
+- Sets `X-User-Id` header with authenticated user's email
+- Sets `X-Proxy-Secret` header with shared secret (configured via `PROXY_SHARED_SECRET`)
+- Backend validates both headers before processing requests
+
+### Docker Deployment
 
 Single container deployment via `Dockerfile`:
 - Multi-stage build (Node for frontend, Python for backend)
 - Serves both frontend static files and backend API
 - Requires external PostgreSQL and MinIO/S3
 - See `deployment-test/` for Kubernetes manifests
+
+### Production Checklist
+
+- Set `DEBUG=false` and `SKIP_HEADER_CHECK=false`
+- Generate and configure `PROXY_SHARED_SECRET` (use `openssl rand -hex 32`)
+- Configure reverse proxy with authentication (see `docs/production/`)
+- Implement custom `_check_group_membership` in `core/group_auth.py`
+- Configure firewall rules to restrict backend access to proxy only
+- Run migrations: `alembic upgrade head`
+- Configure production database and S3/MinIO
+- Set up SSL/TLS certificates
+- Enable monitoring and logging
 
 ## Security Notes
 
@@ -288,3 +315,5 @@ Single container deployment via `Dockerfile`:
 - CORS strictly configured in `middleware/cors_debug.py`
 - Group-based authorization prevents cross-project access
 - Soft deletion prevents accidental data loss (60-day retention by default)
+- Header-based authentication with shared secret validation
+- Backend should only accept connections from trusted reverse proxy

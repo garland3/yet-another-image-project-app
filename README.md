@@ -248,7 +248,27 @@ python scripts/test_ml_pipeline.py --image-id <uuid>
 
 For detailed integration guide, see API documentation at http://localhost:8000/docs
 
-## Kubernetes Deployment
+## Production Deployment
+
+### Reverse Proxy Setup
+
+Production deployments require a reverse proxy for authentication. See comprehensive documentation:
+
+- **Setup Guide:** `docs/production/proxy-setup.md`
+- **Nginx Example:** `docs/production/nginx-example.conf`
+
+The application uses header-based authentication where the reverse proxy authenticates users and forwards their identity to the backend via HTTP headers.
+
+### Docker Deployment
+
+```bash
+docker build -t image-project-manager .
+docker run -p 8000:8000 image-project-manager
+```
+
+Access at http://localhost:8000
+
+### Kubernetes Deployment
 
 Test deployment using minikube:
 
