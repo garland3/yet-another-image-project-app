@@ -31,10 +31,10 @@ if [ -f "/opt/venv/bin/activate" ]; then
   source /opt/venv/bin/activate
   echo "📦 Installing test deps..."
   uv pip install pytest pytest-asyncio pytest-xdist
-elif [ -f "backend/.venv/bin/activate" ]; then
+elif [ -f ".venv/bin/activate" ]; then
   echo "🔧 Activating local virtual environment..."
   # shellcheck disable=SC1091
-  source backend/.venv/bin/activate
+  source .venv/bin/activate
   echo "📦 Installing test deps..."
   uv pip install pytest pytest-asyncio pytest-xdist
 else
