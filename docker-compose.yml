@@ -16,39 +16,14 @@ services:
       timeout: 5s
       retries: 5
 
-  # minio:
-  #   image: minio/minio:latest
-  #   container_name: yaia_minio
-  #   environment:
-  #     MINIO_ROOT_USER: minioadmin
-  #     MINIO_ROOT_PASSWORD: minioadminpassword
-  #     # For Codespaces: Set this to your forwarded port URL
-  #     # Format: https://<codespace-name>-9000.app.github.dev
-  #     # For local: http://localhost:9000
-  #     #MINIO_SERVER_URL: ${MINIO_SERVER_URL:-http://localhost:9000}
-  #     MINIO_SERVER_URL: https://glowing-giggle-jj79679g64hq4qr-9001.app.github.dev
-  #     # Fix CSP issues in Codespaces by allowing GitHub domains
-  #     MINIO_BROWSER_CSP: "default-src 'self' 'unsafe-eval' 'unsafe-inline' https://github.dev; manifest-src 'self' https://github.dev"
-  #   ports:
-  #     - "9000:9000"
-  #     - "9001:9001"
-  #   volumes:
-  #     - minio_data:/data
-  #   command: server /data --console-address ":9001"
-  #   healthcheck:
-  #     test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
-  #     interval: 30s
-  #     timeout: 20s
-  #     retries: 3
-
   minio:
     image: minio/minio:latest
     container_name: yaia_minio
     environment:
       MINIO_ROOT_USER: minioadmin
       MINIO_ROOT_PASSWORD: minioadminpassword
-      MINIO_SERVER_URL: https://glowing-giggle-jj79679g64hq4qr-9000.app.github.dev
-      MINIO_BROWSER_REDIRECT_URL: https://glowing-giggle-jj79679g64hq4qr-9001.app.github.dev
+      MINIO_SERVER_URL: http://localhost:9000
+      MINIO_BROWSER_REDIRECT_URL: http://localhost:9001
       # Optional: usually not needed; remove if you don't explicitly require it
       # MINIO_BROWSER_CSP: "default-src 'self'; img-src 'self' data:; style-src 'self' 'unsafe-inline'; script-src 'self' 'unsafe-eval'"
     ports: ["9000:9000","9001:9001"]
@@ -77,48 +52,6 @@ services:
       - ./pgadmin-servers.json:/pgadmin4/servers.json
     depends_on:
       - postgres
-
-  # app:
-  #   build: .
-  #   container_name: yaia_app
-  #   ports:
-  #     - "8000:8000"
-  #   environment:
-  #     # Database
-  #     POSTGRES_SERVER: postgres
-  #     POSTGRES_PORT: 5432
-  #     POSTGRES_USER: postgres
-  #     POSTGRES_PASSWORD: postgres
-  #     POSTGRES_DB: postgres
-  #     DATABASE_URL: postgresql+asyncpg://postgres:postgres@postgres:5432/postgres
-      
-  #     # S3/MinIO
-  #     S3_ENDPOINT: minio:9000
-  #     S3_ACCESS_KEY: minioadmin
-  #     S3_SECRET_KEY: minioadminpassword
-  #     S3_BUCKET: data-storage
-  #     S3_USE_SSL: false
-      
-  #     # App settings
-  #     DEBUG: true
-  #     SKIP_HEADER_CHECK: true
-  #     FAST_TEST_MODE: false
-      
-  #     # Image deletion settings
-  #     IMAGE_DELETE_RETENTION_DAYS: 60
-  #     IMAGE_DELETE_REASON_MIN_CHARS: 10
-  #     IMAGE_DELETE_PURGE_BATCH_SIZE: 500
-  #     IMAGE_DELETE_PURGE_INTERVAL_SECONDS: 3600
-  #     ENABLE_IMAGE_PURGE: true
-  #   depends_on:
-  #     postgres:
-  #       condition: service_healthy
-  #     minio:
-  #       condition: service_healthy
-  #   volumes:
-  #     - ./backend:/app/backend
-  #     - ./frontend/build:/app/ui2
-  #   command: ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]
 
 volumes:
   postgres_data:

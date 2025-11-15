@@ -29,10 +29,22 @@ export default function HeatmapOverlay({ annotations, containerSize, opacity }) 
       return;
     }
 
-    // Use proxy endpoint to stream heatmap content directly (avoids mixed content issues)
+    // First check if the image is accessible by fetching it
     const proxyUrl = `/api/ml/artifacts/content?path=${encodeURIComponent(heatmapAnnotation.storage_path)}`;
-    console.log('[HeatmapOverlay] Loading heatmap from storage_path:', heatmapAnnotation.storage_path);
-    setHeatmapUrl(proxyUrl);
+    console.log('[HeatmapOverlay] Checking heatmap accessibility for storage_path:', heatmapAnnotation.storage_path);
+
+    fetch(proxyUrl, { method: 'HEAD' })
+      .then(response => {
+        if (!response.ok) {
+          throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+        }
+        console.log('[HeatmapOverlay] Heatmap accessible, loading image');
+        setHeatmapUrl(proxyUrl);
+      })
+      .catch(error => {
+        console.error('[HeatmapOverlay] Failed to access heatmap:', error);
+        setError(`Heatmap load failed: ${error.message}`);
+      });
   }, [annotations]);
 
   if (error) {

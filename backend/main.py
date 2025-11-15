@@ -27,9 +27,6 @@ from routers import projects, images, users, image_classes, comments, project_me
 FastAPI application with modular structure.
 Separates app creation from runtime configuration.
 """
-from utils.boto3_client import boto3_client, ensure_bucket_exists
-from middleware.cors_debug import add_cors_middleware, debug_exception_middleware
-from routers import projects, images, users, image_classes, comments, project_metadata, api_keys
 
 
 # Configure logging
