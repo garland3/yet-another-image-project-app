@@ -11,10 +11,14 @@ import React, { useState, useEffect } from 'react';
  */
 export default function HeatmapOverlay({ annotations, containerSize, opacity }) {
   const [heatmapUrl, setHeatmapUrl] = useState(null);
-  const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
+  const [imageLoaded, setImageLoaded] = useState(false);
 
   useEffect(() => {
+    // Reset state when annotations change
+    setError(null);
+    setImageLoaded(false);
+
     // Find first heatmap/segmentation/mask annotation with storage_path
     const heatmapAnnotation = (annotations || []).find(a =>
       ['heatmap', 'segmentation', 'mask'].includes(a.annotation_type) && a.storage_path
@@ -25,47 +29,11 @@ export default function HeatmapOverlay({ annotations, containerSize, opacity }) 
       return;
     }
 
-    // Fetch presigned URL for the heatmap from the backend
-    const fetchHeatmap = async () => {
-      setLoading(true);
-      setError(null);
-      try {
-        // Request presigned download URL from backend
-        const response = await fetch(`/api/ml/artifacts/download?path=${encodeURIComponent(heatmapAnnotation.storage_path)}`);
-        if (!response.ok) {
-          throw new Error(`Failed to get heatmap URL: ${response.status}`);
-        }
-        const data = await response.json();
-        setHeatmapUrl(data.url || null);
-      } catch (err) {
-        console.error('Error fetching heatmap:', err);
-        setError(err.message);
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchHeatmap();
+    // Use proxy endpoint to stream heatmap content directly (avoids mixed content issues)
+    const proxyUrl = `/api/ml/artifacts/content?path=${encodeURIComponent(heatmapAnnotation.storage_path)}`;
+    console.log('[HeatmapOverlay] Loading heatmap from storage_path:', heatmapAnnotation.storage_path);
+    setHeatmapUrl(proxyUrl);
   }, [annotations]);
-
-  if (loading) {
-    return (
-      <div style={{
-        position: 'absolute',
-        left: 0,
-        top: 0,
-        width: containerSize.width,
-        height: containerSize.height,
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        background: 'rgba(0,0,0,0.1)',
-        pointerEvents: 'none'
-      }}>
-        <span style={{ color: '#fff', fontSize: 12 }}>Loading heatmap...</span>
-      </div>
-    );
-  }
 
   if (error) {
     return (
@@ -100,7 +68,7 @@ export default function HeatmapOverlay({ annotations, containerSize, opacity }) 
         width: containerSize.width,
         height: containerSize.height,
         pointerEvents: 'none',
-        opacity
+        opacity: imageLoaded ? opacity : 0
       }}
     >
       <img
@@ -109,10 +77,31 @@ export default function HeatmapOverlay({ annotations, containerSize, opacity }) 
         style={{
           width: '100%',
           height: '100%',
-          objectFit: 'contain'
+          objectFit: 'contain',
+          mixBlendMode: 'screen',
+          display: imageLoaded ? 'block' : 'none'
         }}
-        onError={() => setError('Failed to load heatmap image')}
+        onLoad={() => {
+          console.log('[HeatmapOverlay] Heatmap loaded successfully');
+          setImageLoaded(true);
+        }}
+        onError={(e) => {
+          console.error('[HeatmapOverlay] Failed to load heatmap image:', e);
+          setError('Failed to load heatmap image');
+        }}
       />
+      {!imageLoaded && !error && (
+        <div style={{
+          width: '100%',
+          height: '100%',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          background: 'rgba(0,0,0,0.1)'
+        }}>
+          <span style={{ color: '#fff', fontSize: 12 }}>Loading heatmap...</span>
+        </div>
+      )}
     </div>
   );
 }

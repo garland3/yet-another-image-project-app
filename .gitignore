@@ -1,6 +1,8 @@
 *.db
 .env
 
+temp
+
 _cache
 ui2
 build

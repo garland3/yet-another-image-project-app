@@ -86,7 +86,85 @@ async def get_artifact_download_url(
     if not download_url:
         raise HTTPException(status_code=500, detail="Failed to generate presigned download URL")
 
-    return {"url": download_url} 
+    return {"url": download_url}
+
+@router.get("/ml/artifacts/content")
+async def get_artifact_content(
+    path: str,
+    db: AsyncSession = Depends(get_db),
+    current_user: schemas.User = Depends(get_current_user),
+):
+    """Stream ML artifact content directly (proxy endpoint to avoid mixed content issues)"""
+    if not settings.ML_ANALYSIS_ENABLED:
+        raise HTTPException(status_code=404, detail="ML analysis feature disabled")
+
+    from utils.boto3_client import boto3_client
+    from fastapi.responses import StreamingResponse
+    from botocore.exceptions import ClientError
+
+    # Validate path starts with ml_outputs/
+    if not path.startswith("ml_outputs/"):
+        raise HTTPException(status_code=400, detail="Invalid artifact path")
+
+    # Extract analysis_id from path (format: ml_outputs/{analysis_id}/...)
+    try:
+        parts = path.split("/")
+        if len(parts) < 3:
+            raise ValueError("Invalid path format")
+        analysis_id_str = parts[1]
+        import uuid as uuid_lib
+        analysis_id = uuid_lib.UUID(analysis_id_str)
+    except (ValueError, IndexError):
+        raise HTTPException(status_code=400, detail="Invalid analysis ID in path")
+
+    # Verify user has access to the analysis
+    db_obj = await crud.get_ml_analysis(db, analysis_id)
+    if not db_obj:
+        raise HTTPException(status_code=404, detail="Analysis not found")
+
+    # Access check via image
+    await get_image_or_403(db_obj.image_id, db, current_user)
+
+    if boto3_client is None:
+        logger.error("S3 client not available, cannot stream artifact")
+        raise HTTPException(status_code=503, detail="Storage service not available")
+
+    # Stream the object from S3
+    try:
+        response = boto3_client.get_object(Bucket=settings.S3_BUCKET, Key=path)
+        content_type = response.get('ContentType', 'application/octet-stream')
+
+        # Stream the body
+        return StreamingResponse(
+            response['Body'].iter_chunks(chunk_size=8192),
+            media_type=content_type,
+            headers={
+                'Cache-Control': 'max-age=3600',
+                'Content-Disposition': f'inline; filename="{parts[-1]}"'
+            }
+        )
+    except ClientError as e:
+        error_code = e.response.get('Error', {}).get('Code')
+        if error_code == 'NoSuchKey':
+            logger.warning("Artifact not found in storage", extra={
+                "path": sanitize_for_log(path),
+                "analysis_id": str(analysis_id)
+            })
+            raise HTTPException(status_code=404, detail="Artifact not found in storage")
+        else:
+            logger.error("S3 error retrieving artifact", extra={
+                "path": sanitize_for_log(path),
+                "error_code": error_code,
+                "error": str(e)
+            })
+            raise HTTPException(status_code=500, detail="Failed to retrieve artifact from storage")
+    except Exception as e:
+        logger.error("Unexpected error streaming artifact", extra={
+            "path": sanitize_for_log(path),
+            "error": str(e),
+            "error_type": type(e).__name__
+        })
+        raise HTTPException(status_code=500, detail="Failed to stream artifact") 
 
 @router.post("/images/{image_id}/analyses", response_model=schemas.MLAnalysis, status_code=status.HTTP_201_CREATED)
 async def create_ml_analysis(
