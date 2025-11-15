@@ -24,8 +24,6 @@ services:
       MINIO_ROOT_PASSWORD: minioadminpassword
       MINIO_SERVER_URL: http://localhost:9000
       MINIO_BROWSER_REDIRECT_URL: http://localhost:9001
-      # Optional: usually not needed; remove if you don't explicitly require it
-      # MINIO_BROWSER_CSP: "default-src 'self'; img-src 'self' data:; style-src 'self' 'unsafe-inline'; script-src 'self' 'unsafe-eval'"
     ports: ["9000:9000","9001:9001"]
     volumes:
       - minio_data:/data

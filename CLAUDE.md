@@ -317,3 +317,12 @@ Single container deployment via `Dockerfile`:
 - Soft deletion prevents accidental data loss (60-day retention by default)
 - Header-based authentication with shared secret validation
 - Backend should only accept connections from trusted reverse proxy
+
+
+# style
+
+* no emojis ever. 
+* each file less than 400 lines of code. 
+
+
+

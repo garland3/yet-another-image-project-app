@@ -18,7 +18,7 @@ User Browser --> Reverse Proxy (authenticates) --> FastAPI Backend
                       |
                       v
                  Sets Headers:
-                 - X-User-Id: user@example.com
+                 - X-User-Email: user@example.com
                  - X-Proxy-Secret: <shared-secret>
 ```
 
@@ -37,7 +37,7 @@ SKIP_HEADER_CHECK=false
 PROXY_SHARED_SECRET=<generate-strong-random-secret>
 
 # Header names (customize if needed)
-X_USER_ID_HEADER=X-User-Id
+X_USER_ID_HEADER=X-User-Email
 X_PROXY_SECRET_HEADER=X-Proxy-Secret
 
 # Optional: URL for auth server (for reference/documentation)
@@ -63,7 +63,7 @@ openssl rand -hex 32
 The backend middleware (`backend/middleware/auth.py`) performs the following checks:
 
 1. **Shared Secret Validation:** Verifies `X-Proxy-Secret` matches `PROXY_SHARED_SECRET`
-2. **User Header Validation:** Extracts and validates email format from `X-User-Id`
+2. **User Header Validation:** Extracts and validates email format from `X-User-Email`
 3. **Group Membership:** Checks user permissions via `core/group_auth.py`
 
 If validation fails, the backend returns `401 Unauthorized`.
@@ -76,7 +76,7 @@ See `nginx-example.conf` in this directory for a complete example.
 
 Key requirements:
 - Authenticate users before forwarding requests
-- Set `X-User-Id` header with authenticated user's email
+- Set `X-User-Email` header with authenticated user's email
 - Set `X-Proxy-Secret` header with shared secret
 - Forward all other headers (especially `Host`, `X-Real-IP`, `X-Forwarded-For`)
 - Handle WebSocket upgrades if needed (future feature)
@@ -106,7 +106,7 @@ For Apache with `mod_auth_openidc` or similar:
         Require valid-user
 
         # Set authentication headers
-        RequestHeader set X-User-Id "%{OIDC_CLAIM_email}e"
+        RequestHeader set X-User-Email "%{OIDC_CLAIM_email}e"
         RequestHeader set X-Proxy-Secret "your-shared-secret-here"
 
         # Proxy to backend
@@ -208,7 +208,7 @@ curl -i http://localhost:8000/api/projects
 With valid headers (should succeed):
 ```bash
 curl -i \
-  -H "X-User-Id: user@example.com" \
+  -H "X-User-Email: user@example.com" \
   -H "X-Proxy-Secret: your-shared-secret" \
   http://localhost:8000/api/projects
 # Expected: 200 OK with project list
@@ -218,7 +218,7 @@ curl -i \
 
 ```bash
 curl -i \
-  -H "X-User-Id: user@example.com" \
+  -H "X-User-Email: user@example.com" \
   -H "X-Proxy-Secret: wrong-secret" \
   http://localhost:8000/api/projects
 # Expected: 401 Unauthorized
@@ -237,7 +237,7 @@ tail -f backend/logs/app.json | grep -i auth
 - [ ] Configure `.env` with production settings
 - [ ] Set `DEBUG=false` and `SKIP_HEADER_CHECK=false`
 - [ ] Configure reverse proxy with authentication
-- [ ] Set required headers (`X-User-Id`, `X-Proxy-Secret`)
+- [ ] Set required headers (`X-User-Email`, `X-Proxy-Secret`)
 - [ ] Implement custom `_check_group_membership` function
 - [ ] Configure firewall rules to restrict backend access
 - [ ] Enable HTTPS/TLS on reverse proxy
@@ -254,7 +254,7 @@ tail -f backend/logs/app.json | grep -i auth
 
 **Possible causes:**
 1. Missing or incorrect `X-Proxy-Secret` header
-2. Missing or invalid `X-User-Id` header
+2. Missing or invalid `X-User-Email` header
 3. Header names don't match configuration (`X_USER_ID_HEADER`, `X_PROXY_SECRET_HEADER`)
 
 **Solution:** Check backend logs and verify header values match configuration.

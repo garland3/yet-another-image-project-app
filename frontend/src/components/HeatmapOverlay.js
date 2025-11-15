@@ -29,22 +29,10 @@ export default function HeatmapOverlay({ annotations, containerSize, opacity }) 
       return;
     }
 
-    // First check if the image is accessible by fetching it
+    // Load heatmap directly - rely on image onError for handling failures
     const proxyUrl = `/api/ml/artifacts/content?path=${encodeURIComponent(heatmapAnnotation.storage_path)}`;
-    console.log('[HeatmapOverlay] Checking heatmap accessibility for storage_path:', heatmapAnnotation.storage_path);
-
-    fetch(proxyUrl, { method: 'HEAD' })
-      .then(response => {
-        if (!response.ok) {
-          throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-        }
-        console.log('[HeatmapOverlay] Heatmap accessible, loading image');
-        setHeatmapUrl(proxyUrl);
-      })
-      .catch(error => {
-        console.error('[HeatmapOverlay] Failed to access heatmap:', error);
-        setError(`Heatmap load failed: ${error.message}`);
-      });
+    console.log('[HeatmapOverlay] Loading heatmap for storage_path:', heatmapAnnotation.storage_path);
+    setHeatmapUrl(proxyUrl);
   }, [annotations]);
 
   if (error) {
