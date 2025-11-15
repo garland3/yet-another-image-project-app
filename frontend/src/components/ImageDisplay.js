@@ -250,7 +250,7 @@ function ImageDisplay({
   // Side-by-side mode helper
   const isSideBySide = overlayOptions?.viewMode === 'side-by-side' && overlayOptions?.bitmapAvailable;
 
-  const renderImageView = (showOverlays = true, containerStyle = {}) => (
+  const renderImageView = (showOverlays = true, containerStyle = {}, attachRef = true) => (
     <div style={{ position: 'relative', ...containerStyle }}>
       {!image ? (
         <div className="loading-container">
@@ -264,7 +264,7 @@ function ImageDisplay({
           className="view-image deleted-image"
           style={{ transform: `scale(${zoomLevel})`, transformOrigin: 'top left' }}
           onClick={handleZoomIn}
-          ref={!isSideBySide ? imgRef : null}
+          ref={attachRef ? imgRef : null}
         />
       ) : (
         <img
@@ -280,7 +280,7 @@ function ImageDisplay({
               e.target.src = `/api/images/${imageId}/thumbnail?width=800&height=600`;
             }
           }}
-          ref={!isSideBySide ? imgRef : null}
+          ref={attachRef ? imgRef : null}
         />
       )}
       {showOverlays && image && overlayOptions?.showBoxes && annotations?.length > 0 && displaySize.width > 0 && (() => {
@@ -320,15 +320,15 @@ function ImageDisplay({
           <div style={{ display: 'flex', gap: '1rem', width: '100%' }}>
             <div style={{ flex: 1, position: 'relative' }}>
               <div style={{ fontSize: 12, fontWeight: 600, marginBottom: '0.25rem', color: '#666' }}>Original</div>
-              {renderImageView(false)}
+              {renderImageView(false, {}, true)}
             </div>
             <div style={{ flex: 1, position: 'relative' }}>
               <div style={{ fontSize: 12, fontWeight: 600, marginBottom: '0.25rem', color: '#666' }}>ML Overlay</div>
-              {renderImageView(true)}
+              {renderImageView(true, {}, false)}
             </div>
           </div>
         ) : (
-          renderImageView(true)
+          renderImageView(true, {}, true)
         )}
       </div>
       
