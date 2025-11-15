@@ -4,6 +4,9 @@
 
 set -euo pipefail
 
+# Trap to handle errors and print clear messages
+trap 'error "Script failed at line $LINENO with exit code $?"; exit 1' ERR
+
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 

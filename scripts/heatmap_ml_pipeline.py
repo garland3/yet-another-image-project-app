@@ -203,20 +203,23 @@ class HeatmapPipeline:
         response.raise_for_status()
         print(f"  Status updated to {status}")
 
-    def generate_random_heatmap(self, image_shape: tuple, num_blobs: int = 5) -> np.ndarray:
+    def generate_random_heatmap(self, image_shape: tuple) -> np.ndarray:
         """
         Generate random heatmap with binary soft-edge blobs for testing
 
         Args:
             image_shape: (height, width, channels) of the original image
-            num_blobs: Number of random "hotspots" to generate
 
         Returns:
             Binary heatmap with soft edges as BGR image (red channel only)
         """
+        height, width = image_shape[0], image_shape[1]
+
+        # Random number of blobs: greater than 5, less than 15
+        num_blobs = np.random.randint(6, 15)
+
         print(f"  Generating binary soft-edge heatmap with {num_blobs} blobs")
 
-        height, width = image_shape[0], image_shape[1]
         heatmap = np.zeros((height, width), dtype=np.float32)
 
         # Generate random Gaussian blobs
@@ -225,9 +228,11 @@ class HeatmapPipeline:
             cx = np.random.randint(int(width * 0.1), int(width * 0.9))
             cy = np.random.randint(int(height * 0.1), int(height * 0.9))
 
-            # Random blob size (10-30% of image dimension)
-            sigma_x = np.random.randint(int(width * 0.1), int(width * 0.3))
-            sigma_y = np.random.randint(int(height * 0.1), int(height * 0.3))
+            # Random blob radius (sigma): greater than 2%, less than 15% of image width
+            sigma_min = int(width * 0.02)
+            sigma_max = int(width * 0.15)
+            sigma_x = np.random.randint(sigma_min, sigma_max + 1)
+            sigma_y = np.random.randint(sigma_min, sigma_max + 1)
 
             # Random intensity
             intensity = np.random.uniform(0.5, 1.0)
@@ -269,11 +274,29 @@ class HeatmapPipeline:
         # Convert to 0-255 range
         heatmap_uint8 = (binary_heatmap * 255).astype(np.uint8)
 
-        # Create BGR image with heatmap in red channel only for clear visibility
+        # Create BGR image with heatmap affecting all color channels
         heatmap_color = np.zeros((height, width, 3), dtype=np.uint8)
+        heatmap_color[:, :, 0] = heatmap_uint8  # Blue channel
+        heatmap_color[:, :, 1] = heatmap_uint8  # Green channel
         heatmap_color[:, :, 2] = heatmap_uint8  # Red channel
 
-        print(f"  Generated binary heatmap shape: {heatmap_color.shape}")
+        # Draw iso curves around key regions
+        # Define threshold levels for iso curves (as percentages of max intensity)
+        iso_levels = [0.3, 0.5, 0.7]  # 30%, 50%, 70% intensity levels
+        colors = [(255, 0, 0), (0, 255, 0), (0, 0, 255)]  # Blue, Green, Red for different levels
+
+        for level, color in zip(iso_levels, colors):
+            # Create binary mask for this iso level
+            threshold_value = int(level * 255)
+            _, threshold_mask = cv2.threshold(heatmap_uint8, threshold_value, 255, cv2.THRESH_BINARY)
+
+            # Find contours
+            contours, _ = cv2.findContours(threshold_mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+
+            # Draw contours on the heatmap
+            cv2.drawContours(heatmap_color, contours, -1, color, 2)  # -1 means all contours, 2 is thickness
+
+        print(f"  Generated binary heatmap with iso curves shape: {heatmap_color.shape}")
         return heatmap_color
 
     def upload_artifact(self, analysis_id: str, artifact_type: str, filename: str, data: bytes):
@@ -375,7 +398,7 @@ class HeatmapPipeline:
             self.update_analysis_status(analysis_id, "processing")
 
             # Generate heatmap
-            heatmap = self.generate_random_heatmap(image.shape, num_blobs=5)
+            heatmap = self.generate_random_heatmap(image.shape)
 
             # Save to local storage if output directory is specified
             if self.output_dir:
@@ -477,6 +500,7 @@ class HeatmapPipeline:
                 success_count += 1
             except Exception as e:
                 print(f"Failed to process image: {e}")
+                # Continue processing other images but track failures
 
         # Summary
         print(f"\n{'='*60}")
@@ -488,6 +512,11 @@ class HeatmapPipeline:
             print(f"Processed: {len(images_to_process)}")
         print(f"Successful: {success_count}")
         print(f"Failed: {len(images_to_process) - success_count}")
+
+        # Exit with error if any images failed
+        if success_count < len(images_to_process):
+            print("\nError: Some images failed to process. Exiting with code 1.")
+            sys.exit(1)
 
 
 def main():
