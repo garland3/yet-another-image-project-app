@@ -31,6 +31,12 @@ if [ -f "/opt/venv/bin/activate" ]; then
   source /opt/venv/bin/activate
   echo "📦 Installing test deps..."
   uv pip install pytest pytest-asyncio pytest-xdist
+elif [ -f "backend/.venv/bin/activate" ]; then
+  echo "🔧 Activating backend virtual environment..."
+  # shellcheck disable=SC1091
+  source backend/.venv/bin/activate
+  echo "📦 Installing test deps..."
+  uv pip install pytest pytest-asyncio pytest-xdist
 elif [ -f ".venv/bin/activate" ]; then
   echo "🔧 Activating local virtual environment..."
   # shellcheck disable=SC1091
@@ -41,10 +47,10 @@ else
   echo "❌ Error: Virtual environment not found
 Expected:
  - Docker: /opt/venv/bin/activate
- - Local: backend/.venv/bin/activate
+ - Local: backend/.venv/bin/activate or .venv/bin/activate
 
 For local dev:
- cd backend && uv venv .venv && source .venv/bin/activate && uv pip install -r requirements.txt"
+ cd backend && uv venv .venv && source .venv/bin/activate && uv pip install -r ../requirements.txt"
   exit 1
 fi
 
@@ -61,8 +67,11 @@ echo ""
 echo "🚀 Starting backend tests..."
 echo "----------------------------"
 
+# Suppress SQLAlchemy logging to reduce noise
+export SQLALCHEMY_WARN_20=0
+
 set +e
-"${PY_BIN}" -m pytest -n auto -q tests/
+"${PY_BIN}" -m pytest -n auto -q --tb=short tests/
 TEST_EXIT_CODE=$?
 set -e
 
