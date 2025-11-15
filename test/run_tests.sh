@@ -71,7 +71,7 @@ echo "----------------------------"
 export SQLALCHEMY_WARN_20=0
 
 set +e
-"${PY_BIN}" -m pytest -n auto -q --tb=short tests/
+"${PY_BIN}" -m pytest -n auto --tb=short --no-header -p no:logging tests/
 TEST_EXIT_CODE=$?
 set -e
 
