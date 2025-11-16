@@ -38,7 +38,7 @@ ENV PYTHONUNBUFFERED=1
 FROM base AS builder
 
 # Install Python dependencies
-COPY ./backend/requirements.txt .
+COPY requirements.txt .
 RUN pip install --no-cache-dir --upgrade pip && \
     uv pip install --no-cache-dir -r requirements.txt
 

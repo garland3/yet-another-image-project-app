@@ -2,15 +2,264 @@
 
 Image management, classification, and collaboration platform for organizing and labeling visual content.
 
+## Features
+
+- **Project Organization** - Organize images into projects with group-based access control
+- **Image Classification** - Apply custom labels and categories to images
+- **Team Collaboration** - Add comments and share insights with your team
+- **Metadata Management** - Store and manage custom metadata for projects and images
+- **ML Analysis Visualization** - View and export machine learning analysis results with interactive overlays
+- **Soft Deletion** - Safe deletion with 60-day retention period before permanent removal
+- **API Access** - RESTful API with comprehensive OpenAPI documentation
+
 ## Requirements
 
-- Node.js 22+
-- Python 3.11+
-- Docker (for PostgreSQL and MinIO)
+- **Node.js** 22+
+- **Python** 3.11+
+- **Docker** (for PostgreSQL and MinIO)
+- **uv** - Python package manager (`pip install uv`)
 
 ## Quick Start
 
-### Production (Docker)
+### 1. Start Infrastructure
+
+```bash
+# Start PostgreSQL and MinIO containers
+docker compose up -d postgres minio
+```
+
+### 2. Setup Backend
+
+```bash
+# Install uv package manager
+pip install uv
+
+# Create virtual environment and install dependencies
+uv venv .venv
+source .venv/bin/activate
+uv pip install -r requirements.txt
+
+# Run database migrations (REQUIRED)
+cd backend
+alembic upgrade head
+
+# Start backend server
+uvicorn main:app --host 0.0.0.0 --port 8000 --reload
+```
+
+**Alternative:** Use the backend helper script:
+```bash
+cd backend
+./run.sh
+```
+
+### 3. Setup Frontend
+
+In a separate terminal:
+
+```bash
+cd frontend
+npm install
+npm run dev
+```
+
+### 4. Access the Application
+
+- **Frontend:** http://localhost:3000
+- **Backend API:** http://localhost:8000
+- **API Documentation:** http://localhost:8000/docs (Swagger UI)
+- **Alternative API Docs:** http://localhost:8000/redoc (ReDoc)
+
+## Configuration
+
+### Environment Setup
+
+1. Copy the example environment file:
+   ```bash
+   cp .env.example .env
+   ```
+
+2. Configure the following settings in `.env`:
+
+**Database:**
+```bash
+DATABASE_URL=postgresql+asyncpg://postgres:postgres@localhost:5433/postgres
+POSTGRES_USER=postgres
+POSTGRES_PASSWORD=postgres
+POSTGRES_DB=postgres
+```
+
+**S3/MinIO Storage:**
+```bash
+S3_ENDPOINT=localhost:9000
+S3_ACCESS_KEY=minioadmin
+S3_SECRET_KEY=minioadminpassword
+S3_BUCKET=data-storage
+S3_USE_SSL=false
+```
+
+**Authentication:**
+```bash
+# Development (uses mock user)
+MOCK_USER_EMAIL=user@example.com
+MOCK_USER_GROUPS_JSON='["admin-group", "data-scientists"]'
+
+# Production (reverse proxy authentication)
+PROXY_SHARED_SECRET=your-secure-secret-here
+AUTH_SERVER_URL=https://your-auth-server.com
+```
+
+**ML Analysis (Optional):**
+```bash
+ML_ANALYSIS_ENABLED=true
+ML_CALLBACK_HMAC_SECRET=your-hmac-secret
+ML_ALLOWED_MODELS=yolo_v8,resnet50_classifier
+```
+
+## Database Migrations (Alembic)
+
+**Important:** Migrations are **NOT** run automatically. This is intentional to prevent accidental schema changes in production.
+
+### Running Migrations
+
+```bash
+cd backend
+source .venv/bin/activate
+alembic upgrade head
+```
+
+### Creating New Migrations
+
+After modifying models in `core/models.py`:
+
+```bash
+cd backend
+alembic revision --autogenerate -m "describe your changes"
+```
+
+**Always review the generated migration file before applying!**
+
+### Common Migration Commands
+
+```bash
+alembic upgrade head              # Apply all pending migrations
+alembic downgrade -1              # Rollback last migration
+alembic history --verbose         # View migration history
+alembic current                   # Show current database version
+alembic stamp head                # Mark DB as up-to-date (use cautiously)
+```
+
+### Why Manual Migrations?
+
+Manual migrations prevent:
+- Accidental schema changes in production
+- Race conditions with multiple application instances
+- Unexpected downtime during deployments
+- Loss of control over when schema changes occur
+
+### Troubleshooting
+
+| Issue | Solution |
+|-------|----------|
+| Autogenerate misses table | Verify model is imported in `core/models.py` |
+| Dialect errors | Ensure using PostgreSQL URL, not SQLite |
+| Schema drift | Run `alembic upgrade head` then regenerate migration |
+
+## Development
+
+### Running Tests
+
+**Backend tests (pytest):**
+```bash
+source .venv/bin/activate
+cd backend
+pytest                                          # Run all tests
+pytest tests/test_specific.py                  # Run specific file
+pytest tests/test_file.py::test_function       # Run specific test
+pytest -v                                       # Verbose output
+pytest -k "auth"                                # Run tests matching pattern
+pytest --coverage                               # With coverage report
+```
+
+**Frontend tests (Jest):**
+```bash
+cd frontend
+npm test                    # Interactive mode
+npm test -- --coverage      # With coverage report
+```
+
+### Building for Production
+
+**Frontend:**
+```bash
+cd frontend
+npm run build
+```
+
+**Docker image:**
+```bash
+docker build -t image-project-manager .
+docker run -p 8000:8000 image-project-manager
+```
+
+Access at http://localhost:8000
+
+## ML Analysis Feature
+
+This feature allows external ML pipelines to submit analysis results for visualization in the UI. Users cannot trigger analyses directly - they are initiated by external systems.
+
+### For End Users
+
+1. Navigate to an image in the web interface
+2. If ML analyses exist, view them in the "ML Analyses" sidebar panel
+3. Toggle bounding box and heatmap overlays
+4. Adjust visualization opacity or use side-by-side comparison
+5. Export results as JSON or CSV
+
+### For ML Pipeline Developers
+
+#### Configuration
+
+```bash
+ML_ANALYSIS_ENABLED=true
+ML_CALLBACK_HMAC_SECRET=your-secure-secret
+ML_ALLOWED_MODELS=yolo_v8,resnet50_classifier,custom_model
+```
+
+#### API Integration Workflow
+
+1. **Create analysis** - `POST /api/images/{image_id}/analyses`
+2. **Update to processing** - `PATCH /api/analyses/{analysis_id}/status`
+3. **Request presigned URL** - `POST /api/analyses/{analysis_id}/artifacts/presign`
+4. **Upload artifacts to S3** - `PUT <presigned_url>`
+5. **Submit annotations** - `POST /api/analyses/{analysis_id}/annotations:bulk`
+6. **Finalize** - `POST /api/analyses/{analysis_id}/finalize`
+
+**Security:** Pipeline endpoints require HMAC authentication:
+- Header: `X-ML-Signature` (HMAC-SHA256 of request body)
+- Header: `X-ML-Timestamp` (Unix timestamp for replay protection)
+
+#### Testing the Pipeline
+
+```bash
+export ML_CALLBACK_HMAC_SECRET='your_secret_here'
+python scripts/test_ml_pipeline.py --image-id <uuid>
+```
+
+For detailed integration guide, see API documentation at http://localhost:8000/docs
+
+## Production Deployment
+
+### Reverse Proxy Setup
+
+Production deployments require a reverse proxy for authentication. See comprehensive documentation:
+
+- **Setup Guide:** `docs/production/proxy-setup.md`
+- **Nginx Example:** `docs/production/nginx-example.conf`
+
+The application uses header-based authentication where the reverse proxy authenticates users and forwards their identity to the backend via HTTP headers.
+
+### Docker Deployment
 
 ```bash
 docker build -t image-project-manager .
@@ -19,218 +268,72 @@ docker run -p 8000:8000 image-project-manager
 
 Access at http://localhost:8000
 
-### Development
+### Kubernetes Deployment
 
-```bash
-# Install dependencies and start services
-./start.sh
-
-# Or start components separately:
-# ./install.sh
-# cd backend && ./run.sh    # Terminal 1 - Backend + DB
-# cd frontend && ./run.sh   # Terminal 2 - Frontend
-```
-
-Backend: http://localhost:8000
-Frontend: http://localhost:3000
-
-## Backend
-
-the backend uses uv for package managment. 
-
-```
-cd backend
-pip install uv
-uv venv .venv
-source .venv/bin/activate
-uv pip install -r requirements.txt
-```
-
-## Features
-
-- Project organization and management
-- Image classification with custom labels
-- Team collaboration with comments
-- Metadata storage for projects and images
-- User access control
-- **ML Analysis Visualization** - View and export machine learning analysis results
-
-## Configuration
-
-Copy `.env.example` to `.env` and configure:
-- Database credentials
-- S3/MinIO storage settings
-- Authentication settings
-
-## Scripts
-
-- `./install.sh` - Install all dependencies
-- `./start.sh` - Start development environment
-- `backend/run.sh` - Start backend with PostgreSQL/MinIO
-- `frontend/run.sh` - Start React development server
-
-## Database Migrations (Alembic)
-
-The project now uses Alembic for schema migrations.
-
-### Setup
-Before running any Alembic commands, ensure you're in the `backend/` directory with a virtual environment active (see Backend section above).
-
-### For New Projects
-If starting from scratch with no existing database, run this to create the schema:
-
-```bash
-alembic upgrade head
-```
-
-This applies all migrations and sets up your database based on the current models.
-
-### Common Commands
-Run these from the `backend/` directory (ensure a virtual environment with dependencies is active):
-
-```bash
-alembic revision --autogenerate -m "describe change"   # Create new migration based on model diffs
-alembic upgrade head                                   # Apply latest migrations
-alembic downgrade -1                                   # Roll back last migration
-alembic history --verbose                              # Show migration history
-alembic current                                        # Show current DB revision
-alembic stamp head                                     # Mark DB as up-to-date without applying (use cautiously)
-```
-
-### Initial Adoption
-If you already had a database before Alembic was introduced and the schema matches the initial revision, stamp instead of applying:
-
-```bash
-alembic stamp 20250930_0001_initial
-```
-
-### Autogenerate Tips
-- Ensure all SQLAlchemy models are imported in `core/models.py` and referenced by `Base.metadata`.
-- Review generated migration files before committing—especially dropped/altered columns.
-
-### Troubleshooting
-| Issue | Resolution |
-|-------|------------|
-| Autogenerate misses table | Verify model imported and Base.metadata includes it. |
-| Dialect errors (SQLite vs Postgres) | Use a Postgres URL for accurate types. |
-| Drift between models & DB | Run `alembic upgrade head` then regenerate; add test (see below). |
-
-### Consistency Test
-A test will compare model metadata vs database (after upgrade) to guard against un-migrated changes.
-
-### Helper Script
-See `backend/migrate.sh` for ergonomic shortcuts.
-
-## Kubernetes Deployment Test
-
-Test deployment on minikube:
-
-Noe: in the dev conatainer, I added minikube and kubectl, so you can run this directly from the dev container.
-* it will have minikube, kubectl, and helm installed
+Test deployment using minikube:
 
 ```bash
 # Start minikube
 minikube start
-# minikube start --driver=docker
 
 # Build and load image
 docker build -t image-project-manager:latest .
 minikube image load image-project-manager:latest
 
-# Deploy to cluster
+# Deploy
 kubectl apply -f deployment-test/
 
 # Access application
 minikube service image-project-manager --url
 ```
 
-See `deployment-test/` folder for Kubernetes manifests.
+See `deployment-test/` directory for Kubernetes manifests.
 
-## ML Analysis (Preview)
+**Note:** The dev container includes minikube, kubectl, and helm pre-installed.
 
-This feature enables visualization of machine learning analysis results. **Users cannot trigger analyses directly** - all ML analyses are initiated by external systems (cron jobs, webhooks, ML pipelines).
+## Architecture
 
-### For End Users
+### Technology Stack
 
-1. Navigate to an image in the UI
-2. If ML analyses exist, the "ML Analyses" panel appears in the sidebar
-3. Click an analysis to view annotations
-4. Use "Overlays" controls to toggle bounding boxes/heatmaps
-5. Adjust opacity slider or switch to side-by-side view
-6. Export analysis results as JSON or CSV
+- **Backend:** FastAPI (Python 3.11+) with async SQLAlchemy
+- **Frontend:** React 18 with React Router
+- **Database:** PostgreSQL 15
+- **Storage:** MinIO/S3 compatible object storage
+- **Migrations:** Alembic
+- **Caching:** aiocache + diskcache
 
-### For System Administrators / Pipeline Developers
+### Project Structure
 
-1. **Enable the feature**: Set `ML_ANALYSIS_ENABLED=true` in your environment
-2. **Configure HMAC secret**: Set `ML_CALLBACK_HMAC_SECRET=<your_secret>` for secure pipeline authentication
-3. **Set allowed models**: Configure `ML_ALLOWED_MODELS=yolo_v8,resnet50_classifier` (comma-separated list)
+```
+backend/
+├── main.py              # Application entry point
+├── core/                # Core components (models, schemas, config)
+├── routers/             # API endpoint definitions
+├── middleware/          # Authentication, CORS, security headers
+├── utils/               # Shared utilities (CRUD, caching, S3)
+├── alembic/             # Database migrations
+└── tests/               # Backend tests
 
-#### API Workflow
-
-External ML pipelines interact with the platform via REST API:
-
-```bash
-# 1. Create analysis (queued status)
-POST /api/images/{image_id}/analyses
-{
-  "image_id": "...",
-  "model_name": "yolo_v8",
-  "model_version": "1.0.0",
-  "parameters": {"threshold": 0.5}
-}
-
-# 2. Update status to processing
-PATCH /api/analyses/{analysis_id}/status
-{"status": "processing"}
-
-# 3. Request presigned upload URL for artifacts
-POST /api/analyses/{analysis_id}/artifacts/presign
-{"artifact_type": "heatmap", "filename": "heatmap.png"}
-
-# 4. Upload artifact to presigned URL (direct to S3/MinIO)
-PUT <presigned_url>
-<binary_data>
-
-# 5. Post annotations
-POST /api/analyses/{analysis_id}/annotations:bulk
-{
-  "annotations": [
-    {
-      "annotation_type": "bounding_box",
-      "class_name": "cat",
-      "confidence": 0.95,
-      "data": {"x_min": 10, "y_min": 20, "x_max": 100, "y_max": 200, ...}
-    },
-    {
-      "annotation_type": "heatmap",
-      "data": {"width": 512, "height": 512},
-      "storage_path": "ml_outputs/{analysis_id}/heatmap.png"
-    }
-  ]
-}
-
-# 6. Finalize analysis
-POST /api/analyses/{analysis_id}/finalize
-{"status": "completed"}
+frontend/
+├── src/
+│   ├── App.js           # Main application component
+│   ├── Project.js       # Project view
+│   ├── ImageView.js     # Image detail view
+│   └── components/      # Reusable React components
 ```
 
-All pipeline endpoints (steps 2-6) require HMAC authentication headers:
-- `X-ML-Signature`: HMAC-SHA256 signature
-- `X-ML-Timestamp`: Unix timestamp
+### Authentication
 
-#### Testing
+- **Development:** Mock user from environment variables
+- **Production:** Header-based authentication via reverse proxy
+- **Group-based access control:** Projects belong to groups
+- **API keys:** Programmatic access via API key authentication
 
-Use the provided simulation script to test the complete pipeline flow:
+## Additional Resources
 
-```bash
-# Set HMAC secret
-export ML_CALLBACK_HMAC_SECRET='your_secret_here'
-
-# Run simulation
-python scripts/test_ml_pipeline.py --image-id <image_uuid>
-```
-
-For detailed integration instructions, see [`docs/ML_PIPELINE_INTEGRATION.md`](docs/ML_PIPELINE_INTEGRATION.md) (coming soon).
+- **API Documentation:** http://localhost:8000/docs
+- **pgAdmin (Database UI):** http://localhost:8080 (user: admin@admin.com, pass: admin)
+- **MinIO Console:** http://localhost:9001 (user: minioadmin, pass: minioadminpassword)
 
 ## License
 

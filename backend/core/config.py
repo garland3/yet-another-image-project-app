@@ -15,7 +15,7 @@ class Settings(BaseSettings):
     MOCK_USER_GROUPS_JSON: str = '["admin-group", "data-scientists", "project-alpha-group"]'
     AUTH_SERVER_URL: Optional[str] = None
     PROXY_SHARED_SECRET: Optional[str] = None
-    X_USER_ID_HEADER: str = "X-User-Id"
+    X_USER_ID_HEADER: str = "X-User-Email"
     X_PROXY_SECRET_HEADER: str = "X-Proxy-Secret"
 
     POSTGRES_USER: str = "postgres"

@@ -430,3 +430,78 @@ def test_status_state_machine_transitions(client):
     client.patch(f"/api/analyses/{a4['id']}/status", json={"status": "completed"})
     resp = client.patch(f"/api/analyses/{a4['id']}/status", json={"status": "queued"})
     assert resp.status_code == 409
+
+
+def test_ml_artifact_content_streaming(client):
+    """Test the new ML artifact content streaming endpoint."""
+    # Create project & image & analysis
+    proj = client.post('/api/projects/', json={"name":"ArtifactTest","description":"d","meta_group_id":"data-scientists"}).json()
+    img = client.post(f"/api/projects/{proj['id']}/images", files={'file': ('f.png', b'\x89PNG\r\n', 'image/png')}, data={'metadata':'{}'}).json()
+    analysis = client.post(f"/api/images/{img['id']}/analyses", json={"image_id": img['id'], "model_name":"resnet50_classifier","model_version":"1","parameters":{}}).json()
+
+    # Test 404 when S3 client not available (simulates real environment for artifact content)
+    # In test environment, boto3_client is None, so endpoint returns 503
+    path = f"ml_outputs/{analysis['id']}/heatmap.png"
+    resp = client.get(f"/api/ml/artifacts/content?path={path}")
+    assert resp.status_code == 503  # Service unavailable when no S3 client
+
+
+def test_ml_artifact_content_invalid_paths(client):
+    """Test path validation and security for artifact content endpoint."""
+    # Test invalid path format - not starting with ml_outputs/
+    resp = client.get("/api/ml/artifacts/content?path=invalid/path.png")
+    assert resp.status_code == 400
+    assert "Invalid artifact path" in resp.text
+
+    # Test path traversal attempt
+    resp = client.get("/api/ml/artifacts/content?path=ml_outputs/../../../etc/passwd")
+    assert resp.status_code == 400
+    assert "Invalid analysis ID in path" in resp.text
+
+    # Test invalid analysis ID format
+    resp = client.get("/api/ml/artifacts/content?path=ml_outputs/not-a-uuid/file.png")
+    assert resp.status_code == 400
+    assert "Invalid analysis ID in path" in resp.text
+
+
+def test_ml_artifact_content_unauthorized_access(client):
+    """Test access control for artifact content endpoint."""
+    # Test access to non-existent analysis (should be 404 from analysis lookup)
+    fake_analysis_id = str(uuid.uuid4())
+    path = f"ml_outputs/{fake_analysis_id}/heatmap.png"
+    resp = client.get(f"/api/ml/artifacts/content?path={path}")
+
+    # In test environment without S3 client, it gets to the analysis lookup which returns 404
+    # If we had proper S3 mocking, this would be 404 for analysis not found
+    assert resp.status_code in [503, 404]  # Either no S3 client (503) or analysis not found (404)
+
+
+def test_ml_artifact_content_feature_flag(client, monkeypatch):
+    """Test that artifact content endpoint respects ML_ANALYSIS_ENABLED flag."""
+    from routers import ml_analyses
+    original = ml_analyses.settings.ML_ANALYSIS_ENABLED
+    ml_analyses.settings.ML_ANALYSIS_ENABLED = False
+    try:
+        resp = client.get("/api/ml/artifacts/content?path=ml_outputs/fake/heatmap.png")
+        assert resp.status_code == 404  # Feature disabled
+    finally:
+        ml_analyses.settings.ML_ANALYSIS_ENABLED = original
+
+
+def test_ml_artifact_download_url_presigned(client):
+    """Test the existing artifact download URL endpoint."""
+    # Create project & image & analysis
+    proj = client.post('/api/projects/', json={"name":"DownloadTest","description":"d","meta_group_id":"data-scientists"}).json()
+    img = client.post(f"/api/projects/{proj['id']}/images", files={'file': ('f.png', b'\x89PNG\r\n', 'image/png')}, data={'metadata':'{}'}).json()
+    analysis = client.post(f"/api/images/{img['id']}/analyses", json={"image_id": img['id'], "model_name":"resnet50_classifier","model_version":"1","parameters":{}}).json()
+
+    # Test presigned download URL endpoint
+    path = f"ml_outputs/{analysis['id']}/mask.png"
+    resp = client.get(f"/api/ml/artifacts/download?path={path}")
+    data = resp.json()
+
+    # In test environment without S3 client, returns mock URL
+    assert resp.status_code == 200
+    assert "url" in data
+    if "example.com" in data["url"]:
+        assert "signature=fake" in data["url"]

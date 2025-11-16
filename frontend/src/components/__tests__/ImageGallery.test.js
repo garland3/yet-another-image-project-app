@@ -184,17 +184,17 @@ describe('ImageGallery', () => {
 
     test('shows search functionality', () => {
       renderImageGallery();
-      
-      const searchInput = screen.getByPlaceholderText('Search images...');
+
+      const searchInput = screen.getByPlaceholderText('Search by filename...');
       expect(searchInput).toBeInTheDocument();
     });
 
     test('filters images based on search term', async () => {
       renderImageGallery({ images: [mockRegularImage, mockDeletedImage] });
-      
-      const searchInput = screen.getByPlaceholderText('Search images...');
+
+      const searchInput = screen.getByPlaceholderText('Search by filename...');
       fireEvent.change(searchInput, { target: { value: 'test-image' } });
-      
+
       await waitFor(() => {
         expect(screen.getByText('test-image.jpg')).toBeInTheDocument();
         expect(screen.queryByText('deleted-image.jpg')).not.toBeInTheDocument();

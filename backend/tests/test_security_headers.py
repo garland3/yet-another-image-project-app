@@ -72,7 +72,7 @@ def test_security_headers_custom_values():
                     assert response.headers.get("Content-Security-Policy") == custom_csp
                 else:
                     # Frontend not built - test API endpoint instead
-                    api_response = test_client.get("/api/users/me")
+                    api_response = test_client.get("/api/health")
                     assert api_response.headers.get("X-Frame-Options") == "DENY"
                     assert api_response.headers.get("Referrer-Policy") == "strict-origin"
                     assert api_response.headers.get("Content-Security-Policy") == custom_csp

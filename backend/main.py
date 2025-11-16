@@ -27,9 +27,6 @@ from routers import projects, images, users, image_classes, comments, project_me
 FastAPI application with modular structure.
 Separates app creation from runtime configuration.
 """
-from utils.boto3_client import boto3_client, ensure_bucket_exists
-from middleware.cors_debug import add_cors_middleware, debug_exception_middleware
-from routers import projects, images, users, image_classes, comments, project_metadata, api_keys
 
 
 # Configure logging
@@ -88,24 +85,18 @@ async def lifespan(app: FastAPI):
     """Application lifespan manager."""
     logger.info("Application startup...")
     if settings.FAST_TEST_MODE:
-        logger.info("FAST_TEST_MODE enabled: skipping DB create/migrate and S3 bucket checks.")
+        logger.info("FAST_TEST_MODE enabled: skipping DB table creation and S3 bucket checks.")
     else:
-        if _app_settings.USE_ALEMBIC_MIGRATIONS:
-            # Run Alembic programmatically (upgrade head)
-            try:
-                from alembic import command
-                from alembic.config import Config
-                alembic_cfg = Config(os.path.join(os.path.dirname(__file__), 'alembic.ini'))
-                logger.info("Running Alembic migrations (upgrade head)...")
-                command.upgrade(alembic_cfg, 'head')
-                logger.info("Alembic migrations complete.")
-            except Exception as e:
-                logger.exception("Alembic migration failed; aborting startup")
-                raise
-        else:
-            logger.info("USE_ALEMBIC_MIGRATIONS disabled: fallback create_all path")
+        # NOTE: Database migrations are NOT run automatically on startup.
+        # Run migrations manually using: ./start.sh -m or alembic upgrade head
+        logger.info("Database migrations should be run manually via './start.sh -m' or 'alembic upgrade head'")
+
+        # Only create tables if not using Alembic (legacy fallback)
+        if not _app_settings.USE_ALEMBIC_MIGRATIONS:
+            logger.info("USE_ALEMBIC_MIGRATIONS disabled: using fallback create_all path")
             await create_db_and_tables()
-            await run_migrations()
+            await run_migrations()  # legacy no-op
+
         logger.info(f"Checking/Creating S3 bucket: {settings.S3_BUCKET}")
         if boto3_client:
             bucket_exists = ensure_bucket_exists(boto3_client, settings.S3_BUCKET)
@@ -220,6 +211,11 @@ def create_app() -> FastAPI:
 
 def setup_static_files(app: FastAPI):
     """Configure static file serving for the frontend."""
+    # Skip static file serving in debug mode (use npm run dev instead)
+    if settings.DEBUG:
+        logger.info("DEBUG mode enabled - skipping static file setup (use npm run dev for frontend)")
+        return
+
     # Get frontend build path from settings
     front_end_build_path = settings.FRONTEND_BUILD_PATH
     # Convert to absolute path if it's relative

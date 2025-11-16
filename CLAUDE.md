@@ -4,253 +4,352 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-Image management, classification, and collaboration platform with ML analysis visualization capabilities. The system orchestrates ML results from external pipelines without performing model inference internally.
+Image Project Manager is a full-stack application for image management, classification, and collaboration. The platform allows teams to organize visual content into projects, apply custom labels, add comments, and visualize machine learning analysis results.
 
 **Stack:**
-- Backend: FastAPI (Python 3.11+) with SQLAlchemy ORM
-- Frontend: React 18 with react-router-dom
-- Database: PostgreSQL 15 (Alembic migrations)
-- Storage: S3/MinIO for images and ML artifacts
-- Package Management: UV (backend), npm (frontend)
+- **Backend:** FastAPI (Python 3.11+) with async SQLAlchemy
+- **Frontend:** React 18 with React Router
+- **Database:** PostgreSQL 15 (with Alembic migrations)
+- **Storage:** MinIO/S3 for object storage
+- **Package Management:** `uv` for Python, `npm` for JavaScript
 
-## Essential Commands
+## Code Style Guidelines
 
-### Development Setup
+**IMPORTANT: NO EMOJIS** - Never use emojis in code, comments, commit messages, documentation, or any output. This codebase maintains a professional, emoji-free style.
 
-```bash
-# Full stack startup
-./start.sh
+## Development Setup Commands
 
-# Or start components separately:
-./install.sh                    # Install all dependencies
-cd backend && ./run.sh         # Terminal 1 - Backend + DB + MinIO
-cd frontend && ./run.sh        # Terminal 2 - React dev server
-```
-
-### Backend Development
+### Initial Setup
 
 ```bash
-cd backend
-source .venv/bin/activate      # Always activate venv first
+# Start infrastructure (Postgres & MinIO)
+docker compose up -d postgres minio
+
+# Backend setup
+pip install uv
+uv venv .venv
+source .venv/bin/activate
 uv pip install -r requirements.txt
 
-# Start backend (includes PostgreSQL & MinIO containers)
+# Run database migrations (REQUIRED - migrations are manual)
+cd backend
+alembic upgrade head
+
+# Start backend
+cd backend
+uvicorn main:app --host 0.0.0.0 --port 8000 --reload
+
+# OR use the backend run script
+cd backend
 ./run.sh
 
-# Run backend server directly
-uvicorn main:app --host 0.0.0.0 --port 8000 --reload
+# Frontend setup (in separate terminal)
+cd frontend
+npm install
+npm run dev
 ```
 
-**IMPORTANT:** All Python commands must use the virtual environment at `/backend/.venv/`
+### Running Tests
 
-### Frontend Development
+**Unified Test Runner** (recommended):
+```bash
+# Run both backend and frontend tests (from project root)
+./test/run_tests.sh
 
+# Run only backend or frontend
+./test/run_tests.sh --backend
+./test/run_tests.sh --frontend
+
+# Verbose output for debugging
+./test/run_tests.sh --verbose
+```
+
+**Test Script Output Philosophy:**
+- Default output is minimal: shows only pass/fail status for each test suite
+- Suppresses verbose tool output, dependency installation messages, and framework noise
+- Clear, concise results that make it immediately obvious if tests are working
+- Use `--verbose` flag when you need detailed output for debugging
+- Follows the "no emojis" rule - professional output only
+
+**Direct Test Commands:**
+
+Backend tests (run from project root):
+```bash
+source .venv/bin/activate
+cd backend
+pytest
+pytest tests/test_specific_file.py              # Single test file
+pytest tests/test_file.py::test_function_name   # Single test
+pytest -v                                       # Verbose output
+pytest -k "test_auth"                           # Run tests matching pattern
+```
+
+Frontend tests use Jest via `react-scripts`:
 ```bash
 cd frontend
-npm run dev                    # Start dev server (optimized)
-npm run build                  # Production build
-npm run test                   # Run tests
-npm run build:analyze          # Analyze bundle size
+npm test                    # Interactive mode
+npm test -- --coverage      # With coverage
 ```
+
+### Building
+
+```bash
+# Frontend production build
+cd frontend
+npm run build
+
+# Docker image
+docker build -t image-project-manager .
+```
+
+## Architecture Overview
+
+### Backend Structure
+
+The FastAPI backend follows a modular architecture:
+
+- **`main.py`**: Application factory, middleware stack, lifespan management, and routing setup
+- **`core/`**: Core application components
+  - `models.py`: SQLAlchemy ORM models (User, Project, DataInstance, ImageClass, etc.)
+  - `schemas.py`: Pydantic models for request/response validation
+  - `database.py`: Async database engine and session management
+  - `config.py`: Centralized settings using Pydantic BaseSettings
+  - `security.py`: Authentication and authorization utilities
+  - `group_auth.py` / `group_auth_helper.py`: Group-based authorization system
+- **`routers/`**: API endpoint definitions organized by resource (projects, images, users, comments, image_classes, ml_analyses, etc.)
+- **`middleware/`**: Request/response processing
+  - `auth.py`: Unified authentication middleware (header-based auth)
+  - `cors_debug.py`: CORS configuration
+  - `security_headers.py`: Security headers (CSP, X-Frame-Options, etc.)
+  - `body_cache.py`: Request body caching for HMAC verification
+- **`utils/`**: Shared utilities
+  - `crud.py`: Database CRUD operations
+  - `dependencies.py`: FastAPI dependency injection helpers
+  - `boto3_client.py`: S3/MinIO client initialization
+  - `cache_manager.py`: Caching layer for performance optimization
+  - `file_security.py`: File type validation
+- **`alembic/`**: Database migration management
+  - `versions/`: Migration scripts
+  - `env.py`: Alembic environment configuration
+
+### Database Models
+
+Key models and their relationships:
+
+- **User**: Application users (referenced by email or UUID)
+- **Project**: Top-level organization unit with group-based access control (`meta_group_id`)
+- **DataInstance** (images): Belongs to a project, stores file metadata and S3 keys
+  - Supports soft deletion (with `deleted_at`, `deletion_reason`)
+  - Hard deletion tracking (`hard_deleted_at`, `storage_deleted`)
+- **ImageClass**: Custom labels/categories per project
+- **ImageClassification**: Links images to classes (created by users)
+- **ImageComment**: User comments on images
+- **MLAnalysis**: Machine learning analysis metadata
+  - **MLAnnotation**: Individual annotations (bounding boxes, heatmaps, etc.)
+  - **MLArtifact**: Binary outputs stored in S3 (visualizations, processed images)
+- **ProjectMetadata**: Key-value metadata for projects
+- **ApiKey**: API key authentication for programmatic access
+
+### Frontend Structure
+
+React application with component-based architecture:
+
+- **`src/App.js`**: Main application component with routing
+- **`src/Project.js`**: Project detail view
+- **`src/ImageView.js`**: Individual image viewer
+- **`src/ApiKeys.js`**: API key management interface
+- **`src/components/`**: Reusable UI components
+  - `ImageGallery.js`: Grid view of images with pagination
+  - `ImageDisplay.js`: Main image display with ML overlays
+  - `ImageClassifications.js`: Classification management
+  - `ImageComments.js`: Comment threads
+  - `ImageMetadata.js`: Metadata viewer/editor
+  - `MLAnalysisPanel.js`: ML analysis selection and controls
+  - `BoundingBoxOverlay.js` / `HeatmapOverlay.js`: ML visualization overlays
+  - `ClassManager.js`: Project-level class management
+  - `MetadataManager.js`: Project metadata editor
+  - `ImageDeletionControls.js`: Soft/hard deletion UI
+
+### Authentication & Authorization
+
+The application uses **header-based authentication** via reverse proxy:
+
+- **Development/Testing Mode**: Mock user from `MOCK_USER_EMAIL` and `MOCK_USER_GROUPS_JSON` environment variables
+- **Production Mode**: Validates `X-User-Email` header and `X-Proxy-Secret` against `PROXY_SHARED_SECRET`
+- **Group-Based Access**: Projects belong to groups (`meta_group_id`), users must be members to access
+- **API Keys**: Alternative authentication via `ApiKey` model for programmatic access
+
+Authentication is enforced by `middleware/auth.py` which sets `request.state.user_email`.
+
+### Caching Strategy
+
+The application implements multi-layer caching for performance:
+
+- **Image list caching**: Cached per user/project with pagination parameters
+- **Thumbnail caching**: Disk cache for resized images
+- **Metadata caching**: Project and image metadata
+- Cache invalidation on mutations (create/update/delete operations)
+- Uses `aiocache` and `diskcache` libraries
 
 ### Database Migrations (Alembic)
 
-Run from `backend/` directory with active venv:
+**CRITICAL**: Migrations are **NOT** automatic. They must be run manually:
 
 ```bash
-# Apply migrations
+# Apply all pending migrations
+cd backend
 alembic upgrade head
 
-# Create new migration
-alembic revision --autogenerate -m "description"
+# Create new migration after model changes
+alembic revision --autogenerate -m "describe change"
 
 # Rollback last migration
 alembic downgrade -1
 
 # View migration history
 alembic history --verbose
-
-# Check current revision
-alembic current
-
-# Initial adoption (if DB existed before Alembic)
-alembic stamp 20250930_0001_initial
 ```
 
-**Migration Tips:**
-- Ensure all SQLAlchemy models are imported in `core/models.py`
-- Review generated migrations before committing (especially drops/alters)
-- Use Postgres URL for accurate type generation
-- See `backend/migrate.sh` for helper shortcuts
+**Key Points:**
+- Migrations are enabled by default (`USE_ALEMBIC_MIGRATIONS=true`)
+- Migration files are in `backend/alembic/versions/`
+- Always review autogenerated migrations before committing
+- For new databases, run `alembic upgrade head` to create schema
+- For existing databases migrated to Alembic, use `alembic stamp <revision>` to mark current state
 
-### Testing
+See README.md "Database Migrations" section for complete details.
 
-```bash
-# Run full test suite (from project root)
-bash test/run_tests.sh
+## ML Analysis Feature
 
-# Backend tests only (from backend/)
-source .venv/bin/activate
-pytest -n auto -q tests/
+External ML pipelines integrate via REST API (users cannot trigger analyses directly):
 
-# Frontend tests (from frontend/)
-npm test
+1. **Create analysis** (`POST /api/images/{image_id}/analyses`)
+2. **Update status** to `processing` (`PATCH /api/analyses/{analysis_id}/status`)
+3. **Request presigned URLs** for artifact uploads (`POST /api/analyses/{analysis_id}/artifacts/presign`)
+4. **Upload artifacts** to S3 via presigned URLs
+5. **Bulk create annotations** (`POST /api/analyses/{analysis_id}/annotations:bulk`)
+6. **Finalize analysis** with `completed` status
+
+**Security:** Pipeline endpoints (steps 2-6) require HMAC authentication:
+- `X-ML-Signature`: HMAC-SHA256(request_body, ML_CALLBACK_HMAC_SECRET)
+- `X-ML-Timestamp`: Unix timestamp (prevents replay attacks)
+
+Configuration:
+- `ML_ANALYSIS_ENABLED=true` to enable feature
+- `ML_CALLBACK_HMAC_SECRET`: Shared secret for HMAC validation
+- `ML_ALLOWED_MODELS`: Comma-separated list of permitted model names
+
+Test script: `scripts/test_ml_pipeline.py`
+
+## Environment Configuration
+
+Copy `.env.example` to `.env` and configure:
+
+**Critical Settings:**
+- `DATABASE_URL`: PostgreSQL connection string (default: `postgresql+asyncpg://postgres:postgres@localhost:5433/postgres`)
+- `S3_ENDPOINT`, `S3_ACCESS_KEY`, `S3_SECRET_KEY`, `S3_BUCKET`: Object storage configuration
+- `DEBUG`: Set to `true` for development (skips frontend static file serving)
+- `PROXY_SHARED_SECRET`: Production authentication shared secret
+- `ML_CALLBACK_HMAC_SECRET`: ML pipeline authentication secret
+
+## Common Development Patterns
+
+### Adding a New API Endpoint
+
+1. Define Pydantic schemas in `core/schemas.py`
+2. Create CRUD functions in `utils/crud.py` if needed
+3. Add router in `routers/<resource>.py`
+4. Include router in `main.py` (in the `api_router` setup)
+5. Add tests in `backend/tests/test_<resource>.py`
+
+### Adding a Database Model
+
+1. Add SQLAlchemy model in `core/models.py`
+2. Create migration: `cd backend && alembic revision --autogenerate -m "add model"`
+3. Review migration file in `alembic/versions/`
+4. Apply migration: `alembic upgrade head`
+5. Add corresponding Pydantic schemas in `core/schemas.py`
+
+### Working with S3/MinIO
+
+- Use `utils/boto3_client.py` for S3 operations
+- Presigned URLs are preferred for direct client uploads/downloads
+- Object keys follow pattern: `projects/{project_id}/{filename}` or `ml_outputs/{analysis_id}/{artifact_name}`
+
+### Cache Invalidation
+
+When modifying data, invalidate relevant cache entries:
+```python
+from aiocache import Cache
+
+cache = Cache()
+await cache.delete(f"projects:user:{user_email}:skip:0:limit:100")
 ```
 
-### Docker & Deployment
+Common cache key patterns are in the respective router files.
 
-```bash
-# Production Docker build
-docker build -t image-project-manager .
-docker run -p 8000:8000 image-project-manager
+## Testing Considerations
 
-# Kubernetes (minikube)
-minikube start
-docker build -t image-project-manager:latest .
-minikube image load image-project-manager:latest
-kubectl apply -f deployment-test/
-minikube service image-project-manager --url
-```
+- Tests use SQLite (`sqlite+aiosqlite:///./test.db`) for speed
+- Set `FAST_TEST_MODE=true` to skip external dependencies
+- Mock S3 operations in tests using `unittest.mock`
+- Authentication is bypassed in tests via `SKIP_HEADER_CHECK=true`
 
-**Note:** The dev container includes minikube, kubectl, and helm pre-installed.
+## Production Deployment
 
-## Architecture
+### Reverse Proxy Setup
 
-### Backend Structure
+Production deployments require a reverse proxy (nginx, Apache) for authentication. The application uses header-based authentication:
 
-**Core Components:**
-- `core/models.py` - SQLAlchemy ORM models (User, Project, DataInstance, ImageClass, MLAnalysis, etc.)
-- `core/schemas.py` - Pydantic request/response schemas
-- `core/config.py` - Settings management via pydantic-settings
-- `core/database.py` - Async database session management
-- `core/group_auth.py` - Group-based authorization logic
+- **Documentation:** `docs/production/proxy-setup.md` - Complete setup guide
+- **Nginx Example:** `docs/production/nginx-example.conf` - Production-ready configuration
 
-**Routers (API Endpoints):**
-- `routers/projects.py` - Project CRUD
-- `routers/images.py` - Image upload/download/classification
-- `routers/users.py` - User management
-- `routers/image_classes.py` - Classification labels
-- `routers/comments.py` - Image comments
-- `routers/project_metadata.py` - Project metadata key-value pairs
-- `routers/api_keys.py` - API key management
-- `routers/ml_analyses.py` - ML analysis orchestration (user + pipeline endpoints)
+Key requirements:
+- Reverse proxy authenticates users (OAuth2, SAML, LDAP, etc.)
+- Sets `X-User-Id` header with authenticated user's email
+- Sets `X-Proxy-Secret` header with shared secret (configured via `PROXY_SHARED_SECRET`)
+- Backend validates both headers before processing requests
 
-**Middleware:**
-- `middleware/cors_debug.py` - CORS handling
-- `middleware/auth.py` - Authentication (header-based or mock)
-- `middleware/security_headers.py` - Security headers (CSP, XFO, etc.)
-- `middleware/body_cache.py` - Request body caching for HMAC verification
+### Docker Deployment
 
-**Utilities:**
-- `utils/boto3_client.py` - S3/MinIO client wrapper with presigned URLs
-- `utils/dependencies.py` - FastAPI dependencies (auth, HMAC verification)
+Single container deployment via `Dockerfile`:
+- Multi-stage build (Node for frontend, Python for backend)
+- Serves both frontend static files and backend API
+- Requires external PostgreSQL and MinIO/S3
+- See `deployment-test/` for Kubernetes manifests
 
-### Frontend Structure
+### Production Checklist
 
-**Main Components:**
-- `App.js` - Main application router and layout
-- `Project.js` - Project view with image gallery
-- `ImageView.js` - Single image detail view
-- `ApiKeys.js` - API key management UI
+- Set `DEBUG=false` and `SKIP_HEADER_CHECK=false`
+- Generate and configure `PROXY_SHARED_SECRET` (use `openssl rand -hex 32`)
+- Configure reverse proxy with authentication (see `docs/production/`)
+- Implement custom `_check_group_membership` in `core/group_auth.py`
+- Configure firewall rules to restrict backend access to proxy only
+- Run migrations: `alembic upgrade head`
+- Configure production database and S3/MinIO
+- Set up SSL/TLS certificates
+- Enable monitoring and logging
 
-**Reusable Components (`components/`):**
-- `ImageGallery.js` - Grid display of images with filtering
-- `ImageDisplay.js` - Image viewer with ML overlay support
-- `ImageClassifications.js` - Classification UI
-- `ImageComments.js` - Comment thread UI
-- `ImageMetadata.js` - Metadata editor
-- `MLAnalysisPanel.js` - ML analysis results viewer
-- `BoundingBoxOverlay.js` - Bounding box visualization
-- `HeatmapOverlay.js` - Heatmap visualization overlay
-- `ClassManager.js` - Manage classification labels
-- `ProjectReport.js` - Export project reports
+## Security Notes
 
-### ML Analysis Feature
+- All file uploads validated by `utils/file_security.py`
+- Security headers configured via `middleware/security_headers.py`
+- CORS strictly configured in `middleware/cors_debug.py`
+- Group-based authorization prevents cross-project access
+- Soft deletion prevents accidental data loss (60-day retention by default)
+- Header-based authentication with shared secret validation
+- Backend should only accept connections from trusted reverse proxy
 
-**User Flow:**
-1. Users view ML analyses via `MLAnalysisPanel.js` in the image sidebar
-2. Frontend fetches analyses from `GET /api/images/{image_id}/analyses`
-3. Overlays (bounding boxes, heatmaps) rendered via `ImageDisplay.js`
-4. Export results as JSON/CSV
 
-**Pipeline Integration (External Systems):**
-1. Create analysis: `POST /api/images/{image_id}/analyses` (returns queued status)
-2. Update status: `PATCH /api/analyses/{analysis_id}/status` (queued→processing)
-3. Upload artifacts: `POST /api/analyses/{analysis_id}/artifacts/presign` → S3 direct upload
-4. Post annotations: `POST /api/analyses/{analysis_id}/annotations:bulk` (HMAC-secured)
-5. Finalize: `POST /api/analyses/{analysis_id}/finalize` (mark completed/failed)
+# style
 
-**Security:** Pipeline endpoints require HMAC authentication via `X-ML-Signature` and `X-ML-Timestamp` headers. Configure `ML_CALLBACK_HMAC_SECRET` in environment.
+* no emojis ever.
+* each file less than 400 lines of code.
+* test scripts and utilities: minimal output by default, verbose mode optional
+  - Show only essential pass/fail information
+  - Suppress dependency installation and framework noise
+  - Make it immediately obvious if things are working
+  - Provide --verbose flag for debugging when needed 
 
-**Testing:** Use `scripts/test_ml_pipeline.py` to simulate external pipeline behavior.
 
-### Authentication Model
 
-- **Production:** Header-based auth via `X-User-Id` and `X-Proxy-Secret` (reverse proxy expected)
-- **Development:** Mock auth via `MOCK_USER_EMAIL` and `MOCK_USER_GROUPS_JSON`
-- **Group Authorization:** Project access controlled by `meta_group_id` matching user groups
-
-### Image Deletion Workflow
-
-- **Soft Delete:** Images marked `deleted_at`, retained for `IMAGE_DELETE_RETENTION_DAYS` (default: 60 days)
-- **Hard Delete:** Background job purges expired soft-deleted images from DB and S3
-- **Audit Trail:** All deletion events logged in `image_deletion_events` table
-
-### Key Configuration
-
-**Environment Variables (.env):**
-- `DEBUG` - Enable debug logging and detailed errors
-- `FAST_TEST_MODE` - Skip external calls for tests
-- `SKIP_HEADER_CHECK` - Disable auth header validation (dev only)
-- `DATABASE_URL` - Postgres connection string
-- `S3_ENDPOINT`, `S3_ACCESS_KEY`, `S3_SECRET_KEY`, `S3_BUCKET` - S3/MinIO config
-- `ML_ANALYSIS_ENABLED` - Toggle ML features
-- `ML_ALLOWED_MODELS` - Comma-separated model allow-list
-- `ML_CALLBACK_HMAC_SECRET` - HMAC secret for pipeline authentication
-- `PROXY_SHARED_SECRET` - Auth proxy shared secret (production)
-
-### Adding Dependencies
-
-**Backend:**
-1. Add to `backend/requirements.txt`
-2. Run: `cd backend && source .venv/bin/activate && uv pip install -r requirements.txt`
-
-**Frontend:**
-1. Run: `cd frontend && npm install <package>`
-2. Commit updated `package.json` and `package-lock.json`
-
-### Common Patterns
-
-**Adding a New API Endpoint:**
-1. Define Pydantic schema in `core/schemas.py`
-2. Create router function in `routers/<module>.py`
-3. Add database model to `core/models.py` if needed
-4. Create Alembic migration: `alembic revision --autogenerate -m "add_<feature>"`
-5. Register router in `main.py` (if new module)
-
-**Adding Frontend Component:**
-1. Create component in `frontend/src/components/`
-2. Import and use in `ImageView.js` or `App.js`
-3. Fetch data via `/api/*` endpoints (proxy configured to port 8000)
-
-**Access Control:**
-- All image/project operations check group membership via `verify_user_in_meta_group()`
-- API keys validated via `get_current_api_key()` dependency
-- ML pipeline endpoints use `verify_hmac_signature_flexible()` for HMAC auth
-
-### Important Constraints
-
-- **Virtual Environment:** All backend Python commands MUST activate `.venv` first
-- **Port Allocation:** Backend (8000), Frontend (3000), PostgreSQL (5433), MinIO (9000/9001)
-- **Image Formats:** Supports JPEG, PNG, TIFF (with Pillow processing)
-- **ML Analysis:** User cannot trigger analyses directly—only external pipelines can (security design)
-- **Database:** Use Alembic for schema changes (do not modify `create_db_and_tables()` for migrations)
-
-### File References
-
-Refer to code locations using `file:line` format:
-- Main app entry: `backend/main.py:1`
-- Database models: `backend/core/models.py:1`
-- Auth middleware: `backend/middleware/auth.py:1`
-- ML analysis router: `backend/routers/ml_analyses.py:1`
-- Frontend image view: `frontend/src/ImageView.js:1`

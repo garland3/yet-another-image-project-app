@@ -1,6 +1,8 @@
 *.db
 .env
 
+temp
+
 _cache
 ui2
 build
@@ -207,3 +209,4 @@ yarn-error.log*
 # Runtime data
 pids
 logs
+yolov8n.pt

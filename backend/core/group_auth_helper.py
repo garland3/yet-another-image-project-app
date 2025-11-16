@@ -7,12 +7,13 @@ import time
 import logging
 from typing import Dict, Tuple, List
 from .group_auth import is_user_in_group as _core_is_user_in_group
+from .config import settings
 
 logger = logging.getLogger(__name__)
 
 # Simple in-memory cache for group membership checks
-# Format: {(user_email, group_id): (is_member, timestamp)}
-_group_membership_cache: Dict[Tuple[str, str], Tuple[bool, float]] = {}
+# Format: {(user_email, group_id, debug_mode): (is_member, timestamp)}
+_group_membership_cache: Dict[Tuple[str, str, bool], Tuple[bool, float]] = {}
 _CACHE_TTL = 300  # 5 minutes
 
 
@@ -34,9 +35,11 @@ def is_user_in_group(user_email: str, group_id: str) -> bool:
     user_email = user_email.lower().strip()
     group_id = group_id.strip()
     
-    cache_key = (user_email, group_id)
+    # Include debug mode in cache key since behavior changes based on DEBUG setting
+    debug_mode = settings.DEBUG or settings.SKIP_HEADER_CHECK
+    cache_key = (user_email, group_id, debug_mode)
     current_time = time.time()
-    
+
     # Check cache first
     if cache_key in _group_membership_cache:
         is_member, cached_time = _group_membership_cache[cache_key]
@@ -44,7 +47,7 @@ def is_user_in_group(user_email: str, group_id: str) -> bool:
             # Sanitize for logging
             safe_user_email = user_email.replace('\n', '').replace('\r', '')
             safe_group_id = group_id.replace('\n', '').replace('\r', '')
-            logger.debug("Cache hit", extra={"user": safe_user_email, "group": safe_group_id, "result": is_member})
+            logger.debug("Cache hit", extra={"user": safe_user_email, "group": safe_group_id, "result": is_member, "debug": debug_mode})
             return is_member
         else:
             # Cache expired, remove entry
@@ -52,11 +55,11 @@ def is_user_in_group(user_email: str, group_id: str) -> bool:
             # Sanitize for logging
             safe_user_email = user_email.replace('\n', '').replace('\r', '')
             safe_group_id = group_id.replace('\n', '').replace('\r', '')
-            logger.debug("Cache expired", extra={"user": safe_user_email, "group": safe_group_id})
-    
+            logger.debug("Cache expired", extra={"user": safe_user_email, "group": safe_group_id, "debug": debug_mode})
+
     # Call core auth function
     is_member = _core_is_user_in_group(user_email, group_id)
-    
+
     # Cache the result
     _group_membership_cache[cache_key] = (is_member, current_time)
     # Sanitize for logging
@@ -144,19 +147,19 @@ def clear_cache() -> None:
 def clear_user_cache(user_email: str) -> None:
     """
     Clear cache entries for a specific user.
-    
+
     Args:
         user_email: The user's email address to clear from cache
     """
     if not user_email:
         return
-    
+
     user_email = user_email.lower().strip()
     keys_to_remove = [key for key in _group_membership_cache.keys() if key[0] == user_email]
-    
+
     for key in keys_to_remove:
         del _group_membership_cache[key]
-    
+
     logger.info(f"Cleared cache for user: {user_email}")
 
 

@@ -1,8 +1,11 @@
 #!/usr/bin/env bash
-# YOLOv8 ML Pipeline Runner
-# End-to-end integration test for ML analysis feature
+# Heatmap ML Pipeline Runner
+# End-to-end integration test for ML heatmap visualization feature
 
 set -euo pipefail
+
+# Trap to handle errors and print clear messages
+trap 'error "Script failed at line $LINENO with exit code $?"; exit 1' ERR
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
@@ -15,26 +18,26 @@ BLUE='\033[0;34m'
 NC='\033[0m' # No Color
 
 say() {
-    echo -e "${BLUE}[yolov8-pipeline]${NC} $*"
+    echo -e "${BLUE}[heatmap-pipeline]${NC} $*"
 }
 
 error() {
-    echo -e "${RED}[yolov8-pipeline]${NC} X $*" >&2
+    echo -e "${RED}[heatmap-pipeline]${NC} $*" >&2
 }
 
 success() {
-    echo -e "${GREEN}[yolov8-pipeline]${NC} X $*"
+    echo -e "${GREEN}[heatmap-pipeline]${NC} $*"
 }
 
 warn() {
-    echo -e "${YELLOW}[yolov8-pipeline]${NC} X $*"
+    echo -e "${YELLOW}[heatmap-pipeline]${NC} $*"
 }
 
 usage() {
     cat << EOF
 Usage: $0 <project_id> [options]
 
-Run YOLOv8 object detection pipeline on a project's images.
+Run heatmap generation pipeline on a project's images.
 
 Arguments:
     project_id          UUID of the project to process
@@ -42,10 +45,11 @@ Arguments:
 Options:
     --api-url URL       API base URL (default: http://localhost:8000)
     --api-key KEY       API key for authentication (optional)
-    --model-size SIZE   YOLOv8 model size: n|s|m|l|x (default: n)
-                        n=nano (fastest), s=small, m=medium, l=large, x=xlarge
+    --heatmap-type TYPE Heatmap type: random (default: random)
+                        Future: gradcam, saliency, attention
     --limit N           Maximum images to process (default: 10)
     --skip-existing     Skip images that already have ML analysis results
+    --output-dir DIR    Directory to save heatmaps locally for inspection (optional)
     --install-deps      Install ML dependencies before running
     --help              Show this help message
 
@@ -54,14 +58,20 @@ Environment Variables:
     API_KEY                    API key for authentication (optional)
 
 Examples:
-    # Run on project with nano model (CPU-friendly)
-    $0 abc-123-def --model-size n --limit 5
+    # Run with random heatmaps (fastest, no ML needed)
+    $0 abc-123-def --limit 5
 
-    # Run with medium model and install dependencies first
-    $0 abc-123-def --model-size m --install-deps
+    # Save heatmaps locally for inspection
+    $0 abc-123-def --limit 5 --output-dir ./heatmap_outputs
+
+    # Skip images with existing analyses
+    $0 abc-123-def --skip-existing
 
     # Use specific API URL and key
     $0 abc-123-def --api-url http://api.example.com --api-key my-key
+
+    # Install dependencies first
+    $0 abc-123-def --install-deps
 
 EOF
 }
@@ -70,9 +80,10 @@ EOF
 PROJECT_ID=""
 API_URL="http://localhost:8000"
 API_KEY="${API_KEY:-}"
-MODEL_SIZE="n"
+HEATMAP_TYPE="random"
 LIMIT=10
 SKIP_EXISTING=false
+OUTPUT_DIR=""
 INSTALL_DEPS=false
 
 while [[ $# -gt 0 ]]; do
@@ -89,8 +100,8 @@ while [[ $# -gt 0 ]]; do
             API_KEY="$2"
             shift 2
             ;;
-        --model-size)
-            MODEL_SIZE="$2"
+        --heatmap-type)
+            HEATMAP_TYPE="$2"
             shift 2
             ;;
         --limit)
@@ -100,6 +111,10 @@ while [[ $# -gt 0 ]]; do
         --skip-existing)
             SKIP_EXISTING=true
             shift
+            ;;
+        --output-dir)
+            OUTPUT_DIR="$2"
+            shift 2
             ;;
         --install-deps)
             INSTALL_DEPS=true
@@ -130,9 +145,9 @@ if [[ -z "$PROJECT_ID" ]]; then
     exit 1
 fi
 
-# Validate model size
-if [[ ! "$MODEL_SIZE" =~ ^[nsmlx]$ ]]; then
-    error "Invalid model size: $MODEL_SIZE (must be n|s|m|l|x)"
+# Validate heatmap type
+if [[ ! "$HEATMAP_TYPE" =~ ^(random)$ ]]; then
+    error "Invalid heatmap type: $HEATMAP_TYPE (currently only 'random' is supported)"
     exit 1
 fi
 
@@ -158,15 +173,16 @@ if [[ -z "${ML_CALLBACK_HMAC_SECRET:-}" ]]; then
     exit 1
 fi
 
-say "YOLOv8 ML Pipeline Integration Test"
+say "Heatmap ML Pipeline Integration Test"
 echo "===================================="
 echo ""
 echo "Project ID:    $PROJECT_ID"
 echo "API URL:       $API_URL"
-echo "Model Size:    yolov8${MODEL_SIZE}"
+echo "Heatmap Type:  $HEATMAP_TYPE"
 echo "Image Limit:   $LIMIT"
 echo "HMAC Secret:   ${ML_CALLBACK_HMAC_SECRET:0:8}... (set)"
 [[ -n "$API_KEY" ]] && echo "API Key:       ${API_KEY:0:8}... (set)"
+[[ -n "$OUTPUT_DIR" ]] && echo "Output Dir:    $OUTPUT_DIR"
 echo ""
 
 # Check for active virtual environment or use root .venv
@@ -221,13 +237,13 @@ if [[ "$INSTALL_DEPS" == true ]]; then
 
     # Use uv with the active python, or pip from virtual environment
     if command -v uv >/dev/null 2>&1; then
-        uv pip install --python "$PYTHON_CMD" -q -r "$SCRIPT_DIR/ml_requirements.txt"
+        uv pip install --python "$PYTHON_CMD" -q -r "$SCRIPT_DIR/heatmap_ml_requirements.txt"
     elif [[ -n "${VIRTUAL_ENV:-}" ]] && [[ -x "$VIRTUAL_ENV/bin/pip" ]]; then
-        "$VIRTUAL_ENV/bin/pip" install -q -r "$SCRIPT_DIR/ml_requirements.txt"
+        "$VIRTUAL_ENV/bin/pip" install -q -r "$SCRIPT_DIR/heatmap_ml_requirements.txt"
     elif command -v pip >/dev/null 2>&1; then
-        pip install -q -r "$SCRIPT_DIR/ml_requirements.txt"
+        pip install -q -r "$SCRIPT_DIR/heatmap_ml_requirements.txt"
     elif command -v pip3 >/dev/null 2>&1; then
-        pip3 install -q -r "$SCRIPT_DIR/ml_requirements.txt"
+        pip3 install -q -r "$SCRIPT_DIR/heatmap_ml_requirements.txt"
     else
         error "No package installer found (pip or uv)"
         exit 1
@@ -237,30 +253,31 @@ if [[ "$INSTALL_DEPS" == true ]]; then
     echo ""
 fi
 
-# Check if ultralytics is available
-if ! $PYTHON_CMD -c "import ultralytics" 2>/dev/null; then
-    error "ultralytics package not found"
+# Check if required packages are available
+if ! $PYTHON_CMD -c "import cv2" 2>/dev/null; then
+    error "opencv-python package not found"
     echo ""
     echo "Install ML dependencies with:"
     echo "  $0 $PROJECT_ID --install-deps"
     echo ""
     echo "Or manually:"
-    echo "  pip3 install -r scripts/ml_requirements.txt"
+    echo "  pip3 install -r scripts/heatmap_ml_requirements.txt"
     exit 1
 fi
 
 # Build command
 CMD=(
     "$PYTHON_CMD"
-    "$SCRIPT_DIR/yolov8_ml_pipeline.py"
+    "$SCRIPT_DIR/heatmap_ml_pipeline.py"
     "$PROJECT_ID"
     "--api-url" "$API_URL"
-    "--model-size" "$MODEL_SIZE"
+    "--heatmap-type" "$HEATMAP_TYPE"
     "--limit" "$LIMIT"
 )
 
 [[ -n "$API_KEY" ]] && CMD+=("--api-key" "$API_KEY")
 [[ "$SKIP_EXISTING" == true ]] && CMD+=("--skip-existing")
+[[ -n "$OUTPUT_DIR" ]] && CMD+=("--output-dir" "$OUTPUT_DIR")
 
 # Run pipeline
 say "Starting pipeline..."
@@ -275,10 +292,11 @@ echo ""
 if [[ $EXIT_CODE -eq 0 ]]; then
     success "Pipeline completed successfully!"
     echo ""
-    echo "X View results in the web UI:"
+    echo "View results in the web UI:"
     echo "   1. Navigate to your project: $API_URL"
     echo "   2. Open any processed image"
     echo "   3. Check the 'ML Analyses' panel in the sidebar"
+    echo "   4. Heatmap overlay should be visible on the image"
     echo ""
 else
     error "Pipeline failed with exit code $EXIT_CODE"
