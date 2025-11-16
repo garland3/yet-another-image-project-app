@@ -1,16 +1,16 @@
 # Image Project Manager
 
-Image management, classification, and collaboration platform for organizing and labeling visual content.
+A full-stack web application for managing, classifying, and collaborating on visual content. Built for teams that need to organize image datasets, apply custom labels, and integrate machine learning analysis results.
 
 ## Features
 
-- **Project Organization** - Organize images into projects with group-based access control
-- **Image Classification** - Apply custom labels and categories to images
+- **Project Organization** - Group images into projects with team-based access control
+- **Image Classification** - Apply custom labels and categories to organize images
 - **Team Collaboration** - Add comments and share insights with your team
-- **Metadata Management** - Store and manage custom metadata for projects and images
-- **ML Analysis Visualization** - View and export machine learning analysis results with interactive overlays
-- **Soft Deletion** - Safe deletion with 60-day retention period before permanent removal
-- **API Access** - RESTful API with comprehensive OpenAPI documentation
+- **Metadata Management** - Store custom key-value metadata for projects and images
+- **ML Analysis Integration** - Visualize machine learning results with interactive overlays (bounding boxes, heatmaps)
+- **Safe Deletion** - Two-stage deletion with 60-day recovery period
+- **API Access** - RESTful API with comprehensive documentation and API key authentication
 
 ## Requirements
 

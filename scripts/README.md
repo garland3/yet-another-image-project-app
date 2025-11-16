@@ -4,7 +4,7 @@ Utility scripts for testing, development, and ML pipeline integration.
 
 ## Available Scripts
 
-### 🤖 YOLOv8 ML Pipeline (`yolov8_ml_pipeline.py`)
+### YOLOv8 ML Pipeline (`yolov8_ml_pipeline.py`)
 
 End-to-end integration test for the ML analysis feature using real YOLOv8 object detection.
 
@@ -30,11 +30,11 @@ source ../.env
 
 **Model sizes:** `n` (nano/fast), `s` (small), `m` (medium), `l` (large), `x` (xlarge)
 
-📖 **Full documentation:** [README_YOLOV8.md](./README_YOLOV8.md)
+**Full documentation:** [README_YOLOV8.md](./README_YOLOV8.md)
 
 ---
 
-### 🧪 Test ML Pipeline (`test_ml_pipeline.py`)
+### Test ML Pipeline (`test_ml_pipeline.py`)
 
 Mock ML pipeline for testing without running real models.
 
