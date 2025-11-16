@@ -1,16 +1,16 @@
 # Image Project Manager
 
-Image management, classification, and collaboration platform for organizing and labeling visual content.
+A full-stack web application for managing, classifying, and collaborating on visual content. Built for teams that need to organize image datasets, apply custom labels, and integrate machine learning analysis results.
 
 ## Features
 
-- **Project Organization** - Organize images into projects with group-based access control
-- **Image Classification** - Apply custom labels and categories to images
+- **Project Organization** - Group images into projects with team-based access control
+- **Image Classification** - Apply custom labels and categories to organize images
 - **Team Collaboration** - Add comments and share insights with your team
-- **Metadata Management** - Store and manage custom metadata for projects and images
-- **ML Analysis Visualization** - View and export machine learning analysis results with interactive overlays
-- **Soft Deletion** - Safe deletion with 60-day retention period before permanent removal
-- **API Access** - RESTful API with comprehensive OpenAPI documentation
+- **Metadata Management** - Store custom key-value metadata for projects and images
+- **ML Analysis Integration** - Visualize machine learning results with interactive overlays (bounding boxes, heatmaps)
+- **Safe Deletion** - Two-stage deletion with 60-day recovery period
+- **API Access** - RESTful API with comprehensive documentation and API key authentication
 
 ## Requirements
 
@@ -329,9 +329,47 @@ frontend/
 - **Group-based access control:** Projects belong to groups
 - **API keys:** Programmatic access via API key authentication
 
-## Additional Resources
+## Documentation
 
-- **API Documentation:** http://localhost:8000/docs
+Comprehensive guides for different user roles:
+
+### For Users
+- **[User Guide](docs/user-guide.md)** - Complete guide for end users
+  - Getting started
+  - Managing projects and images
+  - Classification and collaboration
+  - ML analysis visualization
+
+### For Administrators
+- **[Administrator Guide](docs/admin-guide.md)** - Deployment and maintenance
+  - [Installation & Deployment](docs/admin/installation.md) - Docker, Kubernetes, manual setup
+  - [Configuration](docs/admin/configuration.md) - Environment variables and settings
+  - [Authentication & Security](docs/admin/authentication.md) - Reverse proxy setup and security
+  - [Database Management](docs/admin/database.md) - PostgreSQL, migrations, backups
+  - [Storage Configuration](docs/admin/storage.md) - S3/MinIO setup and management
+  - [Monitoring & Maintenance](docs/admin/monitoring.md) - Logging, metrics, updates
+  - [Troubleshooting](docs/admin/troubleshooting.md) - Common issues and solutions
+
+### For Developers
+- **[Developer Guide](docs/developer-guide.md)** - Development and contribution guide
+  - Development environment setup
+  - Architecture overview
+  - Backend and frontend development
+  - API development
+  - Testing and code style
+
+### For ML Integration
+- **[ML Analysis API Guide](docs/api-ml-guide.md)** - Machine learning integration
+  - Authentication and workflow
+  - API endpoints and data formats
+  - Example implementations
+  - Testing and best practices
+
+### Additional Resources
+
+- **[Production Proxy Setup](docs/production/proxy-setup.md)** - Detailed reverse proxy configuration
+- **API Documentation:** http://localhost:8000/docs (Swagger UI)
+- **Alternative API Docs:** http://localhost:8000/redoc (ReDoc)
 - **pgAdmin (Database UI):** http://localhost:8080 (user: admin@admin.com, pass: admin)
 - **MinIO Console:** http://localhost:9001 (user: minioadmin, pass: minioadminpassword)
 
