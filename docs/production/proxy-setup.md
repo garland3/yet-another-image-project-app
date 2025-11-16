@@ -4,7 +4,7 @@ This document describes how to configure a reverse proxy (nginx, Apache, etc.) f
 
 ## Overview
 
-The application uses **header-based authentication** via a reverse proxy. The proxy supports three authentication methods:
+The application uses **header-based authentication** via a reverse proxy. The proxy supports two authentication methods:
 
 1. **OAuth2/SAML/LDAP** (for browser users)
    - Proxy authenticates users and sets `X-User-Email` + `X-Proxy-Secret` headers
@@ -12,18 +12,22 @@ The application uses **header-based authentication** via a reverse proxy. The pr
 2. **API Keys** (for programmatic access)
    - Client sends `Authorization: Bearer <api-key>` header
    - Backend validates API key directly
-   - Used for scripts, automation, CLI tools
-3. **HMAC Signatures** (for ML pipeline callbacks)
-   - Client sends `X-ML-Signature` + `X-ML-Timestamp` headers
-   - Backend validates HMAC signature
-   - Used exclusively for ML pipeline status updates and artifact uploads
+   - Used for scripts, automation, CLI tools, and ML pipelines
+
+**HMAC Signatures** (additional security layer for ML pipelines):
+- ML pipeline endpoints require **BOTH** user authentication (API key) **AND** HMAC signature
+- Client sends `X-ML-Signature` + `X-ML-Timestamp` headers along with API key
+- This two-layer approach ensures:
+  - Only authenticated users can trigger ML callbacks
+  - Only authorized pipelines (with HMAC secret) can update analyses
+  - Prevents unauthorized pipelines from making callbacks even with valid user credentials
 
 The reverse proxy is responsible for:
 
 1. Authenticating browser users (via OAuth2, SAML, LDAP, etc.)
 2. Setting authentication headers on requests to the backend
-3. Forwarding API key and HMAC requests directly to backend
-4. Forwarding requests to the FastAPI backend
+3. Forwarding API key requests directly to backend (bypassing OAuth)
+4. Forwarding all requests to the FastAPI backend
 5. Serving static frontend assets (optional)
 
 ## Authentication Flow
@@ -47,14 +51,22 @@ Authorization: Bearer <key>   Forwards header   Validates API key
                               X-Proxy-Secret     Returns user from DB
 ```
 
-### HMAC Authentication (ML Pipeline)
+### HMAC Authentication (ML Pipeline - Two Layers)
 ```
 ML Pipeline --> Reverse Proxy --> FastAPI Backend
     |               |                   |
     v               v                   v
-X-ML-Signature   Forwards headers   Validates HMAC
-X-ML-Timestamp   (no OAuth check)   Verifies timestamp
+Authorization:   Forwards both      1. Validates API key
+  Bearer <key>   auth headers       2. Validates HMAC signature
++                                   3. Verifies timestamp
+X-ML-Signature                      (Both must pass)
+X-ML-Timestamp
 ```
+
+**Why two layers?**
+- Layer 1 (API key): Identifies and authenticates the user
+- Layer 2 (HMAC): Proves request came from authorized ML pipeline
+- This prevents unauthorized pipelines from accessing endpoints even if they steal/guess valid API keys
 
 ## Required Configuration
 
@@ -106,7 +118,7 @@ If validation fails, the backend returns `401 Unauthorized`.
 
 ### Nginx Configuration
 
-See `nginx-example.conf` in this directory for a complete example with all three authentication methods.
+See `nginx-example.conf` in this directory for a complete example with both authentication methods.
 
 Key requirements:
 
@@ -116,20 +128,13 @@ Key requirements:
 - Set `X-Proxy-Secret` header with shared secret
 - Forward standard headers (`Host`, `X-Real-IP`, `X-Forwarded-For`)
 
-**For API key requests (programmatic access):**
+**For API key requests (programmatic access and ML pipelines):**
 - Skip OAuth authentication if `Authorization: Bearer` header is present
 - Forward `Authorization` header to backend for validation
 - Set `X-Proxy-Secret` header (required for all backend requests)
 - Use error_page handler to fallback to API key when OAuth fails
-
-**For HMAC requests (ML pipeline callbacks):**
-- Bypass OAuth completely for ML pipeline endpoints:
-  - `/api/analyses/{id}/status`
-  - `/api/analyses/{id}/annotations:bulk`
-  - `/api/analyses/{id}/artifacts/presign`
-  - `/api/analyses/{id}/finalize`
-- Forward all headers including `X-ML-Signature` and `X-ML-Timestamp`
-- Backend validates HMAC signature independently
+- Forward all headers including `X-ML-Signature` and `X-ML-Timestamp` (for ML pipelines)
+- Backend validates API key, then validates HMAC if present
 
 **General:**
 - Handle WebSocket upgrades if needed (future feature)
@@ -311,26 +316,35 @@ curl -i \
 - Backend should log API key authentication success
 - nginx should have triggered @api_key_fallback handler
 
-### 3. Test HMAC Authentication (ML Pipeline)
+### 3. Test HMAC Authentication (ML Pipeline - Two Layers)
+
+**IMPORTANT:** ML pipeline requires BOTH API key AND HMAC signature.
 
 **End-to-end test using heatmap pipeline:**
 ```bash
 # Set required environment variable
 export ML_CALLBACK_HMAC_SECRET=your-hmac-secret
 
-# Run pipeline (uses HMAC auth for callbacks)
+# Run pipeline with API key (REQUIRED)
 ./scripts/run_heatmap_pipeline.sh PROJECT_ID \
   --api-url https://yourdomain.com \
+  --api-key your-api-key-here \
   --limit 3
 # Expected: Pipeline completes successfully
 # Check: ML analysis results appear in web UI
 ```
+
+**What gets validated:**
+1. First layer: API key authentication (identifies user)
+2. Second layer: HMAC signature (proves authorized pipeline)
+3. Timestamp check (prevents replay attacks)
 
 **Manual HMAC request test:**
 ```bash
 # See backend/tests/test_ml_hmac_security.py for HMAC generation examples
 # HMAC signature format: sha256=<hex(HMAC-SHA256(timestamp.body, secret))>
 # This is complex - use the pipeline script for testing
+# Remember: Must include Authorization header with API key
 ```
 
 ### 4. Check Logs
@@ -362,9 +376,9 @@ tail -f /var/log/nginx/image-manager-error.log
 **Reverse Proxy Configuration:**
 - [ ] Configure OAuth2/SAML/LDAP authentication
 - [ ] Set required headers (`X-User-Email`, `X-Proxy-Secret`)
-- [ ] Configure ML pipeline endpoints to bypass OAuth
 - [ ] Add `@api_key_fallback` location block for API key support
-- [ ] Forward `Authorization` header to backend
+- [ ] Forward `Authorization` header to backend (for API keys)
+- [ ] Forward all headers to backend (including X-ML-* for HMAC)
 - [ ] Configure rate limiting per endpoint type
 - [ ] Set appropriate timeouts for long-running requests
 
@@ -421,16 +435,18 @@ tail -f /var/log/nginx/image-manager-error.log
 ### Issue: 401 Unauthorized (HMAC/ML Pipeline)
 
 **Possible causes:**
-1. ML pipeline endpoints not configured to bypass OAuth
-2. Invalid HMAC signature
-3. Timestamp too old (replay protection)
-4. `ML_CALLBACK_HMAC_SECRET` mismatch between pipeline and backend
+1. Missing API key (ML pipeline requires BOTH API key AND HMAC)
+2. Invalid API key
+3. Invalid HMAC signature
+4. Timestamp too old (replay protection, default 300 seconds)
+5. `ML_CALLBACK_HMAC_SECRET` mismatch between pipeline and backend
 
 **Solution:**
-- Verify nginx config has specific location blocks for ML endpoints
-- Check location block order (most specific first)
+- Ensure pipeline script is called with `--api-key` parameter
+- Verify API key is active in database
 - Verify `ML_CALLBACK_HMAC_SECRET` matches on both sides
-- Check backend logs for HMAC validation errors
+- Check backend logs to see which auth layer failed (API key or HMAC)
+- For timestamp issues, ensure server clocks are synchronized
 
 ### Issue: 403 Forbidden
 
