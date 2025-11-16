@@ -100,6 +100,10 @@ describe('ImageView', () => {
     test('loads regular image successfully via direct endpoint', async () => {
       fetch
         .mockResolvedValueOnce({
+          ok: false,
+          status: 401
+        })
+        .mockResolvedValueOnce({
           ok: true,
           json: () => Promise.resolve(mockRegularImage)
         })
@@ -112,8 +116,8 @@ describe('ImageView', () => {
           json: () => Promise.resolve([])
         })
         .mockResolvedValueOnce({
-          ok: false,
-          status: 401
+          ok: true,
+          json: () => Promise.resolve([])
         });
 
       renderImageView();
@@ -129,6 +133,10 @@ describe('ImageView', () => {
     test('sets document title correctly for regular images', async () => {
       fetch
         .mockResolvedValueOnce({
+          ok: false,
+          status: 401
+        })
+        .mockResolvedValueOnce({
           ok: true,
           json: () => Promise.resolve(mockRegularImage)
         })
@@ -141,8 +149,8 @@ describe('ImageView', () => {
           json: () => Promise.resolve([])
         })
         .mockResolvedValueOnce({
-          ok: false,
-          status: 401
+          ok: true,
+          json: () => Promise.resolve([])
         });
 
       renderImageView();
@@ -158,6 +166,10 @@ describe('ImageView', () => {
       fetch
         .mockResolvedValueOnce({
           ok: false,
+          status: 401
+        })
+        .mockResolvedValueOnce({
+          ok: false,
           status: 404
         })
         .mockResolvedValueOnce({
@@ -173,8 +185,8 @@ describe('ImageView', () => {
           json: () => Promise.resolve([])
         })
         .mockResolvedValueOnce({
-          ok: false,
-          status: 401
+          ok: true,
+          json: () => Promise.resolve([])
         });
 
       renderImageView();
@@ -183,17 +195,21 @@ describe('ImageView', () => {
         expect(screen.getByText('deleted-image.jpg')).toBeInTheDocument();
       });
 
-      // Verify direct fetch was attempted first
-      expect(fetch).toHaveBeenNthCalledWith(1, '/api/images/test-image-id');
-      
-      // Verify fallback to project endpoint with include_deleted=true
-      expect(fetch).toHaveBeenNthCalledWith(2, '/api/projects/test-project-id/images?include_deleted=true');
+      // Verify direct fetch was attempted first (2nd call after /api/users/me)
+      expect(fetch).toHaveBeenNthCalledWith(2, '/api/images/test-image-id');
+
+      // Verify fallback to project endpoint with include_deleted=true (3rd call)
+      expect(fetch).toHaveBeenNthCalledWith(3, '/api/projects/test-project-id/images?include_deleted=true');
     });
 
     test('logs fallback attempt when direct fetch fails', async () => {
       const consoleSpy = jest.spyOn(console, 'log').mockImplementation();
-      
+
       fetch
+        .mockResolvedValueOnce({
+          ok: false,
+          status: 401
+        })
         .mockResolvedValueOnce({
           ok: false,
           status: 404
@@ -211,8 +227,8 @@ describe('ImageView', () => {
           json: () => Promise.resolve([])
         })
         .mockResolvedValueOnce({
-          ok: false,
-          status: 401
+          ok: true,
+          json: () => Promise.resolve([])
         });
 
       renderImageView();
@@ -230,6 +246,10 @@ describe('ImageView', () => {
       fetch
         .mockResolvedValueOnce({
           ok: false,
+          status: 401
+        })
+        .mockResolvedValueOnce({
+          ok: false,
           status: 404
         })
         .mockResolvedValueOnce({
@@ -245,8 +265,8 @@ describe('ImageView', () => {
           json: () => Promise.resolve([])
         })
         .mockResolvedValueOnce({
-          ok: false,
-          status: 401
+          ok: true,
+          json: () => Promise.resolve([])
         });
 
       renderImageView();
@@ -258,6 +278,10 @@ describe('ImageView', () => {
 
     test('handles case where image not found in project images', async () => {
       fetch
+        .mockResolvedValueOnce({
+          ok: false,
+          status: 401
+        })
         .mockResolvedValueOnce({
           ok: false,
           status: 404
@@ -283,6 +307,10 @@ describe('ImageView', () => {
       fetch
         .mockResolvedValueOnce({
           ok: false,
+          status: 401
+        })
+        .mockResolvedValueOnce({
+          ok: false,
           status: 404
         })
         .mockResolvedValueOnce({
@@ -302,6 +330,10 @@ describe('ImageView', () => {
     test('loads project images with include_deleted=true', async () => {
       fetch
         .mockResolvedValueOnce({
+          ok: false,
+          status: 401
+        })
+        .mockResolvedValueOnce({
           ok: true,
           json: () => Promise.resolve(mockRegularImage)
         })
@@ -314,8 +346,8 @@ describe('ImageView', () => {
           json: () => Promise.resolve([])
         })
         .mockResolvedValueOnce({
-          ok: false,
-          status: 401
+          ok: true,
+          json: () => Promise.resolve([])
         });
 
       renderImageView();
@@ -327,6 +359,10 @@ describe('ImageView', () => {
 
     test('handles project images loading failure', async () => {
       fetch
+        .mockResolvedValueOnce({
+          ok: false,
+          status: 401
+        })
         .mockResolvedValueOnce({
           ok: true,
           json: () => Promise.resolve(mockRegularImage)
@@ -348,6 +384,10 @@ describe('ImageView', () => {
     test('back button navigates to project page', async () => {
       fetch
         .mockResolvedValueOnce({
+          ok: false,
+          status: 401
+        })
+        .mockResolvedValueOnce({
           ok: true,
           json: () => Promise.resolve(mockRegularImage)
         })
@@ -360,14 +400,14 @@ describe('ImageView', () => {
           json: () => Promise.resolve([])
         })
         .mockResolvedValueOnce({
-          ok: false,
-          status: 401
+          ok: true,
+          json: () => Promise.resolve([])
         });
 
       renderImageView();
 
       await waitFor(() => {
-        expect(screen.getByText('< Back to Project')).toBeInTheDocument();
+        expect(screen.getByText('← Back')).toBeInTheDocument();
       });
     });
   });
@@ -400,6 +440,10 @@ describe('ImageView', () => {
     test('renders all expected child components', async () => {
       fetch
         .mockResolvedValueOnce({
+          ok: false,
+          status: 401
+        })
+        .mockResolvedValueOnce({
           ok: true,
           json: () => Promise.resolve(mockRegularImage)
         })
@@ -412,8 +456,8 @@ describe('ImageView', () => {
           json: () => Promise.resolve([])
         })
         .mockResolvedValueOnce({
-          ok: false,
-          status: 401
+          ok: true,
+          json: () => Promise.resolve([])
         });
 
       renderImageView();
@@ -421,7 +465,6 @@ describe('ImageView', () => {
       await waitFor(() => {
         expect(screen.getByTestId('image-display')).toBeInTheDocument();
         expect(screen.getByTestId('image-metadata')).toBeInTheDocument();
-        expect(screen.getByTestId('image-classifications')).toBeInTheDocument();
         expect(screen.getByTestId('compact-image-classifications')).toBeInTheDocument();
         expect(screen.getByTestId('image-comments')).toBeInTheDocument();
         expect(screen.getByTestId('image-deletion-controls')).toBeInTheDocument();

@@ -51,8 +51,30 @@ npm run dev
 
 ### Running Tests
 
+**Unified Test Runner** (recommended):
 ```bash
-# Backend tests (run from project root)
+# Run both backend and frontend tests (from project root)
+./test/run_tests.sh
+
+# Run only backend or frontend
+./test/run_tests.sh --backend
+./test/run_tests.sh --frontend
+
+# Verbose output for debugging
+./test/run_tests.sh --verbose
+```
+
+**Test Script Output Philosophy:**
+- Default output is minimal: shows only pass/fail status for each test suite
+- Suppresses verbose tool output, dependency installation messages, and framework noise
+- Clear, concise results that make it immediately obvious if tests are working
+- Use `--verbose` flag when you need detailed output for debugging
+- Follows the "no emojis" rule - professional output only
+
+**Direct Test Commands:**
+
+Backend tests (run from project root):
+```bash
 source .venv/bin/activate
 cd backend
 pytest
@@ -321,8 +343,13 @@ Single container deployment via `Dockerfile`:
 
 # style
 
-* no emojis ever. 
-* each file less than 400 lines of code. 
+* no emojis ever.
+* each file less than 400 lines of code.
+* test scripts and utilities: minimal output by default, verbose mode optional
+  - Show only essential pass/fail information
+  - Suppress dependency installation and framework noise
+  - Make it immediately obvious if things are working
+  - Provide --verbose flag for debugging when needed 
 
 
 
