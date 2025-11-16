@@ -4,22 +4,56 @@ This document describes how to configure a reverse proxy (nginx, Apache, etc.) f
 
 ## Overview
 
-The application uses **header-based authentication** via a reverse proxy. The proxy is responsible for:
+The application uses **header-based authentication** via a reverse proxy. The proxy supports three authentication methods:
 
-1. Authenticating users (via OAuth2, SAML, LDAP, etc.)
+1. **OAuth2/SAML/LDAP** (for browser users)
+   - Proxy authenticates users and sets `X-User-Email` + `X-Proxy-Secret` headers
+   - Used for web UI and interactive API access
+2. **API Keys** (for programmatic access)
+   - Client sends `Authorization: Bearer <api-key>` header
+   - Backend validates API key directly
+   - Used for scripts, automation, CLI tools
+3. **HMAC Signatures** (for ML pipeline callbacks)
+   - Client sends `X-ML-Signature` + `X-ML-Timestamp` headers
+   - Backend validates HMAC signature
+   - Used exclusively for ML pipeline status updates and artifact uploads
+
+The reverse proxy is responsible for:
+
+1. Authenticating browser users (via OAuth2, SAML, LDAP, etc.)
 2. Setting authentication headers on requests to the backend
-3. Forwarding requests to the FastAPI backend
-4. Serving static frontend assets (optional)
+3. Forwarding API key and HMAC requests directly to backend
+4. Forwarding requests to the FastAPI backend
+5. Serving static frontend assets (optional)
 
 ## Authentication Flow
 
+### OAuth/SAML/LDAP (Browser Users)
 ```
-User Browser --> Reverse Proxy (authenticates) --> FastAPI Backend
-                      |
-                      v
-                 Sets Headers:
-                 - X-User-Email: user@example.com
-                 - X-Proxy-Secret: <shared-secret>
+Browser --> Reverse Proxy (OAuth) --> FastAPI Backend
+                |
+                v
+           Sets Headers:
+           - X-User-Email: user@example.com
+           - X-Proxy-Secret: <shared-secret>
+```
+
+### API Key Authentication (Scripts/Automation)
+```
+Script/CLI --> Reverse Proxy --> FastAPI Backend
+    |              |                    |
+    v              v                    v
+Authorization: Bearer <key>   Forwards header   Validates API key
+                              X-Proxy-Secret     Returns user from DB
+```
+
+### HMAC Authentication (ML Pipeline)
+```
+ML Pipeline --> Reverse Proxy --> FastAPI Backend
+    |               |                   |
+    v               v                   v
+X-ML-Signature   Forwards headers   Validates HMAC
+X-ML-Timestamp   (no OAuth check)   Verifies timestamp
 ```
 
 ## Required Configuration
@@ -72,14 +106,35 @@ If validation fails, the backend returns `401 Unauthorized`.
 
 ### Nginx Configuration
 
-See `nginx-example.conf` in this directory for a complete example.
+See `nginx-example.conf` in this directory for a complete example with all three authentication methods.
 
 Key requirements:
-- Authenticate users before forwarding requests
+
+**For OAuth-authenticated requests (browser users):**
+- Authenticate users via OAuth2 before forwarding requests
 - Set `X-User-Email` header with authenticated user's email
 - Set `X-Proxy-Secret` header with shared secret
-- Forward all other headers (especially `Host`, `X-Real-IP`, `X-Forwarded-For`)
+- Forward standard headers (`Host`, `X-Real-IP`, `X-Forwarded-For`)
+
+**For API key requests (programmatic access):**
+- Skip OAuth authentication if `Authorization: Bearer` header is present
+- Forward `Authorization` header to backend for validation
+- Set `X-Proxy-Secret` header (required for all backend requests)
+- Use error_page handler to fallback to API key when OAuth fails
+
+**For HMAC requests (ML pipeline callbacks):**
+- Bypass OAuth completely for ML pipeline endpoints:
+  - `/api/analyses/{id}/status`
+  - `/api/analyses/{id}/annotations:bulk`
+  - `/api/analyses/{id}/artifacts/presign`
+  - `/api/analyses/{id}/finalize`
+- Forward all headers including `X-ML-Signature` and `X-ML-Timestamp`
+- Backend validates HMAC signature independently
+
+**General:**
 - Handle WebSocket upgrades if needed (future feature)
+- Rate limiting per endpoint type
+- Appropriate timeouts for long-running requests
 
 ### Apache Configuration
 
@@ -197,15 +252,15 @@ Configure these in your `.env` file if needed.
 
 ## Testing the Setup
 
-### 1. Test Authentication
+### 1. Test OAuth Authentication (Browser Users)
 
-Without proper headers (should fail):
-```bash
-curl -i http://localhost:8000/api/projects
-# Expected: 401 Unauthorized
-```
+**Via browser:**
+1. Navigate to `https://yourdomain.com`
+2. Should redirect to OAuth provider
+3. After successful login, should see application
+4. Check nginx access logs for `X-User-Email` header
 
-With valid headers (should succeed):
+**Direct backend test (simulating proxy headers):**
 ```bash
 curl -i \
   -H "X-User-Email: user@example.com" \
@@ -214,43 +269,133 @@ curl -i \
 # Expected: 200 OK with project list
 ```
 
-### 2. Test Invalid Secret
+**Without proper headers (should fail):**
+```bash
+curl -i http://localhost:8000/api/projects
+# Expected: 401 Unauthorized or 500 Server configuration error
+```
 
+**Invalid secret (should fail):**
 ```bash
 curl -i \
   -H "X-User-Email: user@example.com" \
   -H "X-Proxy-Secret: wrong-secret" \
   http://localhost:8000/api/projects
-# Expected: 401 Unauthorized
+# Expected: 401 Invalid proxy authentication
 ```
 
-### 3. Check Logs
+### 2. Test API Key Authentication (Programmatic Access)
 
-Backend logs authentication attempts:
+**Create an API key first:**
+```bash
+# Via web UI: Navigate to /api-keys and create a new key
+# Or via API (if you have OAuth access):
+curl -X POST https://yourdomain.com/api/api-keys \
+  -H "Cookie: oauth2_proxy_cookie..." \
+  -H "Content-Type: application/json" \
+  -d '{"name": "My Script", "scopes": ["read", "write"]}'
+# Save the returned "key" value
+```
+
+**Test API key request:**
+```bash
+curl -i \
+  -H "Authorization: Bearer your-api-key-here" \
+  https://yourdomain.com/api/projects
+# Expected: 200 OK with project list
+# Should work without OAuth authentication
+```
+
+**Verify in logs:**
+- Should NOT see "Invalid proxy authentication"
+- Backend should log API key authentication success
+- nginx should have triggered @api_key_fallback handler
+
+### 3. Test HMAC Authentication (ML Pipeline)
+
+**End-to-end test using heatmap pipeline:**
+```bash
+# Set required environment variable
+export ML_CALLBACK_HMAC_SECRET=your-hmac-secret
+
+# Run pipeline (uses HMAC auth for callbacks)
+./scripts/run_heatmap_pipeline.sh PROJECT_ID \
+  --api-url https://yourdomain.com \
+  --limit 3
+# Expected: Pipeline completes successfully
+# Check: ML analysis results appear in web UI
+```
+
+**Manual HMAC request test:**
+```bash
+# See backend/tests/test_ml_hmac_security.py for HMAC generation examples
+# HMAC signature format: sha256=<hex(HMAC-SHA256(timestamp.body, secret))>
+# This is complex - use the pipeline script for testing
+```
+
+### 4. Check Logs
+
+**Backend logs:**
 ```bash
 tail -f backend/logs/app.json | grep -i auth
+# Look for authentication method used (OAuth headers, API key, HMAC)
+```
+
+**Nginx logs:**
+```bash
+tail -f /var/log/nginx/image-manager-access.log
+# Look for status codes and which endpoints are hit
+tail -f /var/log/nginx/image-manager-error.log
+# Look for auth_request failures or proxy errors
 ```
 
 ## Deployment Checklist
 
-- [ ] Generate strong `PROXY_SHARED_SECRET`
-- [ ] Configure `.env` with production settings
+**Security Configuration:**
+- [ ] Generate strong `PROXY_SHARED_SECRET` (32+ bytes)
+- [ ] Generate strong `ML_CALLBACK_HMAC_SECRET` (if using ML features)
 - [ ] Set `DEBUG=false` and `SKIP_HEADER_CHECK=false`
-- [ ] Configure reverse proxy with authentication
-- [ ] Set required headers (`X-User-Email`, `X-Proxy-Secret`)
-- [ ] Implement custom `_check_group_membership` function
-- [ ] Configure firewall rules to restrict backend access
+- [ ] Configure firewall rules to restrict backend access to proxy only
 - [ ] Enable HTTPS/TLS on reverse proxy
-- [ ] Test authentication flow end-to-end
-- [ ] Configure logging and monitoring
-- [ ] Set up database backups
+- [ ] Configure security headers (HSTS, CSP, etc.)
+
+**Reverse Proxy Configuration:**
+- [ ] Configure OAuth2/SAML/LDAP authentication
+- [ ] Set required headers (`X-User-Email`, `X-Proxy-Secret`)
+- [ ] Configure ML pipeline endpoints to bypass OAuth
+- [ ] Add `@api_key_fallback` location block for API key support
+- [ ] Forward `Authorization` header to backend
+- [ ] Configure rate limiting per endpoint type
+- [ ] Set appropriate timeouts for long-running requests
+
+**Backend Configuration:**
+- [ ] Configure `.env` with production settings
+- [ ] Set `PROXY_SHARED_SECRET` matching nginx config
+- [ ] Set `ML_CALLBACK_HMAC_SECRET` (if using ML features)
+- [ ] Implement custom `_check_group_membership` function
+- [ ] Configure database connection (PostgreSQL)
 - [ ] Configure S3/MinIO for production storage
 - [ ] Run database migrations (`alembic upgrade head`)
+
+**Testing:**
+- [ ] Test OAuth authentication (browser users)
+- [ ] Test API key authentication (programmatic access)
+- [ ] Test HMAC authentication (ML pipeline)
 - [ ] Test group-based access control
+- [ ] Verify all three auth methods work through nginx
+- [ ] Load test with expected traffic patterns
+
+**Operations:**
+- [ ] Configure logging and monitoring
+- [ ] Set up database backups
+- [ ] Set up log rotation
+- [ ] Configure alerts for authentication failures
+- [ ] Document API key creation process for users
+- [ ] Plan for secret rotation procedures
 
 ## Troubleshooting
 
-### Issue: 401 Unauthorized
+### Issue: 401 Unauthorized (OAuth)
 
 **Possible causes:**
 1. Missing or incorrect `X-Proxy-Secret` header
@@ -258,6 +403,34 @@ tail -f backend/logs/app.json | grep -i auth
 3. Header names don't match configuration (`X_USER_ID_HEADER`, `X_PROXY_SECRET_HEADER`)
 
 **Solution:** Check backend logs and verify header values match configuration.
+
+### Issue: 401 Unauthorized (API Key)
+
+**Possible causes:**
+1. API key not being forwarded by nginx (missing `proxy_set_header Authorization`)
+2. OAuth blocking request before API key can be checked
+3. Invalid or expired API key
+4. Missing `error_page 401 = @api_key_fallback` in nginx config
+
+**Solution:**
+- Verify nginx config has `@api_key_fallback` location block
+- Check nginx config forwards `Authorization` header
+- Verify API key is active in database
+- Test API key directly against backend (bypassing nginx)
+
+### Issue: 401 Unauthorized (HMAC/ML Pipeline)
+
+**Possible causes:**
+1. ML pipeline endpoints not configured to bypass OAuth
+2. Invalid HMAC signature
+3. Timestamp too old (replay protection)
+4. `ML_CALLBACK_HMAC_SECRET` mismatch between pipeline and backend
+
+**Solution:**
+- Verify nginx config has specific location blocks for ML endpoints
+- Check location block order (most specific first)
+- Verify `ML_CALLBACK_HMAC_SECRET` matches on both sides
+- Check backend logs for HMAC validation errors
 
 ### Issue: 403 Forbidden
 
@@ -275,6 +448,19 @@ tail -f backend/logs/app.json | grep -i auth
 3. S3/MinIO unavailable
 
 **Solution:** Check backend logs (`backend/logs/app.json`) for detailed error messages.
+
+### Issue: API Keys Work in Dev but Not Production
+
+**Possible causes:**
+1. Nginx `auth_request` blocking all requests
+2. `Authorization` header not being forwarded
+3. `error_page` handler not configured
+
+**Solution:**
+- Compare nginx config with `docs/production/nginx-example.conf`
+- Verify `@api_key_fallback` location block exists
+- Test with `curl -v` to see full request/response headers
+- Check nginx error logs for auth_request failures
 
 ## Additional Resources
 

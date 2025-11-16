@@ -546,8 +546,11 @@ def main():
     # Get API key from args or environment
     api_key = args.api_key or os.environ.get('API_KEY')
 
+    # Get user email from environment or default
+    user_email = os.environ.get('MOCK_USER_EMAIL', 'test@example.com')
+
     # Run pipeline
-    pipeline = HeatmapPipeline(args.api_url, hmac_secret, api_key, output_dir=args.output_dir)
+    pipeline = HeatmapPipeline(args.api_url, hmac_secret, api_key, user_email=user_email, output_dir=args.output_dir)
     pipeline.run_project_pipeline(args.project_id, args.heatmap_type, args.limit, args.skip_existing)
 
 

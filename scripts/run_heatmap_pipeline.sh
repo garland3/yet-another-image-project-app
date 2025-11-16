@@ -237,13 +237,13 @@ if [[ "$INSTALL_DEPS" == true ]]; then
 
     # Use uv with the active python, or pip from virtual environment
     if command -v uv >/dev/null 2>&1; then
-        uv pip install --python "$PYTHON_CMD" -q -r "$SCRIPT_DIR/heatmap_ml_requirements.txt"
+        uv pip install --python "$PYTHON_CMD" -r "$SCRIPT_DIR/heatmap_ml_requirements.txt"
     elif [[ -n "${VIRTUAL_ENV:-}" ]] && [[ -x "$VIRTUAL_ENV/bin/pip" ]]; then
-        "$VIRTUAL_ENV/bin/pip" install -q -r "$SCRIPT_DIR/heatmap_ml_requirements.txt"
+        "$VIRTUAL_ENV/bin/pip" install -r "$SCRIPT_DIR/heatmap_ml_requirements.txt"
     elif command -v pip >/dev/null 2>&1; then
-        pip install -q -r "$SCRIPT_DIR/heatmap_ml_requirements.txt"
+        pip install -r "$SCRIPT_DIR/heatmap_ml_requirements.txt"
     elif command -v pip3 >/dev/null 2>&1; then
-        pip3 install -q -r "$SCRIPT_DIR/heatmap_ml_requirements.txt"
+        pip3 install -r "$SCRIPT_DIR/heatmap_ml_requirements.txt"
     else
         error "No package installer found (pip or uv)"
         exit 1
