@@ -118,7 +118,7 @@ If validation fails, the backend returns `401 Unauthorized`.
 
 ### Nginx Configuration
 
-See `nginx-example.conf` in this directory for a complete example with both authentication methods.
+See `nginx-simplified.conf` in this directory for the recommended multi-prefix configuration (`/api`, `/api-key`, `/api-ml`) that matches the current authentication model.
 
 Key requirements:
 
@@ -538,8 +538,8 @@ proxy_set_header X-ML-Timestamp $http_x_ml_timestamp;
 3. `error_page` handler not configured
 
 **Solution:**
-- Compare nginx config with `docs/production/nginx-example.conf`
-- Verify `@api_key_fallback` location block exists
+- Compare nginx config with `docs/production/nginx-simplified.conf`
+- Ensure `/api`, `/api-key`, and `/api-ml` prefixes are configured as documented (no `@api_key_fallback`)
 - Test with `curl -v` to see full request/response headers
 - Check nginx error logs for auth_request failures
 

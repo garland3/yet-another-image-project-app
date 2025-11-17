@@ -335,10 +335,10 @@ curl -v -H "Authorization: Bearer fake-key" http://localhost:8000/api-ml/project
 
 ### Step 4: Update Nginx Configuration
 
-**File:** `docs/production/nginx-example.conf`
+**File:** `docs/production/nginx-simplified.conf`
 
 **What to do:**
-Simplify the nginx configuration by removing the `@api_key_fallback` handler and creating separate location blocks for each prefix.
+Use the simplified multi-prefix nginx configuration by defining separate location blocks for each prefix and removing any legacy `@api_key_fallback` handlers.
 
 **Find the `/api/images` location block** (around line 134):
 
@@ -850,7 +850,7 @@ pytest tests/test_multi_prefix_auth.py -v
 
 If issues arise, you can rollback in stages:
 
-1. **Rollback nginx only** - revert `nginx-example.conf` to use `@api_key_fallback`
+1. **Rollback nginx only** - temporarily restore a previous nginx config backup if needed; do not reintroduce the legacy `@api_key_fallback` pattern or the removed `nginx-example.conf`.
 2. **Rollback backend** - comment out `api_key_router` and `api_ml_router` in `main.py`
 3. **Full rollback** - `git revert <commit-hash>`
 
