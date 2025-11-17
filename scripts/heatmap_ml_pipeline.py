@@ -251,10 +251,12 @@ class HeatmapPipeline:
         """Update analysis status"""
         print(f"  Updating analysis status to: {status}")
 
-        url = self._get_ml_url(f"analyses/{analysis_id}/status")
+        # Status updates go through the standard API (API key auth),
+        # not the dedicated /api-ml HMAC pipeline endpoints.
+        url = self._get_api_url(f"analyses/{analysis_id}/status")
         data = {"status": status}
 
-        response = self._make_hmac_request('PATCH', url, data)
+        response = self.session.patch(url, json=data)
         response.raise_for_status()
         print(f"  Status updated to {status}")
 
