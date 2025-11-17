@@ -407,6 +407,71 @@ tail -f /var/log/nginx/image-manager-error.log
 - [ ] Document API key creation process for users
 - [ ] Plan for secret rotation procedures
 
+## Security Model Changes (v1.x → v2.x)
+
+### Critical Breaking Change: Dual Authentication Required
+
+Starting with version 2.0, ML pipeline callbacks now require **dual-layer authentication**:
+
+1. **User Authentication**: API key or user session (same as other endpoints)
+2. **HMAC Signature**: Proves the request comes from an authorized pipeline
+
+This replaces the previous HMAC-only authentication model.
+
+#### Migration Guide for Existing Pipelines
+
+**Immediate Action Required**: All existing ML pipelines will break without modification.
+
+1. **Update pipeline scripts** to include API key authentication:
+   ```bash
+   # Set API key (get from UI or API)
+   export API_KEY="your_api_key_here"
+
+   # Run pipeline with both HMAC secret AND API key
+   python yolov8_ml_pipeline.py --api-key $API_KEY --hmac-secret $ML_CALLBACK_HMAC_SECRET ...
+   ```
+
+2. **Code changes required** in pipeline scripts:
+   ```python
+   # OLD: HMAC-only (no longer works)
+   def _make_hmac_request(self, method, url, json_data):
+       # Only HMAC headers...
+
+   # NEW: Dual authentication required
+   def _make_hmac_request(self, method, url, json_data):
+       # Add BOTH API key and HMAC headers
+       headers = {
+           'Authorization': f'Bearer {self.api_key}',  # NEW: API key required
+           'X-ML-Signature': signature,
+           'X-ML-Timestamp': timestamp,
+           'Content-Type': 'application/json'
+       }
+   ```
+
+#### Backward Compatibility
+
+- No backward compatibility flag is currently provided
+- Pipelines using only HMAC will be rejected with 401 errors
+- Temporarily disable HMAC (`ML_PIPELINE_REQUIRE_HMAC=false`) for testing only
+
+#### API Key Management Best Practices
+
+1. **Use separate API keys** for production ML pipelines
+2. **Rotate keys regularly** and update pipeline environment variables
+3. **Store keys securely**:
+   - Kubernetes: Use secrets or sealed secrets
+   - Docker: Use environment variables, not command line
+   - Cloud: Use managed secret services
+
+### Nginx Configuration Updates
+
+Add these headers to your nginx configuration for both `/api/images` and `/api/` location blocks:
+
+```
+proxy_set_header X-ML-Signature $http_x_ml_signature;
+proxy_set_header X-ML-Timestamp $http_x_ml_timestamp;
+```
+
 ## Troubleshooting
 
 ### Issue: 401 Unauthorized (OAuth)

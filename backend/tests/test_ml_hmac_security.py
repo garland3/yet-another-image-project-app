@@ -8,6 +8,7 @@ import hashlib
 import time
 import json
 import pytest
+from unittest.mock import patch
 
 
 def _generate_hmac_signature(body: bytes, secret: str, timestamp: str = None) -> tuple[dict, str]:
@@ -28,8 +29,8 @@ def _generate_hmac_signature(body: bytes, secret: str, timestamp: str = None) ->
     return headers, ts
 
 
-def test_valid_hmac_signature_accepted(client, monkeypatch):
-    """Test that valid HMAC signatures are accepted."""
+def test_dual_auth_valid_api_key_and_hmac_accepted(client, monkeypatch):
+    """Test that dual auth (valid API key + valid HMAC) is accepted."""
     from core import config as cfg
     import os
 
@@ -38,19 +39,26 @@ def test_valid_hmac_signature_accepted(client, monkeypatch):
     monkeypatch.setenv('ML_CALLBACK_HMAC_SECRET', 'test_secret_123')
     monkeypatch.setattr('routers.ml_analyses.settings.ML_PIPELINE_REQUIRE_HMAC', True)
 
+    # Create API key
+    api_key_resp = client.post('/api/api-keys/', json={"name": "test_key", "description": "Test key"}).json()
+    api_key = api_key_resp['key']
+
     # Create test data
     proj = client.post('/api/projects/', json={"name":"HMACTest","description":"d","meta_group_id":"data-scientists"}).json()
     img = client.post(f"/api/projects/{proj['id']}/images", files={'file': ('f.png', b'\x89PNG\r\n', 'image/png')}, data={'metadata':'{}'}).json()
     analysis = client.post(f"/api/images/{img['id']}/analyses", json={"image_id": img['id'], "model_name":"resnet50_classifier","model_version":"1","parameters":{}}).json()
 
-    # Test valid HMAC on bulk annotations endpoint
+    # Test valid dual auth on bulk annotations endpoint
     body = {"annotations":[{"annotation_type":"classification","class_name":"cat","confidence":0.9,"data":{"score":0.9}}]}
     body_bytes = json.dumps(body).encode('utf-8')
     headers, ts = _generate_hmac_signature(body_bytes, 'test_secret_123')
-    headers['Content-Type'] = 'application/json'
+    headers.update({
+        'Content-Type': 'application/json',
+        'Authorization': f'Bearer {api_key}'  # Add API key auth
+    })
 
     resp = client.post(f"/api/analyses/{analysis['id']}/annotations:bulk", data=body_bytes, headers=headers)
-    assert resp.status_code == 200, f"Valid HMAC should be accepted: {resp.text}"
+    assert resp.status_code == 200, f"Valid dual auth should be accepted: {resp.text}"
 
 
 def test_invalid_hmac_signature_rejected(client, monkeypatch):
@@ -245,6 +253,57 @@ def test_hmac_disabled_allows_requests(client, monkeypatch):
 
     resp = client.post(f"/api/analyses/{analysis['id']}/annotations:bulk", data=body_bytes, headers={'Content-Type': 'application/json'})
     assert resp.status_code == 200, "Request without HMAC should be allowed when HMAC is disabled"
+
+
+def test_dual_auth_requires_both_api_key_and_hmac(client, monkeypatch):
+    """Test that dual auth requires BOTH API key AND HMAC (neither alone is sufficient)."""
+    from core import config as cfg
+    import os
+    from fastapi import HTTPException
+
+    secret = 'test_secret_dual'
+    monkeypatch.setattr('routers.ml_analyses.settings.ML_CALLBACK_HMAC_SECRET', secret)
+    monkeypatch.setenv('ML_CALLBACK_HMAC_SECRET', 'test_secret_dual')
+    monkeypatch.setattr('routers.ml_analyses.settings.ML_PIPELINE_REQUIRE_HMAC', True)
+
+    # Create API key
+    api_key_resp = client.post('/api/api-keys/', json={"name": "test_key", "description": "Test key"}).json()
+    api_key = api_key_resp['key']
+
+    # Create test data
+    proj = client.post('/api/projects/', json={"name":"DualAuthTest","description":"d","meta_group_id":"data-scientists"}).json()
+    img = client.post(f"/api/projects/{proj['id']}/images", files={'file': ('f.png', b'\x89PNG\r\n', 'image/png')}, data={'metadata':'{}'}).json()
+    analysis = client.post(f"/api/images/{img['id']}/analyses", json={"image_id": img['id'], "model_name":"resnet50_classifier","model_version":"1","parameters":{}}).json()
+
+    body = {"annotations":[{"annotation_type":"classification","class_name":"test","confidence":0.5,"data":{"score":0.5}}]}
+    body_bytes = json.dumps(body).encode('utf-8')
+
+    # Test 1: Valid HMAC but NO API key (should fail - user auth fails)
+    # Temporarily disable SKIP_HEADER_CHECK to make auth requirement strict
+    monkeypatch.setattr('backend.middleware.auth.settings', cfg.settings.patch({'SKIP_HEADER_CHECK': False}))
+    with patch.object(cfg.settings, 'SKIP_HEADER_CHECK', False), \
+         patch.object(cfg.settings, 'DEBUG', False):
+        headers_hmac_only, _ = _generate_hmac_signature(body_bytes, 'test_secret_dual')
+        headers_hmac_only['Content-Type'] = 'application/json'
+        resp = client.post(f"/api/analyses/{analysis['id']}/annotations:bulk", data=body_bytes, headers=headers_hmac_only)
+        assert resp.status_code == 401, "Valid HMAC without API key should be rejected"
+
+    # Test 2: Valid API key but NO HMAC (should fail)
+    headers_api_only = {
+        'Content-Type': 'application/json',
+        'Authorization': f'Bearer {api_key}'
+    }
+    resp = client.post(f"/api/analyses/{analysis['id']}/annotations:bulk", data=body_bytes, headers=headers_api_only)
+    assert resp.status_code == 401, "Valid API key without HMAC should be rejected"
+
+    # Test 3: Invalid API key with valid HMAC (should fail - user auth fails first)
+    headers_invalid_api, _ = _generate_hmac_signature(body_bytes, 'test_secret_dual')
+    headers_invalid_api.update({
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer invalid_key_123'
+    })
+    resp = client.post(f"/api/analyses/{analysis['id']}/annotations:bulk", data=body_bytes, headers=headers_invalid_api)
+    assert resp.status_code == 401, "Invalid API key with valid HMAC should be rejected"
 
 
 def test_hmac_test_vectors():

@@ -45,7 +45,7 @@ class HeatmapPipeline:
         self.session.headers.update({'X-User-Email': self.user_email})
 
         if self.api_key:
-            self.session.headers.update({'X-API-Key': self.api_key})
+            self.session.headers.update({'Authorization': f'Bearer {self.api_key}'})
 
     def _generate_hmac_signature(self, body: str) -> tuple[str, str]:
         """Generate HMAC signature for ML pipeline authentication"""

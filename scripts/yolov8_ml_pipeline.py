@@ -65,7 +65,15 @@ class YOLOv8Pipeline:
         return signature, timestamp
 
     def _make_hmac_request(self, method: str, url: str, json_data: Dict[str, Any]) -> requests.Response:
-        """Make authenticated request with HMAC signature"""
+        """Make authenticated request with HMAC signature
+
+        HMAC requests require TWO layers of authentication:
+        1. User authentication (API key OR user email headers)
+        2. HMAC signature (proves request is from authorized ML pipeline)
+
+        This prevents unauthorized pipelines from making callbacks, even if they
+        have valid user credentials.
+        """
         body = json.dumps(json_data, separators=(',', ':'))
         signature, timestamp = self._generate_hmac_signature(body)
 
@@ -75,8 +83,15 @@ class YOLOv8Pipeline:
             'Content-Type': 'application/json'
         }
 
-        # Don't use session (which has user headers) for HMAC requests
-        # HMAC endpoints use their own auth mechanism
+        # Add user authentication headers
+        # Prefer API key if available, otherwise use user email (for dev/testing)
+        if self.api_key:
+            headers['Authorization'] = f'Bearer {self.api_key}'
+        else:
+            # For dev/testing without API key - assumes DEBUG=true on backend
+            headers['X-User-Email'] = self.user_email
+
+        # Make request with both auth layers
         response = requests.request(
             method=method,
             url=url,
