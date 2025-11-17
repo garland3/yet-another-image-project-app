@@ -48,7 +48,37 @@ class YOLOv8Pipeline:
         self.session.headers.update({'X-User-Email': self.user_email})
 
         if self.api_key:
-            self.session.headers.update({'X-API-Key': self.api_key})
+            self.session.headers.update({'Authorization': f'Bearer {self.api_key}'})
+
+    def _get_api_url(self, path: str) -> str:
+        """
+        Build URL for regular API endpoint (non-HMAC).
+        Uses /api-key prefix when using API key, /api when using OAuth.
+
+        Args:
+            path: API path (e.g., "/projects/123/images")
+
+        Returns:
+            Full URL with appropriate prefix
+        """
+        path = path.lstrip('/')
+        # Use /api-key prefix if we have an API key, otherwise /api (OAuth)
+        prefix = "api-key" if self.api_key else "api"
+        return f"{self.api_base_url}/{prefix}/{path}"
+
+    def _get_ml_url(self, path: str) -> str:
+        """
+        Build URL for ML pipeline endpoint.
+        Uses /api-ml prefix which requires API key + HMAC authentication.
+
+        Args:
+            path: API path (e.g., "/analyses/123/status")
+
+        Returns:
+            Full URL with /api-ml prefix
+        """
+        path = path.lstrip('/')
+        return f"{self.api_base_url}/api-ml/{path}"
 
     def _generate_hmac_signature(self, body: str) -> tuple[str, str]:
         """Generate HMAC signature for ML pipeline authentication"""
@@ -111,7 +141,7 @@ class YOLOv8Pipeline:
         """Fetch images from a project"""
         print(f"X Fetching images from project {project_id}")
 
-        url = f"{self.api_base_url}/api/projects/{project_id}/images"
+        url = self._get_api_url(f"projects/{project_id}/images")
         params = {'skip': 0, 'limit': limit}
 
         response = self.session.get(url, params=params)
@@ -123,7 +153,7 @@ class YOLOv8Pipeline:
 
     def get_image_analyses(self, image_id: str) -> List[Dict[str, Any]]:
         """Fetch existing analyses for an image"""
-        url = f"{self.api_base_url}/api/images/{image_id}/analyses"
+        url = self._get_api_url(f"images/{image_id}/analyses")
 
         try:
             response = self.session.get(url)
@@ -140,7 +170,7 @@ class YOLOv8Pipeline:
         print(f"  X Downloading image {image_id}")
 
         # First, get the download info (returns JSON with URL)
-        info_url = f"{self.api_base_url}/api/images/{image_id}/download"
+        info_url = self._get_api_url(f"images/{image_id}/download")
         info_response = self.session.get(info_url)
         info_response.raise_for_status()
 
@@ -152,9 +182,11 @@ class YOLOv8Pipeline:
 
         # Now download the actual image content
         if not content_url.startswith('http'):
-            # Ensure the content URL has /api prefix if it doesn't
-            if not content_url.startswith('/api/'):
-                content_url = f"/api{content_url}"
+            # Ensure the content URL has proper API prefix if it's a relative path
+            if not content_url.startswith(('/api/', '/api-key/', '/api-ml/')):
+                # Prepend appropriate prefix for relative URLs
+                prefix = "api-key" if self.api_key else "api"
+                content_url = f"/{prefix}{content_url}"
             content_url = f"{self.api_base_url}{content_url}"
 
         response = self.session.get(content_url, stream=True)
@@ -195,7 +227,7 @@ class YOLOv8Pipeline:
         """Create ML analysis entry"""
         print(f"  X Creating analysis for image {image_id}")
 
-        url = f"{self.api_base_url}/api/images/{image_id}/analyses"
+        url = self._get_api_url(f"images/{image_id}/analyses")
         data = {
             "image_id": image_id,  # Include image_id in request body
             "model_name": "yolo_v8",
@@ -223,7 +255,7 @@ class YOLOv8Pipeline:
         """Update analysis status"""
         print(f"  X Updating analysis status to: {status}")
 
-        url = f"{self.api_base_url}/api/analyses/{analysis_id}/status"
+        url = self._get_ml_url(f"analyses/{analysis_id}/status")
         data = {"status": status}
 
         response = self._make_hmac_request('PATCH', url, data)
@@ -300,7 +332,7 @@ class YOLOv8Pipeline:
         print(f"  X Uploading {artifact_type}: {filename}")
 
         # Get presigned URL
-        url = f"{self.api_base_url}/api/analyses/{analysis_id}/artifacts/presign"
+        url = self._get_ml_url(f"analyses/{analysis_id}/artifacts/presign")
         presign_data = {
             "artifact_type": artifact_type,
             "filename": filename
@@ -370,7 +402,7 @@ class YOLOv8Pipeline:
             "ordering": len(detections)
         })
 
-        url = f"{self.api_base_url}/api/analyses/{analysis_id}/annotations:bulk"
+        url = self._get_ml_url(f"analyses/{analysis_id}/annotations:bulk")
         data = {
             "annotations": annotations,
             "mode": "append"
@@ -385,7 +417,7 @@ class YOLOv8Pipeline:
         """Finalize analysis"""
         print(f"  X Finalizing analysis as {status}")
 
-        url = f"{self.api_base_url}/api/analyses/{analysis_id}/finalize"
+        url = self._get_ml_url(f"analyses/{analysis_id}/finalize")
         data = {"status": status}
         if error_message:
             data["error_message"] = error_message

@@ -19,7 +19,7 @@ def sanitize_for_log(value: str) -> str:
         value = str(value)
     return value.replace('\r', '').replace('\n', '')
 
-router = APIRouter(prefix="/api", tags=["ML Analyses"])
+router = APIRouter(tags=["ML Analyses"])
 
 
 # Dependency to get cached request body

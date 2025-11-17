@@ -9,7 +9,6 @@ from core.group_auth_helper import is_user_in_group
 from utils.dependencies import get_current_user
 
 router = APIRouter(
-    prefix="/api/users",
     tags=["Users"],
 )
 

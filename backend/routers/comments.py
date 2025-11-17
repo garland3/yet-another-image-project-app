@@ -8,7 +8,6 @@ from core.database import get_db
 from utils.dependencies import get_current_user, get_user_context, UserContext, get_image_or_403
 
 router = APIRouter(
-    prefix="/api",
     tags=["Comments"],
 )
 

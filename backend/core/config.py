@@ -93,6 +93,17 @@ class Settings(BaseSettings):
         import json
         return json.loads(self.MOCK_USER_GROUPS_JSON)
 
+    def patch(self, updates: dict):
+        """Return a shallow patched copy of settings with provided overrides.
+
+        Does not mutate the original instance. Intended for tests where
+        monkeypatch.setattr(module_path, settings.patch({...})) is used.
+        """
+        if not isinstance(updates, dict):
+            raise TypeError("updates must be a dict")
+        # Pydantic v2 provides model_copy for efficient cloning
+        return self.model_copy(update=updates)
+
 def _running_in_docker() -> bool:
     # Basic heuristics to detect containerized runtime
     return os.path.exists('/.dockerenv') or os.environ.get('IN_DOCKER') == '1'

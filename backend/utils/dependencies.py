@@ -360,3 +360,105 @@ async def get_user_context(
     # Ensure user ID is resolved
     await resolve_user_id(current_user, db)
     return UserContext(current_user)
+
+
+async def require_api_key(
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+    api_user: Optional[User] = Depends(get_user_from_api_key)
+) -> User:
+    """
+    Require API key authentication only (no header-based auth).
+    Used for /api-key endpoints (scripts, automation, CLI tools).
+
+    Args:
+        request: FastAPI request object
+        db: Database session
+        api_user: User from API key (if valid key was provided)
+
+    Returns:
+        Authenticated User object
+
+    Raises:
+        HTTPException 401: If no valid API key is provided
+    """
+    if not api_user:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="API key required for /api-key endpoints. Include 'Authorization: Bearer <api-key>' header.",
+        )
+    return api_user
+
+
+async def get_raw_body(request: Request) -> bytes:
+    """
+    Get raw request body from cache.
+    The BodyCacheMiddleware caches the body early in the request lifecycle.
+    Used for HMAC verification - this is imported from ML analysis router.
+    """
+    if hasattr(request.state, "cached_body"):
+        return request.state.cached_body
+    # Fallback for non-cached requests (shouldn't happen for POST/PATCH/PUT)
+    return await request.body()
+
+
+async def require_hmac_auth(
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+    body_bytes: bytes = Depends(get_raw_body)
+) -> User:
+    """
+    Require both user authentication AND HMAC signature.
+    Used for /api-ml endpoints (ML pipelines).
+
+    This implements dual-layer security:
+    1. User authentication (via API key or header-based auth)
+    2. HMAC signature verification (proves authorized pipeline)
+
+    Args:
+        request: FastAPI request object
+        db: Database session
+        current_user: Authenticated user (via get_current_user dependency)
+        body_bytes: Raw request body for HMAC verification
+
+    Returns:
+        Authenticated User object (if both layers pass)
+
+    Raises:
+        HTTPException 500: If HMAC secret not configured
+        HTTPException 401: If HMAC signature is invalid or missing
+    """
+    # User is already authenticated via get_current_user dependency
+    # Now verify HMAC signature
+
+    if not settings.ML_CALLBACK_HMAC_SECRET:
+        logger.error("HMAC authentication required but ML_CALLBACK_HMAC_SECRET not configured")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="HMAC authentication not configured on server"
+        )
+
+    # Extract HMAC headers
+    signature = request.headers.get("X-ML-Signature", "")
+    timestamp = request.headers.get("X-ML-Timestamp", "0")
+
+    # Verify signature
+    if not verify_hmac_signature_flexible(
+        settings.ML_CALLBACK_HMAC_SECRET,
+        body_bytes,
+        timestamp,
+        signature
+    ):
+        logger.warning("HMAC signature verification failed", extra={
+            "user": current_user.email,
+            "path": request.url.path,
+            "has_signature": bool(signature),
+            "has_timestamp": bool(timestamp and timestamp != "0")
+        })
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid HMAC signature. Include 'X-ML-Signature' and 'X-ML-Timestamp' headers."
+        )
+
+    return current_user

@@ -21,7 +21,6 @@ import json as _json
 from PIL import Image
 
 router = APIRouter(
-    prefix="/api",
     tags=["Images"],
 )
 

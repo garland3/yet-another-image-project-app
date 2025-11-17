@@ -60,6 +60,12 @@ async def auth_middleware(request: Request, call_next):
             if not hasattr(request.state, 'is_authenticated'):
                 request.state.is_authenticated = False  # type: ignore
             return await call_next(request)
+
+        # Skip middleware auth for /api-key and /api-ml routes - dependencies will handle authentication
+        if path.startswith("/api-key") or path.startswith("/api-ml"):
+            if not hasattr(request.state, 'is_authenticated'):
+                request.state.is_authenticated = False  # type: ignore
+            return await call_next(request)
         # Case-insensitive headers
         headers = {k.lower(): v for k, v in request.headers.items()}
 
