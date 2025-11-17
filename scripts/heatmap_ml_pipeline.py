@@ -14,8 +14,15 @@ import hmac
 import hashlib
 import time
 import argparse
+from pathlib import Path
 from typing import List, Dict, Any, Optional
 from io import BytesIO
+
+from dotenv import load_dotenv
+
+# Load environment variables from .env file in project root
+project_root = Path(__file__).parent.parent
+load_dotenv(project_root / '.env')
 
 import requests
 from PIL import Image
