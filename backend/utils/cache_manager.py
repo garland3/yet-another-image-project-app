@@ -3,6 +3,9 @@ from pathlib import Path
 from typing import Optional, Any
 from diskcache import Cache
 from core.config import settings
+import logging
+
+logger = logging.getLogger(__name__)
 
 class CacheManager:
     """Simple wrapper around diskcache with project-specific configuration."""
@@ -104,15 +107,29 @@ class CacheManager:
 import threading
 
 # Global cache manager instance with thread lock
-_cache_manager: Optional[CacheManager] = None
+_cache_manager: Optional[Any] = None
 _cache_lock = threading.Lock()
 
-def get_cache() -> CacheManager:
-    """Get or create the global cache manager instance (thread-safe)."""
+def get_cache():
+    """Get or create the global cache manager instance (thread-safe).
+    
+    Returns Redis cache if REDIS_ENABLED=true, otherwise returns disk cache.
+    Falls back to disk cache if Redis is unavailable.
+    """
     global _cache_manager
     if _cache_manager is None:
         with _cache_lock:
             # Double-check locking pattern
             if _cache_manager is None:
-                _cache_manager = CacheManager()
+                if settings.REDIS_ENABLED:
+                    try:
+                        from utils.redis_cache import RedisCacheManager
+                        _cache_manager = RedisCacheManager()
+                        logger.info("Using Redis cache backend")
+                    except Exception as e:
+                        logger.warning(f"Redis cache initialization failed, falling back to disk cache: {e}")
+                        _cache_manager = CacheManager()
+                else:
+                    _cache_manager = CacheManager()
+                    logger.info("Using disk cache backend")
     return _cache_manager
