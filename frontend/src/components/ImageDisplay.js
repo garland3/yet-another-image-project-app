@@ -22,6 +22,8 @@ function ImageDisplay({
   overlayOptions,
   userAnnotations = [],
   annotationMode = false,
+  showUserAnnotations = true,
+  availableClasses = [],
   onAnnotationsChange
 }) {
   const [zoomLevel, setZoomLevel] = useState(1);
@@ -314,14 +316,15 @@ function ImageDisplay({
           />
         </div>
       )}
-      {/* User Annotation Tool - always show if we have user annotations or annotation mode is enabled */}
-      {image && displaySize.width > 0 && (userAnnotations.length > 0 || annotationMode) && (
+      {/* User Annotation Tool - show when visibility enabled or in annotation mode */}
+      {image && displaySize.width > 0 && showUserAnnotations && (userAnnotations.length > 0 || annotationMode) && (
         <div style={{ transform: `scale(${zoomLevel})`, transformOrigin: 'top left', position: 'absolute', top: 0, left: 0 }}>
           <UserAnnotationTool
             imageId={imageId}
             naturalSize={{ width: image.width, height: image.height }}
             displaySize={displaySize}
             userAnnotations={userAnnotations}
+            availableClasses={availableClasses}
             onAnnotationsChange={onAnnotationsChange}
             enabled={annotationMode}
           />

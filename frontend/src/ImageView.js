@@ -64,6 +64,10 @@ function ImageView() {
   // User annotation state
   const [userAnnotations, setUserAnnotations] = useState([]);
   const [annotationMode, setAnnotationMode] = useState(false);
+  const [showUserAnnotations, setShowUserAnnotations] = useState(() => {
+    const saved = localStorage.getItem('showUserAnnotations');
+    return saved !== 'false'; // Default to true (show annotations)
+  });
 
   // ML analysis selection handler
   const handleMLAnalysisSelect = useCallback((data) => {
@@ -298,6 +302,11 @@ function ImageView() {
     localStorage.setItem('mlAutoSelectLatest', autoSelectLatest.toString());
   }, [autoSelectLatest]);
 
+  // Save show user annotations preference to localStorage
+  useEffect(() => {
+    localStorage.setItem('showUserAnnotations', showUserAnnotations.toString());
+  }, [showUserAnnotations]);
+
   // Handle resize functionality
   const handleMouseDown = useCallback(() => {
     setIsResizing(true);
@@ -420,8 +429,23 @@ function ImageView() {
               {/* User Annotation Toggle */}
               <div className="section-card" style={{ marginBottom: '1rem' }}>
                 <div className="section-header" style={{ marginBottom: '0.5rem' }}>
-                  <h3>Annotations</h3>
+                  <h3>User Annotations</h3>
                 </div>
+                
+                {/* Visibility toggle */}
+                <div style={{ marginBottom: '0.5rem' }}>
+                  <label style={{ display: 'flex', alignItems: 'center', cursor: 'pointer' }}>
+                    <input
+                      type="checkbox"
+                      checked={showUserAnnotations}
+                      onChange={(e) => setShowUserAnnotations(e.target.checked)}
+                      style={{ marginRight: '8px' }}
+                    />
+                    <span style={{ fontSize: '14px' }}>Show annotations</span>
+                  </label>
+                </div>
+                
+                {/* Draw mode button */}
                 <button
                   onClick={() => setAnnotationMode(!annotationMode)}
                   style={{
@@ -433,19 +457,21 @@ function ImageView() {
                     borderRadius: '4px',
                     cursor: 'pointer',
                     fontSize: '14px',
-                    fontWeight: 'bold'
+                    fontWeight: 'bold',
+                    marginBottom: '0.5rem'
                   }}
                 >
-                  {annotationMode ? 'Exit Annotation Mode' : 'Draw Annotations'}
+                  {annotationMode ? 'Exit Draw Mode' : 'Draw New Annotation'}
                 </button>
+                
                 {annotationMode && (
-                  <p style={{ marginTop: '0.5rem', fontSize: '12px', color: '#666' }}>
-                    Click and drag on the image to draw bounding boxes. Click a box to edit or delete it.
+                  <p style={{ marginTop: '0', marginBottom: '0.5rem', fontSize: '12px', color: '#666' }}>
+                    Click and drag on the image to draw bounding boxes. Select a label from available classes.
                   </p>
                 )}
                 {userAnnotations.length > 0 && (
-                  <p style={{ marginTop: '0.5rem', fontSize: '12px', color: '#666' }}>
-                    {userAnnotations.length} annotation{userAnnotations.length !== 1 ? 's' : ''}
+                  <p style={{ marginTop: '0', fontSize: '12px', color: '#666' }}>
+                    {userAnnotations.length} annotation{userAnnotations.length !== 1 ? 's' : ''} on this image
                   </p>
                 )}
               </div>
@@ -497,6 +523,8 @@ function ImageView() {
                 overlayOptions={overlayOptions}
                 userAnnotations={userAnnotations}
                 annotationMode={annotationMode}
+                showUserAnnotations={showUserAnnotations}
+                availableClasses={classes}
                 onAnnotationsChange={setUserAnnotations}
               />
             </div>

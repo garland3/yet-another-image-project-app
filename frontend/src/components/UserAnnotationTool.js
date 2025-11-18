@@ -16,6 +16,7 @@ export default function UserAnnotationTool({
   naturalSize,
   displaySize,
   userAnnotations = [],
+  availableClasses = [],
   onAnnotationsChange,
   enabled = false
 }) {
@@ -23,6 +24,7 @@ export default function UserAnnotationTool({
   const [currentBox, setCurrentBox] = useState(null);
   const [editingAnnotation, setEditingAnnotation] = useState(null);
   const [labelInput, setLabelInput] = useState('');
+  const [selectedClassId, setSelectedClassId] = useState('');
   const canvasRef = useRef(null);
 
   // Reset state when disabled
@@ -32,6 +34,7 @@ export default function UserAnnotationTool({
       setCurrentBox(null);
       setEditingAnnotation(null);
       setLabelInput('');
+      setSelectedClassId('');
     }
   }, [enabled]);
 
@@ -126,11 +129,20 @@ export default function UserAnnotationTool({
   const handleSaveLabel = async () => {
     if (!editingAnnotation) return;
     
+    // Get the label from selected class or custom input
+    let finalLabel = labelInput;
+    if (selectedClassId && availableClasses.length > 0) {
+      const selectedClass = availableClasses.find(c => c.id === selectedClassId);
+      if (selectedClass) {
+        finalLabel = selectedClass.name;
+      }
+    }
+    
     try {
       const response = await fetch(`/api/annotations/${editingAnnotation.id}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ label: labelInput || null })
+        body: JSON.stringify({ label: finalLabel || null })
       });
       
       if (!response.ok) {
@@ -151,6 +163,7 @@ export default function UserAnnotationTool({
       
       setEditingAnnotation(null);
       setLabelInput('');
+      setSelectedClassId('');
     } catch (error) {
       console.error('Error updating label:', error);
     }
@@ -213,6 +226,13 @@ export default function UserAnnotationTool({
               e.stopPropagation();
               setEditingAnnotation(annotation);
               setLabelInput(annotation.label || '');
+              // Try to find matching class
+              if (annotation.label && availableClasses.length > 0) {
+                const matchingClass = availableClasses.find(c => c.name === annotation.label);
+                setSelectedClassId(matchingClass ? matchingClass.id : '');
+              } else {
+                setSelectedClassId('');
+              }
             }}
           >
             {annotation.label && (
@@ -300,18 +320,64 @@ export default function UserAnnotationTool({
           borderRadius: '8px',
           boxShadow: '0 4px 12px rgba(0,0,0,0.3)',
           zIndex: 1000,
-          minWidth: '300px'
+          minWidth: '350px',
+          maxWidth: '90vw'
         }}>
           <h3 style={{ marginTop: 0 }}>Edit Annotation</h3>
+          
+          {/* Class dropdown if classes are available */}
+          {availableClasses.length > 0 && (
+            <div style={{ marginBottom: '15px' }}>
+              <label style={{ display: 'block', marginBottom: '5px', fontWeight: 'bold' }}>
+                Select Class:
+              </label>
+              <select
+                value={selectedClassId}
+                onChange={(e) => {
+                  setSelectedClassId(e.target.value);
+                  // Update label input with selected class name
+                  if (e.target.value) {
+                    const selectedClass = availableClasses.find(c => c.id === e.target.value);
+                    if (selectedClass) {
+                      setLabelInput(selectedClass.name);
+                    }
+                  }
+                }}
+                style={{
+                  width: '100%',
+                  padding: '8px',
+                  border: '1px solid #ddd',
+                  borderRadius: '4px',
+                  fontSize: '14px'
+                }}
+              >
+                <option value="">-- Select a class --</option>
+                {availableClasses.map(cls => (
+                  <option key={cls.id} value={cls.id}>{cls.name}</option>
+                ))}
+              </select>
+            </div>
+          )}
+          
+          {/* Custom label input */}
           <div style={{ marginBottom: '15px' }}>
             <label style={{ display: 'block', marginBottom: '5px', fontWeight: 'bold' }}>
-              Label:
+              {availableClasses.length > 0 ? 'Or Custom Label:' : 'Label:'}
             </label>
             <input
               type="text"
               value={labelInput}
-              onChange={(e) => setLabelInput(e.target.value)}
-              placeholder="Enter label (optional)"
+              onChange={(e) => {
+                setLabelInput(e.target.value);
+                // Clear class selection if custom label is entered
+                if (e.target.value && selectedClassId) {
+                  const selectedClass = availableClasses.find(c => c.id === selectedClassId);
+                  if (selectedClass && selectedClass.name !== e.target.value) {
+                    setSelectedClassId('');
+                  }
+                }
+              }}
+              placeholder="Enter custom label (optional)"
               style={{
                 width: '100%',
                 padding: '8px',
@@ -319,9 +385,10 @@ export default function UserAnnotationTool({
                 borderRadius: '4px',
                 fontSize: '14px'
               }}
-              autoFocus
+              autoFocus={availableClasses.length === 0}
             />
           </div>
+          
           <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end' }}>
             <button
               onClick={() => handleDeleteAnnotation(editingAnnotation.id)}
@@ -340,6 +407,7 @@ export default function UserAnnotationTool({
               onClick={() => {
                 setEditingAnnotation(null);
                 setLabelInput('');
+                setSelectedClassId('');
               }}
               style={{
                 padding: '8px 16px',
@@ -384,6 +452,7 @@ export default function UserAnnotationTool({
           onClick={() => {
             setEditingAnnotation(null);
             setLabelInput('');
+            setSelectedClassId('');
           }}
         />
       )}
