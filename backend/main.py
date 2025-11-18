@@ -203,28 +203,24 @@ def create_app() -> FastAPI:
         dependencies=[Depends(require_hmac_auth)]
     )
 
-    # Standardized router registration: define once, register across all prefixes
+    # Standardized router registration: define once, register across all prefixes.
+    # Routers are written with paths relative to their resource, and we apply
+    # consistent prefixes here to keep the routing table easy to reason about.
     routers_config = [
         {"router": projects.router, "prefix": "/projects"},
-        {"router": images.router, "prefix": None},  # full paths include /projects
+        {"router": images.router, "prefix": "/projects"},
         {"router": users.router, "prefix": "/users"},
-        {"router": image_classes.router, "prefix": None},
-        {"router": comments.router, "prefix": None},
-        {"router": project_metadata.router, "prefix": None},
-        {"router": api_keys.router, "prefix": None},
-        {"router": ml_analyses.router, "prefix": None},
+        {"router": image_classes.router, "prefix": "/image-classes"},
+        {"router": comments.router, "prefix": "/comments"},
+        {"router": project_metadata.router, "prefix": "/project-metadata"},
+        {"router": api_keys.router, "prefix": "/api-keys"},
+        {"router": ml_analyses.router, "prefix": "/ml-analyses"},
     ]
 
     for cfg in routers_config:
-        prefix = cfg["prefix"]
-        if prefix:
-            api_router.include_router(cfg["router"], prefix=prefix)
-            api_key_router.include_router(cfg["router"], prefix=prefix)
-            api_ml_router.include_router(cfg["router"], prefix=prefix)
-        else:
-            api_router.include_router(cfg["router"])
-            api_key_router.include_router(cfg["router"])
-            api_ml_router.include_router(cfg["router"])
+        api_router.include_router(cfg["router"], prefix=cfg["prefix"])
+        api_key_router.include_router(cfg["router"], prefix=cfg["prefix"])
+        api_ml_router.include_router(cfg["router"], prefix=cfg["prefix"])
 
     # Add health check endpoint (no auth required)
     @app.get("/api/health")
