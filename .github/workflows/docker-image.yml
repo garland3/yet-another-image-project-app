@@ -174,7 +174,7 @@ jobs:
           -e POSTGRES_DB=postgres \
           -e POSTGRES_SERVER=localhost \
           ${{ env.DOCKER_USERNAME }}/${{ env.DOCKER_IMAGE_NAME }}:latest \
-          bash -c "bash ../test/run_tests.sh"
+          bash -c "bash ../test/run_tests.sh --backend"
 
     - name: Push Docker image
       if: github.event_name != 'pull_request'
