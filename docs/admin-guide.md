@@ -13,8 +13,9 @@ This administrator guide is organized into the following sections:
 3. **[Authentication & Security](admin/authentication.md)** - Reverse proxy setup, authentication, security hardening
 4. **[Database Management](admin/database.md)** - Migrations, backups, maintenance
 5. **[Storage Configuration](admin/storage.md)** - S3/MinIO setup and management
-6. **[Monitoring & Maintenance](admin/monitoring.md)** - Logging, health checks, updates
-7. **[Troubleshooting](admin/troubleshooting.md)** - Common issues and solutions
+6. **[Caching System](admin/caching.md)** - Disk cache and Redis cache configuration
+7. **[Monitoring & Maintenance](admin/monitoring.md)** - Logging, health checks, updates
+8. **[Troubleshooting](admin/troubleshooting.md)** - Common issues and solutions
 
 ### Quick Links
 

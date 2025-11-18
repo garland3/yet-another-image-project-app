@@ -236,16 +236,137 @@ LOG_JSON=true
 
 ## Cache Configuration
 
+The application supports two caching backends: **disk cache** (default) and **Redis** (optional).
+
+### Disk Cache (Default)
+
+Disk cache is enabled by default and requires no additional setup.
+
 ```bash
-# Cache TTL in seconds
-CACHE_TTL=300                          # 5 minutes
-
-# Thumbnail cache directory
-THUMBNAIL_CACHE_DIR=/tmp/thumbnail-cache
-
 # Cache size limit (MB)
 CACHE_SIZE_MB=1000
+
+# Redis disabled (default)
+REDIS_ENABLED=false
 ```
+
+**Disk cache characteristics:**
+- Zero configuration required
+- Suitable for single-instance deployments
+- Data persists in `backend/_cache/` directory
+- LRU (Least Recently Used) eviction policy
+
+### Redis Cache (Optional)
+
+Redis provides better performance for distributed deployments and allows cache sharing across multiple application instances.
+
+```bash
+# Enable Redis cache
+REDIS_ENABLED=true
+
+# Redis connection settings
+REDIS_HOST=localhost
+REDIS_PORT=6379
+REDIS_DB=0
+
+# Redis password (optional, for secured Redis instances)
+REDIS_PASSWORD=your-redis-password
+```
+
+**Redis cache characteristics:**
+- Shared cache across multiple application instances
+- Better performance for distributed deployments
+- Automatic fallback to disk cache if Redis is unavailable
+- Requires Redis server (see setup below)
+
+### Starting Redis with Docker Compose
+
+For development and testing:
+
+```bash
+# Start Redis alongside other services
+docker compose up -d redis
+
+# Verify Redis is running
+docker compose ps redis
+```
+
+### Production Redis Setup
+
+**Using Docker:**
+```bash
+docker run -d \
+  --name redis \
+  -p 6379:6379 \
+  -v redis_data:/data \
+  redis:7-alpine redis-server --appendonly yes
+```
+
+**Using managed Redis:**
+- AWS ElastiCache
+- Azure Cache for Redis
+- Google Cloud Memorystore
+- Redis Cloud
+
+Configure the connection in `.env`:
+```bash
+REDIS_ENABLED=true
+REDIS_HOST=your-redis-host.example.com
+REDIS_PORT=6379
+REDIS_PASSWORD=your-secure-password
+```
+
+### Cache Behavior
+
+The cache is used for:
+- Project image listings
+- Image metadata
+- Thumbnail data
+- API responses for frequently accessed data
+
+**Cache invalidation:**
+- Automatically cleared when data is modified (create, update, delete operations)
+- Pattern-based clearing for related cache entries
+- Manual clearing via admin endpoints (if available)
+
+**Cache keys format:**
+```
+project_images:{project_id}:skip:{skip}:limit:{limit}:...
+image:{image_id}:metadata
+thumbnail:{image_id}:{size}
+```
+
+### Monitoring Cache Performance
+
+Check cache statistics programmatically:
+```python
+from utils.cache_manager import get_cache
+
+cache = get_cache()
+stats = cache.stats()
+
+# Returns:
+# {
+#   'size_bytes': 1234567,
+#   'size_mb': 1.18,
+#   'limit_mb': 1000,
+#   'usage_percent': 0.12,
+#   'count': 42  # number of cache entries
+# }
+```
+
+### Troubleshooting
+
+**Redis connection failures:**
+- Application automatically falls back to disk cache
+- Check logs for "Redis cache initialization failed, falling back to disk cache"
+- Verify Redis is running: `redis-cli ping` (should return "PONG")
+- Check firewall rules if Redis is on another host
+
+**Cache not being used:**
+- Verify `REDIS_ENABLED=true` is set correctly
+- Check application logs for cache backend initialization
+- Confirm Redis connectivity with `redis-cli -h <host> -p <port> ping`
 
 ## Deletion Configuration
 

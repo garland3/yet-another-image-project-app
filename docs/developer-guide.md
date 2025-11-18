@@ -262,11 +262,157 @@ User Request → Frontend (React)
 
 ### Caching Strategy
 
-Multi-layer caching for performance:
+The application uses a pluggable caching system that supports two backends:
 
-1. **Application Cache:** aiocache with TTL for API responses
-2. **Thumbnail Cache:** diskcache for resized images
-3. **Metadata Cache:** Project and image metadata
+#### Cache Backends
+
+**1. Disk Cache (Default):**
+- Uses `diskcache` library
+- LRU eviction policy
+- Suitable for single-instance deployments
+- No external dependencies required
+
+**2. Redis Cache (Optional):**
+- Uses `redis` library
+- Shared cache across multiple instances
+- Better performance for distributed deployments
+- Automatic fallback to disk cache if unavailable
+
+#### Using the Cache in Your Code
+
+The cache is accessed via a unified interface:
+
+```python
+from utils.cache_manager import get_cache
+
+# Get cache instance (returns Redis or disk cache based on configuration)
+cache = get_cache()
+
+# Set a cache entry
+cache.set("my_key", {"data": "value"}, expire=300)  # expire in 300 seconds
+
+# Get a cache entry
+result = cache.get("my_key", default=None)
+
+# Delete a cache entry
+cache.delete("my_key")
+
+# Clear entries matching a pattern
+cache.clear_pattern("project:123")  # clears all keys containing "project:123"
+
+# Get cache statistics
+stats = cache.stats()
+# Returns: {'size_bytes': 1234, 'size_mb': 0.01, 'limit_mb': 1000, 'usage_percent': 0.001, 'count': 5}
+```
+
+#### Cache Key Patterns
+
+Use consistent naming patterns for cache keys:
+
+```python
+# Project listings
+f"project_images:{project_id}:skip:{skip}:limit:{limit}:include_deleted:{include_deleted}"
+
+# Image metadata
+f"image:{image_id}:metadata"
+
+# Thumbnails
+f"thumbnail:{image_id}:{width}x{height}"
+
+# Analysis results
+f"analysis:{analysis_id}:results"
+```
+
+#### Cache Invalidation
+
+**Always invalidate cache when data changes:**
+
+```python
+from utils.cache_manager import get_cache
+
+cache = get_cache()
+
+# After creating/updating/deleting images in a project
+cache.clear_pattern(f"project_images:{project_id}")
+
+# After updating image metadata
+cache.delete(f"image:{image_id}:metadata")
+
+# After updating analysis results
+cache.clear_pattern(f"analysis:{analysis_id}")
+```
+
+**Example from `routers/images.py`:**
+
+```python
+@router.post("/projects/{project_id}/images")
+async def upload_image_to_project(
+    project_id: uuid.UUID,
+    file: UploadFile = File(...),
+    db: AsyncSession = Depends(get_db),
+    current_user: schemas.User = Depends(get_current_user),
+):
+    # ... upload logic ...
+    
+    # Invalidate project images cache after adding new image
+    cache = get_cache()
+    cache.clear_pattern(f"project_images:{project_id}")
+    
+    return db_data_instance
+```
+
+#### Configuring Cache Backend
+
+Cache backend is selected automatically based on `REDIS_ENABLED` setting:
+
+```python
+# In backend/utils/cache_manager.py
+def get_cache():
+    """Returns Redis cache if enabled, otherwise disk cache."""
+    if settings.REDIS_ENABLED:
+        try:
+            return RedisCacheManager()  # Try Redis
+        except Exception as e:
+            logger.warning(f"Redis failed, falling back to disk cache: {e}")
+            return CacheManager()  # Fallback to disk
+    else:
+        return CacheManager()  # Use disk cache
+```
+
+#### Cache Implementation Details
+
+**RedisCacheManager** (`utils/redis_cache.py`):
+- JSON serialization for complex types (dicts, lists)
+- Connection pooling with timeout/retry
+- SCAN-based pattern matching (production-safe)
+- Graceful error handling
+
+**CacheManager** (`utils/cache_manager.py`):
+- File-based storage in `backend/_cache/`
+- Size limit enforcement
+- Thread-safe singleton pattern
+
+#### Testing with Cache
+
+Tests should clear cache before/after to prevent test pollution:
+
+```python
+import pytest
+from utils.cache_manager import get_cache
+
+@pytest.fixture(autouse=True)
+def clear_cache():
+    """Clear cache before and after each test."""
+    cache = get_cache()
+    cache.clear()
+    yield
+    cache.clear()
+
+def test_with_cache():
+    cache = get_cache()
+    cache.set("test_key", "test_value")
+    assert cache.get("test_key") == "test_value"
+```
 
 Cache invalidation on mutations (create/update/delete).
 
