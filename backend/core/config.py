@@ -47,6 +47,13 @@ class Settings(BaseSettings):
     
     # Cache configuration
     CACHE_SIZE_MB: int = 1000
+    
+    # Redis cache configuration
+    REDIS_ENABLED: bool = False
+    REDIS_HOST: str = "localhost"
+    REDIS_PORT: int = 6379
+    REDIS_DB: int = 0
+    REDIS_PASSWORD: Optional[str] = None
 
     # ML Analysis settings
     ML_ANALYSIS_ENABLED: bool = True
@@ -73,7 +80,7 @@ class Settings(BaseSettings):
         'DEBUG', 'FAST_TEST_MODE', 'SKIP_HEADER_CHECK', 'S3_USE_SSL',
         'SECURITY_NOSNIFF_ENABLED', 'SECURITY_XFO_ENABLED',
         'SECURITY_REFERRER_POLICY_ENABLED', 'SECURITY_CSP_ENABLED',
-        'ENABLE_IMAGE_PURGE', 'USE_ALEMBIC_MIGRATIONS',
+        'ENABLE_IMAGE_PURGE', 'USE_ALEMBIC_MIGRATIONS', 'REDIS_ENABLED',
         mode='before'
     )
     @classmethod

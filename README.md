@@ -116,6 +116,21 @@ ML_CALLBACK_HMAC_SECRET=your-hmac-secret
 ML_ALLOWED_MODELS=yolo_v8,resnet50_classifier
 ```
 
+**Redis Cache (Optional):**
+```bash
+# Use Redis for caching instead of disk cache
+REDIS_ENABLED=true
+REDIS_HOST=localhost
+REDIS_PORT=6379
+REDIS_DB=0
+# REDIS_PASSWORD=your-redis-password  # Optional
+```
+
+To start Redis with Docker Compose:
+```bash
+docker compose up -d redis
+```
+
 ## Database Migrations (Alembic)
 
 **Important:** Migrations are **NOT** run automatically. This is intentional to prevent accidental schema changes in production.
