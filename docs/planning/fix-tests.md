@@ -193,3 +193,18 @@ None. This is a test/implementation bug, not a security vulnerability:
 - HMAC authentication logic is sound
 - Only affecting test execution, not production behavior
 - Once fixed, dual authentication (API key + HMAC) will work as designed
+
+## Frontend Test Status
+
+Frontend tests are **all passing** (59 tests across 5 test suites). The "Overall: FAILED" result from the test runner is solely due to the backend test failures, not any frontend issues.
+
+However, there is a minor issue with the test script that violates code style guidelines:
+
+**Location**: `test/run_tests.sh:8`
+**Issue**: `VERBOSE_MODE=true` defaults to verbose output
+**Expected**: Should default to `false` for minimal output
+
+According to CLAUDE.md style guidelines:
+> test scripts and utilities: minimal output by default, verbose mode optional
+
+This doesn't affect test results but produces excessive console output.
