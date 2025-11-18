@@ -363,8 +363,6 @@ async def get_user_context(
 
 
 async def require_api_key(
-    request: Request,
-    db: AsyncSession = Depends(get_db),
     api_user: Optional[User] = Depends(get_user_from_api_key)
 ) -> User:
     """
@@ -372,8 +370,6 @@ async def require_api_key(
     Used for /api-key endpoints (scripts, automation, CLI tools).
 
     Args:
-        request: FastAPI request object
-        db: Database session
         api_user: User from API key (if valid key was provided)
 
     Returns:
@@ -385,7 +381,7 @@ async def require_api_key(
     if not api_user:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="API key required for /api-key endpoints. Include 'Authorization: Bearer <api-key>' header.",
+            detail="Authentication required.",
         )
     return api_user
 
@@ -402,10 +398,22 @@ async def get_raw_body(request: Request) -> bytes:
     return await request.body()
 
 
+async def get_current_user_from_api_key_only(
+    api_user: Optional[User] = Depends(get_user_from_api_key)
+) -> User:
+    """Resolve current user using ONLY API key authentication.
+
+    Used for /api-ml endpoints where dual authentication (API key + HMAC)
+    is required. Header-based auth is intentionally not allowed here.
+    """
+    if not api_user:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="API key required.")
+    return api_user
+
+
 async def require_hmac_auth(
     request: Request,
-    db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(get_current_user_from_api_key_only),
     body_bytes: bytes = Depends(get_raw_body)
 ) -> User:
     """
@@ -418,8 +426,7 @@ async def require_hmac_auth(
 
     Args:
         request: FastAPI request object
-        db: Database session
-        current_user: Authenticated user (via get_current_user dependency)
+        current_user: Authenticated user (via API key dependency)
         body_bytes: Raw request body for HMAC verification
 
     Returns:
@@ -429,9 +436,13 @@ async def require_hmac_auth(
         HTTPException 500: If HMAC secret not configured
         HTTPException 401: If HMAC signature is invalid or missing
     """
-    # User is already authenticated via get_current_user dependency
-    # Now verify HMAC signature
+    # User is already authenticated via API key dependency
+    # If HMAC is disabled via configuration, accept the request after
+    # user auth succeeds. This is primarily for test environments.
+    if not settings.ML_PIPELINE_REQUIRE_HMAC:
+        return current_user
 
+    # HMAC is required from this point onward
     if not settings.ML_CALLBACK_HMAC_SECRET:
         logger.error("HMAC authentication required but ML_CALLBACK_HMAC_SECRET not configured")
         raise HTTPException(
@@ -448,7 +459,8 @@ async def require_hmac_auth(
         settings.ML_CALLBACK_HMAC_SECRET,
         body_bytes,
         timestamp,
-        signature
+        signature,
+        skew_seconds=settings.ML_HMAC_TIMESTAMP_SKEW_SECONDS,
     ):
         logger.warning("HMAC signature verification failed", extra={
             "user": current_user.email,
@@ -458,7 +470,7 @@ async def require_hmac_auth(
         })
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid HMAC signature. Include 'X-ML-Signature' and 'X-ML-Timestamp' headers."
+            detail="Invalid or missing HMAC signature."
         )
 
     return current_user

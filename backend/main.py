@@ -203,35 +203,28 @@ def create_app() -> FastAPI:
         dependencies=[Depends(require_hmac_auth)]
     )
 
-    # Include all resource routers in each API router
-    # This allows the same endpoints to be accessible via different auth methods
-    # Each router needs its resource-specific prefix (e.g., /projects, /images)
-    api_router.include_router(projects.router, prefix="/projects")
-    api_router.include_router(images.router)  # images.router routes already have /projects prefix in paths
-    api_router.include_router(users.router, prefix="/users")
-    api_router.include_router(image_classes.router)  # routes have full paths with /projects or /images
-    api_router.include_router(comments.router)  # routes have full paths with /images
-    api_router.include_router(project_metadata.router)  # routes have full paths with /projects
-    api_router.include_router(api_keys.router)  # routes have /api-keys in their paths
-    api_router.include_router(ml_analyses.router)  # ml_analyses has routes with full paths
+    # Standardized router registration: define once, register across all prefixes
+    routers_config = [
+        {"router": projects.router, "prefix": "/projects"},
+        {"router": images.router, "prefix": None},  # full paths include /projects
+        {"router": users.router, "prefix": "/users"},
+        {"router": image_classes.router, "prefix": None},
+        {"router": comments.router, "prefix": None},
+        {"router": project_metadata.router, "prefix": None},
+        {"router": api_keys.router, "prefix": None},
+        {"router": ml_analyses.router, "prefix": None},
+    ]
 
-    api_key_router.include_router(projects.router, prefix="/projects")
-    api_key_router.include_router(images.router)
-    api_key_router.include_router(users.router, prefix="/users")
-    api_key_router.include_router(image_classes.router)
-    api_key_router.include_router(comments.router)
-    api_key_router.include_router(project_metadata.router)
-    api_key_router.include_router(api_keys.router)  # routes have /api-keys in their paths
-    api_key_router.include_router(ml_analyses.router)
-
-    api_ml_router.include_router(projects.router, prefix="/projects")
-    api_ml_router.include_router(images.router)
-    api_ml_router.include_router(users.router, prefix="/users")
-    api_ml_router.include_router(image_classes.router)
-    api_ml_router.include_router(comments.router)
-    api_ml_router.include_router(project_metadata.router)
-    api_ml_router.include_router(api_keys.router)  # routes have /api-keys in their paths
-    api_ml_router.include_router(ml_analyses.router)
+    for cfg in routers_config:
+        prefix = cfg["prefix"]
+        if prefix:
+            api_router.include_router(cfg["router"], prefix=prefix)
+            api_key_router.include_router(cfg["router"], prefix=prefix)
+            api_ml_router.include_router(cfg["router"], prefix=prefix)
+        else:
+            api_router.include_router(cfg["router"])
+            api_key_router.include_router(cfg["router"])
+            api_ml_router.include_router(cfg["router"])
 
     # Add health check endpoint (no auth required)
     @app.get("/api/health")

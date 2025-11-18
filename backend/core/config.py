@@ -55,6 +55,7 @@ class Settings(BaseSettings):
     ML_DEFAULT_STATUS: str = "queued"
     ML_CALLBACK_HMAC_SECRET: Optional[str] = None
     ML_PIPELINE_REQUIRE_HMAC: bool = True
+    ML_HMAC_TIMESTAMP_SKEW_SECONDS: int = 300
     ML_MAX_BULK_ANNOTATIONS: int = 1000  # Lowered from 5000 to prevent memory/timeout issues
     ML_PRESIGNED_URL_EXPIRY_SECONDS: int = 3600  # 1 hour to allow slow uploads of large artifacts
 
