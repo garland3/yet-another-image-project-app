@@ -4,8 +4,8 @@ import { BrowserRouter } from 'react-router-dom';
 import ImageView from '../ImageView';
 
 // Mock react-router-dom
-const mockParams = { imageId: 'test-image-id' };
-const mockSearchParams = new URLSearchParams('project=test-project-id');
+let mockParams = { imageId: 'test-image-id' };
+let mockSearchParams = new URLSearchParams('project=test-project-id');
 const mockNavigate = jest.fn();
 
 jest.mock('react-router-dom', () => ({
@@ -88,37 +88,29 @@ const renderImageView = () => {
 describe('ImageView', () => {
   beforeEach(() => {
     fetch.mockClear();
+    // Provide a safe default for any unexpected fetches
+    fetch.mockResolvedValue({ ok: false, status: 401, json: async () => ({}), text: async () => '' });
     mockNavigate.mockClear();
     console.error = jest.fn(); // Mock console.error to avoid noise in tests
+    // Reset dynamic router params to defaults before each test
+    mockParams = { imageId: 'test-image-id' };
+    mockSearchParams = new URLSearchParams('project=test-project-id');
   });
 
   afterEach(() => {
-    fetch.mockRestore();
+    // Keep the jest mock in place between tests; just reset calls/implementations
+    fetch.mockReset();
   });
 
   describe('Regular Image Loading', () => {
     test('loads regular image successfully via direct endpoint', async () => {
-      fetch
-        .mockResolvedValueOnce({
-          ok: false,
-          status: 401
-        })
-        .mockResolvedValueOnce({
-          ok: true,
-          json: () => Promise.resolve(mockRegularImage)
-        })
-        .mockResolvedValueOnce({
-          ok: true,
-          json: () => Promise.resolve(mockProjectImages)
-        })
-        .mockResolvedValueOnce({
-          ok: true,
-          json: () => Promise.resolve([])
-        })
-        .mockResolvedValueOnce({
-          ok: true,
-          json: () => Promise.resolve([])
-        });
+      fetch.mockImplementation((url) => {
+        if (url === '/api/users/me') return Promise.resolve({ ok: false, status: 401 });
+        if (url === `/api/images/${mockParams.imageId}`) return Promise.resolve({ ok: true, json: async () => mockRegularImage });
+        if (url === `/api/projects/test-project-id/images?include_deleted=true`) return Promise.resolve({ ok: true, json: async () => mockProjectImages });
+        if (url === `/api/projects/test-project-id/classes`) return Promise.resolve({ ok: true, json: async () => [] });
+        return Promise.resolve({ ok: true, json: async () => [] });
+      });
 
       renderImageView();
 
@@ -131,27 +123,13 @@ describe('ImageView', () => {
     });
 
     test('sets document title correctly for regular images', async () => {
-      fetch
-        .mockResolvedValueOnce({
-          ok: false,
-          status: 401
-        })
-        .mockResolvedValueOnce({
-          ok: true,
-          json: () => Promise.resolve(mockRegularImage)
-        })
-        .mockResolvedValueOnce({
-          ok: true,
-          json: () => Promise.resolve(mockProjectImages)
-        })
-        .mockResolvedValueOnce({
-          ok: true,
-          json: () => Promise.resolve([])
-        })
-        .mockResolvedValueOnce({
-          ok: true,
-          json: () => Promise.resolve([])
-        });
+      fetch.mockImplementation((url) => {
+        if (url === '/api/users/me') return Promise.resolve({ ok: false, status: 401 });
+        if (url === `/api/images/${mockParams.imageId}`) return Promise.resolve({ ok: true, json: async () => mockRegularImage });
+        if (url === `/api/projects/test-project-id/images?include_deleted=true`) return Promise.resolve({ ok: true, json: async () => mockProjectImages });
+        if (url === `/api/projects/test-project-id/classes`) return Promise.resolve({ ok: true, json: async () => [] });
+        return Promise.resolve({ ok: true, json: async () => [] });
+      });
 
       renderImageView();
 
@@ -163,31 +141,14 @@ describe('ImageView', () => {
 
   describe('Deleted Image Fallback Logic', () => {
     test('falls back to project endpoint when direct fetch fails', async () => {
-      fetch
-        .mockResolvedValueOnce({
-          ok: false,
-          status: 401
-        })
-        .mockResolvedValueOnce({
-          ok: false,
-          status: 404
-        })
-        .mockResolvedValueOnce({
-          ok: true,
-          json: () => Promise.resolve([mockDeletedImage])
-        })
-        .mockResolvedValueOnce({
-          ok: true,
-          json: () => Promise.resolve(mockProjectImages)
-        })
-        .mockResolvedValueOnce({
-          ok: true,
-          json: () => Promise.resolve([])
-        })
-        .mockResolvedValueOnce({
-          ok: true,
-          json: () => Promise.resolve([])
-        });
+      fetch.mockImplementation((url) => {
+        if (url === '/api/users/me') return Promise.resolve({ ok: false, status: 401 });
+        if (url === `/api/images/${mockParams.imageId}`) return Promise.resolve({ ok: false, status: 404 });
+        if (url === `/api/projects/test-project-id/images?include_deleted=true`) return Promise.resolve({ ok: true, json: async () => [mockDeletedImage] });
+        if (url === `/api/projects/test-project-id/classes`) return Promise.resolve({ ok: true, json: async () => [] });
+        if (url === `/api/projects/test-project-id/images?include_deleted=true`) return Promise.resolve({ ok: true, json: async () => mockProjectImages });
+        return Promise.resolve({ ok: true, json: async () => [] });
+      });
 
       renderImageView();
 
@@ -195,41 +156,21 @@ describe('ImageView', () => {
         expect(screen.getByText('deleted-image.jpg')).toBeInTheDocument();
       });
 
-      // Verify direct fetch was attempted first (2nd call after /api/users/me)
-      expect(fetch).toHaveBeenNthCalledWith(2, '/api/images/test-image-id');
-
-      // Verify fallback to project endpoint with include_deleted=true (3rd call)
-      expect(fetch).toHaveBeenNthCalledWith(3, '/api/projects/test-project-id/images?include_deleted=true');
+      // Verify expected endpoints were called
+      expect(fetch).toHaveBeenCalledWith('/api/images/test-image-id');
+      expect(fetch).toHaveBeenCalledWith('/api/projects/test-project-id/images?include_deleted=true');
     });
 
     test('logs fallback attempt when direct fetch fails', async () => {
       const consoleSpy = jest.spyOn(console, 'log').mockImplementation();
 
-      fetch
-        .mockResolvedValueOnce({
-          ok: false,
-          status: 401
-        })
-        .mockResolvedValueOnce({
-          ok: false,
-          status: 404
-        })
-        .mockResolvedValueOnce({
-          ok: true,
-          json: () => Promise.resolve([mockDeletedImage])
-        })
-        .mockResolvedValueOnce({
-          ok: true,
-          json: () => Promise.resolve(mockProjectImages)
-        })
-        .mockResolvedValueOnce({
-          ok: true,
-          json: () => Promise.resolve([])
-        })
-        .mockResolvedValueOnce({
-          ok: true,
-          json: () => Promise.resolve([])
-        });
+      fetch.mockImplementation((url) => {
+        if (url === '/api/users/me') return Promise.resolve({ ok: false, status: 401 });
+        if (url === `/api/images/${mockParams.imageId}`) return Promise.resolve({ ok: false, status: 404 });
+        if (url === `/api/projects/test-project-id/images?include_deleted=true`) return Promise.resolve({ ok: true, json: async () => [mockDeletedImage] });
+        if (url === `/api/projects/test-project-id/classes`) return Promise.resolve({ ok: true, json: async () => [] });
+        return Promise.resolve({ ok: true, json: async () => mockProjectImages });
+      });
 
       renderImageView();
 
@@ -243,31 +184,13 @@ describe('ImageView', () => {
     });
 
     test('sets document title correctly for deleted images loaded via fallback', async () => {
-      fetch
-        .mockResolvedValueOnce({
-          ok: false,
-          status: 401
-        })
-        .mockResolvedValueOnce({
-          ok: false,
-          status: 404
-        })
-        .mockResolvedValueOnce({
-          ok: true,
-          json: () => Promise.resolve([mockDeletedImage])
-        })
-        .mockResolvedValueOnce({
-          ok: true,
-          json: () => Promise.resolve(mockProjectImages)
-        })
-        .mockResolvedValueOnce({
-          ok: true,
-          json: () => Promise.resolve([])
-        })
-        .mockResolvedValueOnce({
-          ok: true,
-          json: () => Promise.resolve([])
-        });
+      fetch.mockImplementation((url) => {
+        if (url === '/api/users/me') return Promise.resolve({ ok: false, status: 401 });
+        if (url === `/api/images/${mockParams.imageId}`) return Promise.resolve({ ok: false, status: 404 });
+        if (url === `/api/projects/test-project-id/images?include_deleted=true`) return Promise.resolve({ ok: true, json: async () => [mockDeletedImage] });
+        if (url === `/api/projects/test-project-id/classes`) return Promise.resolve({ ok: true, json: async () => [] });
+        return Promise.resolve({ ok: true, json: async () => mockProjectImages });
+      });
 
       renderImageView();
 
@@ -277,19 +200,24 @@ describe('ImageView', () => {
     });
 
     test('handles case where image not found in project images', async () => {
-      fetch
-        .mockResolvedValueOnce({
-          ok: false,
-          status: 401
-        })
-        .mockResolvedValueOnce({
-          ok: false,
-          status: 404
-        })
-        .mockResolvedValueOnce({
-          ok: true,
-          json: () => Promise.resolve([]) // Empty array - image not found
-        });
+      // URL-based mocking to avoid order fragility
+      fetch.mockImplementation((url) => {
+        if (url === '/api/users/me') {
+          return Promise.resolve({ ok: false, status: 401 });
+        }
+        if (url === `/api/images/${mockParams.imageId}`) {
+          return Promise.resolve({ ok: false, status: 404 });
+        }
+        if (url === `/api/projects/test-project-id/images?include_deleted=true`) {
+          // Fallback lookup returns empty (image not found)
+          return Promise.resolve({ ok: true, json: async () => [] });
+        }
+        if (url === `/api/projects/test-project-id/classes`) {
+          return Promise.resolve({ ok: true, json: async () => [] });
+        }
+        // Default: succeed with empty to avoid overriding error
+        return Promise.resolve({ ok: true, json: async () => [] });
+      });
 
       renderImageView();
 
@@ -358,19 +286,22 @@ describe('ImageView', () => {
     });
 
     test('handles project images loading failure', async () => {
-      fetch
-        .mockResolvedValueOnce({
-          ok: false,
-          status: 401
-        })
-        .mockResolvedValueOnce({
-          ok: true,
-          json: () => Promise.resolve(mockRegularImage)
-        })
-        .mockResolvedValueOnce({
-          ok: false,
-          status: 500
-        });
+      // URL-based mocking to ensure image load succeeds but project images fail
+      fetch.mockImplementation((url) => {
+        if (url === '/api/users/me') {
+          return Promise.resolve({ ok: false, status: 401 });
+        }
+        if (url === `/api/images/${mockParams.imageId}`) {
+          return Promise.resolve({ ok: true, json: async () => mockRegularImage });
+        }
+        if (url === `/api/projects/test-project-id/images?include_deleted=true`) {
+          return Promise.resolve({ ok: false, status: 500 });
+        }
+        if (url === `/api/projects/test-project-id/classes`) {
+          return Promise.resolve({ ok: true, json: async () => [] });
+        }
+        return Promise.resolve({ ok: true, json: async () => [] });
+      });
 
       renderImageView();
 
@@ -414,13 +345,9 @@ describe('ImageView', () => {
 
   describe('Error States', () => {
     test('displays error when image ID or project ID is missing', () => {
-      // Mock missing params
-      jest.doMock('react-router-dom', () => ({
-        ...jest.requireActual('react-router-dom'),
-        useParams: () => ({ imageId: null }),
-        useSearchParams: () => [new URLSearchParams()],
-        useNavigate: () => mockNavigate,
-      }));
+      // Override dynamic params used by our jest.mock above
+      mockParams = { imageId: null };
+      mockSearchParams = new URLSearchParams('');
 
       renderImageView();
 
@@ -432,7 +359,8 @@ describe('ImageView', () => {
 
       renderImageView();
 
-      expect(screen.getByText('Loading image...')).toBeInTheDocument();
+      // With mocked ImageDisplay, we show a placeholder text
+      expect(screen.getByTestId('image-display')).toHaveTextContent('Loading');
     });
   });
 

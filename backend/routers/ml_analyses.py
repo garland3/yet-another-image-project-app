@@ -19,7 +19,7 @@ def sanitize_for_log(value: str) -> str:
         value = str(value)
     return value.replace('\r', '').replace('\n', '')
 
-router = APIRouter(prefix="/api", tags=["ML Analyses"])
+router = APIRouter(tags=["ML Analyses"])
 
 
 # Dependency to get cached request body
@@ -399,6 +399,24 @@ class BulkAnnotationsPayload(schemas.BaseModel):  # type: ignore[attr-defined]
 
 
 def _verify_pipeline_hmac(request: Request, body_bytes: bytes):
+    """
+    Verify HMAC signature for ML pipeline callbacks.
+
+    This function implements dual-layer security for ML pipeline endpoints:
+    1. User authentication (API key or user session) - verified by get_current_user() dependency
+    2. HMAC signature verification - proves the request comes from an authorized ML pipeline
+
+    The dual-layer approach prevents unauthorized pipelines from making callbacks even if they
+    obtain valid user credentials (API keys). HMAC validation is optional when ML_PIPELINE_REQUIRE_HMAC=false
+    for backward compatibility during migration.
+
+    Args:
+        request: FastAPI request object containing headers
+        body_bytes: Raw request body bytes for signature verification
+
+    Raises:
+        HTTPException: If HMAC verification fails or is required but not configured
+    """
     if not settings.ML_PIPELINE_REQUIRE_HMAC:
         return
     secret = settings.ML_CALLBACK_HMAC_SECRET

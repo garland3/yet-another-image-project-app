@@ -8,8 +8,6 @@ from core.database import get_db
 from utils.dependencies import get_current_user, get_project_or_403
 
 router = APIRouter(
-    # prefix /api
-    prefix="/api",
     tags=["Project Metadata"],
 )
 

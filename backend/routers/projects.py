@@ -10,7 +10,6 @@ from utils.dependencies import get_current_user
 from aiocache import Cache
 
 router = APIRouter(
-    prefix="/api/projects",
     tags=["Projects"],
 )
 

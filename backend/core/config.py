@@ -55,6 +55,7 @@ class Settings(BaseSettings):
     ML_DEFAULT_STATUS: str = "queued"
     ML_CALLBACK_HMAC_SECRET: Optional[str] = None
     ML_PIPELINE_REQUIRE_HMAC: bool = True
+    ML_HMAC_TIMESTAMP_SKEW_SECONDS: int = 300
     ML_MAX_BULK_ANNOTATIONS: int = 1000  # Lowered from 5000 to prevent memory/timeout issues
     ML_PRESIGNED_URL_EXPIRY_SECONDS: int = 3600  # 1 hour to allow slow uploads of large artifacts
 
@@ -92,6 +93,17 @@ class Settings(BaseSettings):
     def MOCK_USER_GROUPS(self):
         import json
         return json.loads(self.MOCK_USER_GROUPS_JSON)
+
+    def patch(self, updates: dict):
+        """Return a shallow patched copy of settings with provided overrides.
+
+        Does not mutate the original instance. Intended for tests where
+        monkeypatch.setattr(module_path, settings.patch({...})) is used.
+        """
+        if not isinstance(updates, dict):
+            raise TypeError("updates must be a dict")
+        # Pydantic v2 provides model_copy for efficient cloning
+        return self.model_copy(update=updates)
 
 def _running_in_docker() -> bool:
     # Basic heuristics to detect containerized runtime

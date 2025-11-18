@@ -5,6 +5,13 @@ Debug script to check heatmap annotations in the database
 import asyncio
 import sys
 import os
+from pathlib import Path
+
+from dotenv import load_dotenv
+
+# Load environment variables from .env file in project root
+project_root = Path(__file__).parent.parent
+load_dotenv(project_root / '.env')
 
 # Add backend to path
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'backend'))

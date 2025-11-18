@@ -14,8 +14,15 @@ import hmac
 import hashlib
 import time
 import argparse
+from pathlib import Path
 from typing import List, Dict, Any, Optional
 from io import BytesIO
+
+from dotenv import load_dotenv
+
+# Load environment variables from .env file in project root
+project_root = Path(__file__).parent.parent
+load_dotenv(project_root / '.env')
 
 import requests
 from PIL import Image
@@ -45,7 +52,38 @@ class HeatmapPipeline:
         self.session.headers.update({'X-User-Email': self.user_email})
 
         if self.api_key:
-            self.session.headers.update({'X-API-Key': self.api_key})
+            self.session.headers.update({'Authorization': f'Bearer {self.api_key}'})
+
+    def _get_api_url(self, path: str) -> str:
+        """
+        Build URL for regular API endpoint (non-HMAC).
+        Uses /api-key prefix when using API key, /api when using OAuth.
+
+        Args:
+            path: API path (e.g., "/projects/123/images")
+
+        Returns:
+            Full URL with appropriate prefix
+        """
+        path = path.lstrip('/')
+        # Use /api-key prefix if we have an API key, otherwise /api (OAuth)
+        prefix = "api-key" if self.api_key else "api"
+        return f"{self.api_base_url}/{prefix}/{path}"
+
+    def _get_ml_url(self, path: str) -> str:
+        """
+        Build URL for ML pipeline endpoint.
+        Uses /api-ml prefix which requires API key + HMAC authentication.
+
+        Args:
+            path: API path (e.g., "/analyses/123/status")
+
+        Returns:
+            Full URL with /api-ml prefix
+        """
+        # Remove leading slash if present
+        path = path.lstrip('/')
+        return f"{self.api_base_url}/api-ml/{path}"
 
     def _generate_hmac_signature(self, body: str) -> tuple[str, str]:
         """Generate HMAC signature for ML pipeline authentication"""
@@ -62,7 +100,15 @@ class HeatmapPipeline:
         return signature, timestamp
 
     def _make_hmac_request(self, method: str, url: str, json_data: Dict[str, Any]) -> requests.Response:
-        """Make authenticated request with HMAC signature"""
+        """Make authenticated request with HMAC signature
+
+        HMAC requests require TWO layers of authentication:
+        1. User authentication (API key OR user email headers)
+        2. HMAC signature (proves request is from authorized ML pipeline)
+
+        This prevents unauthorized pipelines from making callbacks, even if they
+        have valid user credentials.
+        """
         body = json.dumps(json_data, separators=(',', ':'))
         signature, timestamp = self._generate_hmac_signature(body)
 
@@ -72,8 +118,15 @@ class HeatmapPipeline:
             'Content-Type': 'application/json'
         }
 
-        # Don't use session (which has user headers) for HMAC requests
-        # HMAC endpoints use their own auth mechanism
+        # Add user authentication headers
+        # Prefer API key if available, otherwise use user email (for dev/testing)
+        if self.api_key:
+            headers['Authorization'] = f'Bearer {self.api_key}'
+        else:
+            # For dev/testing without API key - assumes DEBUG=true on backend
+            headers['X-User-Email'] = self.user_email
+
+        # Make request with both auth layers
         response = requests.request(
             method=method,
             url=url,
@@ -86,7 +139,7 @@ class HeatmapPipeline:
         """Fetch images from a project"""
         print(f"Fetching images from project {project_id}")
 
-        url = f"{self.api_base_url}/api/projects/{project_id}/images"
+        url = self._get_api_url(f"projects/{project_id}/images")
         params = {'skip': 0, 'limit': limit}
 
         response = self.session.get(url, params=params)
@@ -98,7 +151,7 @@ class HeatmapPipeline:
 
     def get_image_analyses(self, image_id: str) -> List[Dict[str, Any]]:
         """Fetch existing analyses for an image"""
-        url = f"{self.api_base_url}/api/images/{image_id}/analyses"
+        url = self._get_api_url(f"images/{image_id}/analyses")
 
         try:
             response = self.session.get(url)
@@ -115,7 +168,7 @@ class HeatmapPipeline:
         print(f"  Downloading image {image_id}")
 
         # First, get the download info (returns JSON with URL)
-        info_url = f"{self.api_base_url}/api/images/{image_id}/download"
+        info_url = self._get_api_url(f"images/{image_id}/download")
         info_response = self.session.get(info_url)
         info_response.raise_for_status()
 
@@ -127,9 +180,11 @@ class HeatmapPipeline:
 
         # Now download the actual image content
         if not content_url.startswith('http'):
-            # Ensure the content URL has /api prefix if it doesn't
-            if not content_url.startswith('/api/'):
-                content_url = f"/api{content_url}"
+            # Ensure the content URL has proper API prefix if it's a relative path
+            if not content_url.startswith(('/api/', '/api-key/', '/api-ml/')):
+                # Prepend appropriate prefix for relative URLs
+                prefix = "api-key" if self.api_key else "api"
+                content_url = f"/{prefix}{content_url}"
             content_url = f"{self.api_base_url}{content_url}"
 
         response = self.session.get(content_url, stream=True)
@@ -169,7 +224,7 @@ class HeatmapPipeline:
         """Create ML analysis entry"""
         print(f"  Creating analysis for image {image_id}")
 
-        url = f"{self.api_base_url}/api/images/{image_id}/analyses"
+        url = self._get_api_url(f"images/{image_id}/analyses")
         data = {
             "image_id": image_id,
             "model_name": "heatmap_generator",
@@ -196,10 +251,12 @@ class HeatmapPipeline:
         """Update analysis status"""
         print(f"  Updating analysis status to: {status}")
 
-        url = f"{self.api_base_url}/api/analyses/{analysis_id}/status"
+        # Status updates go through the standard API (API key auth),
+        # not the dedicated /api-ml HMAC pipeline endpoints.
+        url = self._get_api_url(f"analyses/{analysis_id}/status")
         data = {"status": status}
 
-        response = self._make_hmac_request('PATCH', url, data)
+        response = self.session.patch(url, json=data)
         response.raise_for_status()
         print(f"  Status updated to {status}")
 
@@ -304,7 +361,7 @@ class HeatmapPipeline:
         print(f"  Uploading {artifact_type}: {filename}")
 
         # Get presigned URL
-        url = f"{self.api_base_url}/api/analyses/{analysis_id}/artifacts/presign"
+        url = self._get_ml_url(f"analyses/{analysis_id}/artifacts/presign")
         presign_data = {
             "artifact_type": artifact_type,
             "filename": filename
@@ -356,7 +413,7 @@ class HeatmapPipeline:
             "ordering": 0
         }]
 
-        url = f"{self.api_base_url}/api/analyses/{analysis_id}/annotations:bulk"
+        url = self._get_ml_url(f"analyses/{analysis_id}/annotations:bulk")
         data = {
             "annotations": annotations,
             "mode": "append"
@@ -371,7 +428,7 @@ class HeatmapPipeline:
         """Finalize analysis"""
         print(f"  Finalizing analysis as {status}")
 
-        url = f"{self.api_base_url}/api/analyses/{analysis_id}/finalize"
+        url = self._get_ml_url(f"analyses/{analysis_id}/finalize")
         data = {"status": status}
         if error_message:
             data["error_message"] = error_message

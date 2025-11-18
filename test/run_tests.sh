@@ -5,7 +5,7 @@
 set -euo pipefail
 
 # Parse arguments
-VERBOSE_MODE=false
+VERBOSE_MODE=true
 RUN_BACKEND=false
 RUN_FRONTEND=false
 
@@ -132,13 +132,13 @@ if [ "$RUN_FRONTEND" = true ]; then
   echo -n "Frontend tests... "
 
   set +e
-  # Run Jest tests, excluding the custom test-runner.js script
+  # Run Jest tests, excluding the custom test-runner script
   if [ "$VERBOSE_MODE" = true ]; then
     echo ""
     echo "Jest tests:"
-    npx react-scripts test --testPathIgnorePatterns=test-runner.js --watchAll=false --passWithNoTests
+    npx react-scripts test --testPathIgnorePatterns=test-runner.cjs --watchAll=false --passWithNoTests
   else
-    npx react-scripts test --testPathIgnorePatterns=test-runner.js --watchAll=false --passWithNoTests --silent >/dev/null 2>&1
+    npx react-scripts test --testPathIgnorePatterns=test-runner.cjs --watchAll=false --passWithNoTests --silent >/dev/null 2>&1
   fi
   JEST_EXIT_CODE=$?
 
@@ -146,9 +146,9 @@ if [ "$RUN_FRONTEND" = true ]; then
   if [ "$VERBOSE_MODE" = true ]; then
     echo ""
     echo "Custom test runner:"
-    node src/__tests__/test-runner.js
+    node src/__tests__/test-runner.cjs
   else
-    node src/__tests__/test-runner.js >/dev/null 2>&1
+    node src/__tests__/test-runner.cjs >/dev/null 2>&1
   fi
   CUSTOM_TEST_EXIT_CODE=$?
 

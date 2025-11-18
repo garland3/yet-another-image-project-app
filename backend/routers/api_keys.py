@@ -8,7 +8,6 @@ from core.database import get_db
 from utils.dependencies import get_current_user, generate_api_key, hash_api_key
 
 router = APIRouter(
-    prefix="/api",
     tags=["API Keys"],
 )
 

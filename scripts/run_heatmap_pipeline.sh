@@ -10,6 +10,13 @@ trap 'error "Script failed at line $LINENO with exit code $?"; exit 1' ERR
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 
+# Load environment variables from .env file
+if [[ -f "$PROJECT_ROOT/.env" ]]; then
+    set -a
+    source "$PROJECT_ROOT/.env"
+    set +a
+fi
+
 # Colors for output
 RED='\033[0;31m'
 GREEN='\033[0;32m'
@@ -44,7 +51,9 @@ Arguments:
 
 Options:
     --api-url URL       API base URL (default: http://localhost:8000)
-    --api-key KEY       API key for authentication (optional)
+    --api-key KEY       API key for authentication
+                        REQUIRED for production (with auth enabled)
+                        Optional for dev/test (with DEBUG=true)
     --heatmap-type TYPE Heatmap type: random (default: random)
                         Future: gradcam, saliency, attention
     --limit N           Maximum images to process (default: 10)
@@ -55,23 +64,26 @@ Options:
 
 Environment Variables:
     ML_CALLBACK_HMAC_SECRET    HMAC secret (required)
-    API_KEY                    API key for authentication (optional)
+    API_KEY                    API key for authentication (alternative to --api-key)
 
 Examples:
-    # Run with random heatmaps (fastest, no ML needed)
+    # Development/testing (with DEBUG=true on backend)
     $0 abc-123-def --limit 5
+
+    # Production (requires API key)
+    $0 abc-123-def --api-url https://api.example.com --api-key your-api-key --limit 5
 
     # Save heatmaps locally for inspection
     $0 abc-123-def --limit 5 --output-dir ./heatmap_outputs
 
     # Skip images with existing analyses
-    $0 abc-123-def --skip-existing
-
-    # Use specific API URL and key
-    $0 abc-123-def --api-url http://api.example.com --api-key my-key
+    $0 abc-123-def --skip-existing --api-key your-api-key
 
     # Install dependencies first
     $0 abc-123-def --install-deps
+
+Note: ML pipeline callbacks require BOTH API key AND HMAC signature in production.
+      The API key authenticates the user, HMAC proves the request is from an authorized pipeline.
 
 EOF
 }

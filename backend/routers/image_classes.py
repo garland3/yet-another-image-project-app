@@ -9,7 +9,6 @@ from core.group_auth_helper import is_user_in_group
 from utils.dependencies import get_current_user, get_project_or_403, get_image_or_403
 
 router = APIRouter(
-    prefix="/api",
     tags=["Image Classes"],
 )
 

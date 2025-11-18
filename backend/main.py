@@ -3,7 +3,7 @@ import json
 import logging
 from datetime import datetime
 from contextlib import asynccontextmanager
-from fastapi import FastAPI, Request, status, HTTPException
+from fastapi import FastAPI, Request, status, HTTPException, Depends
 from fastapi.routing import APIRouter
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import JSONResponse, FileResponse, HTMLResponse
@@ -178,18 +178,53 @@ def create_app() -> FastAPI:
             content={"detail": exc.errors()},
         )
 
-    # Create an API router 
-    api_router = APIRouter()
+    # Create three API routers with different authentication methods
 
-    # Include all API routers under the /api prefix
-    api_router.include_router(projects.router)
-    api_router.include_router(images.router)
-    api_router.include_router(users.router)
-    api_router.include_router(image_classes.router)
-    api_router.include_router(comments.router)
-    api_router.include_router(project_metadata.router)
-    api_router.include_router(api_keys.router)
-    api_router.include_router(ml_analyses.router)
+    # Router 1: /api - OAuth authentication (header-based via middleware)
+    # Used by: Web UI, browser users
+    # Auth: Middleware validates X-User-Email + X-Proxy-Secret headers
+    api_router = APIRouter(prefix="/api")
+
+    # Router 2: /api-key - API key authentication only
+    # Used by: Scripts, automation, CLI tools
+    # Auth: require_api_key dependency validates Authorization header
+    from utils.dependencies import require_api_key
+    api_key_router = APIRouter(
+        prefix="/api-key",
+        dependencies=[Depends(require_api_key)]
+    )
+
+    # Router 3: /api-ml - API key + HMAC authentication
+    # Used by: ML pipelines
+    # Auth: require_hmac_auth dependency validates Authorization header + HMAC signature
+    from utils.dependencies import require_hmac_auth
+    api_ml_router = APIRouter(
+        prefix="/api-ml",
+        dependencies=[Depends(require_hmac_auth)]
+    )
+
+    # Standardized router registration: define once, register across all prefixes
+    routers_config = [
+        {"router": projects.router, "prefix": "/projects"},
+        {"router": images.router, "prefix": None},  # full paths include /projects
+        {"router": users.router, "prefix": "/users"},
+        {"router": image_classes.router, "prefix": None},
+        {"router": comments.router, "prefix": None},
+        {"router": project_metadata.router, "prefix": None},
+        {"router": api_keys.router, "prefix": None},
+        {"router": ml_analyses.router, "prefix": None},
+    ]
+
+    for cfg in routers_config:
+        prefix = cfg["prefix"]
+        if prefix:
+            api_router.include_router(cfg["router"], prefix=prefix)
+            api_key_router.include_router(cfg["router"], prefix=prefix)
+            api_ml_router.include_router(cfg["router"], prefix=prefix)
+        else:
+            api_router.include_router(cfg["router"])
+            api_key_router.include_router(cfg["router"])
+            api_ml_router.include_router(cfg["router"])
 
     # Add health check endpoint (no auth required)
     @app.get("/api/health")
@@ -197,8 +232,10 @@ def create_app() -> FastAPI:
         """Health check endpoint for container monitoring."""
         return {"status": "healthy", "timestamp": datetime.utcnow().isoformat() + 'Z'}
 
-    # Include the API router in the main app
+    # Include all three API routers in the main app
     app.include_router(api_router)
+    app.include_router(api_key_router)
+    app.include_router(api_ml_router)
 
     # Setup static file serving
     setup_static_files(app)

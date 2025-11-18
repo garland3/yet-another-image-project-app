@@ -46,7 +46,8 @@ describe('ImageDisplay', () => {
   });
 
   afterEach(() => {
-    fetch.mockRestore();
+    // Keep the jest mock installed; just reset between tests
+    fetch.mockReset();
   });
 
   describe('Regular Images', () => {
@@ -88,12 +89,12 @@ describe('ImageDisplay', () => {
 
   describe('Deleted Images', () => {
     test('renders deleted image with placeholder SVG', () => {
-      renderImageDisplay({ 
+      renderImageDisplay({
         imageId: 'img-2',
         image: mockDeletedImage
       });
-      
-      const image = screen.getByAltText('Deleted Image');
+
+      const image = screen.getByAltText('Deleted');
       expect(image).toBeInTheDocument();
       expect(image.src).toContain('data:image/svg+xml;base64,');
       expect(image).toHaveClass('deleted-image');
@@ -121,16 +122,16 @@ describe('ImageDisplay', () => {
     });
 
     test('zoom works on deleted image placeholder', () => {
-      renderImageDisplay({ 
+      renderImageDisplay({
         imageId: 'img-2',
         image: mockDeletedImage
       });
-      
-      const image = screen.getByAltText('Deleted Image');
+
+      const image = screen.getByAltText('Deleted');
       const zoomInButton = screen.getByText('Zoom In');
-      
+
       expect(image.style.transform).toBe('scale(1)');
-      
+
       fireEvent.click(zoomInButton);
       expect(image.style.transform).toBe('scale(1.25)');
     });
@@ -150,34 +151,28 @@ describe('ImageDisplay', () => {
         blob: () => Promise.resolve(mockBlob)
       });
 
-      // Mock URL.createObjectURL and click functionality
-      global.URL.createObjectURL = jest.fn(() => 'blob:fake-url');
-      global.URL.revokeObjectURL = jest.fn();
-      
-      const mockClick = jest.fn();
-      const mockAppendChild = jest.fn();
-      const mockRemoveChild = jest.fn();
-      
-      document.createElement = jest.fn((tagName) => {
-        if (tagName === 'a') {
-          return {
-            href: '',
-            download: '',
-            click: mockClick,
-            style: {}
-          };
-        }
-        return {};
-      });
-      
-      document.body.appendChild = mockAppendChild;
-      document.body.removeChild = mockRemoveChild;
+        // Mock URL.createObjectURL and click functionality
+        const originalCreateElement = document.createElement.bind(document);
+        global.URL.createObjectURL = jest.fn(() => 'blob:fake-url');
+        global.URL.revokeObjectURL = jest.fn();
+
+        const mockClick = jest.fn();
+
+        // Only mock anchor creation; preserve default DOM behavior
+        document.createElement = jest.fn((tagName) => {
+          if (tagName === 'a') {
+            const a = originalCreateElement('a');
+            a.click = mockClick;
+            return a;
+          }
+          return originalCreateElement(tagName);
+        });
 
       renderImageDisplay();
-      
+
       const downloadButton = screen.getByText('Download');
       fireEvent.click(downloadButton);
-      
+
       await waitFor(() => {
         expect(fetch).toHaveBeenCalledWith('/api/images/img-1/content');
       });
@@ -185,6 +180,7 @@ describe('ImageDisplay', () => {
       // Cleanup
       global.URL.createObjectURL.mockRestore();
       global.URL.revokeObjectURL.mockRestore();
+      document.createElement = originalCreateElement;
     });
   });
 
@@ -206,7 +202,7 @@ describe('ImageDisplay', () => {
       const deleteButton = screen.getByText('Delete');
       fireEvent.click(deleteButton);
       
-      const submitButton = screen.getByRole('button', { name: /^Delete$/ });
+      const submitButton = screen.getAllByRole('button', { name: /^Delete$/ })[1];
       fireEvent.click(submitButton);
       
       await waitFor(() => {
@@ -234,7 +230,7 @@ describe('ImageDisplay', () => {
       const reasonTextarea = screen.getByLabelText('Reason (required)');
       fireEvent.change(reasonTextarea, { target: { value: 'Test deletion reason' } });
       
-      const submitButton = screen.getByRole('button', { name: /^Delete$/ });
+      const submitButton = screen.getAllByRole('button', { name: /^Delete$/ })[1];
       fireEvent.click(submitButton);
       
       await waitFor(() => {

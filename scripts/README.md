@@ -59,8 +59,10 @@ pip install -r ml_requirements.txt
 
 ## Environment Variables
 
-- `ML_CALLBACK_HMAC_SECRET` - Required for pipeline authentication
-- `API_KEY` - Optional API key for user endpoints
+- `ML_CALLBACK_HMAC_SECRET` - Required for ML pipeline authentication (HMAC)
+- `API_KEY` - API key used by ML scripts when calling API endpoints
+
+These are normally loaded from the project root `.env` file by the Python and shell scripts in this folder. If you change either value in `.env`, restart the backend so FastAPI picks up the new secrets; otherwise HMAC checks on `/api-ml` endpoints will continue to fail with 401.
 
 ## Usage Examples
 
