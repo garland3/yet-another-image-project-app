@@ -727,3 +727,63 @@ async def deactivate_api_key(db: AsyncSession, api_key_id: uuid.UUID, deactivate
     
     log_db_operation("UPDATE", "api_keys", api_key_id, deactivated_by or "system", {"deactivated": True})
     return True
+
+# User Annotation CRUD operations
+async def create_user_annotation(db: AsyncSession, annotation: schemas.UserAnnotationCreate, created_by_id: uuid.UUID) -> models.UserAnnotation:
+    db_annotation = models.UserAnnotation(
+        image_id=annotation.image_id,
+        created_by_id=created_by_id,
+        annotation_type=annotation.annotation_type,
+        label=annotation.label,
+        data=annotation.data
+    )
+    db.add(db_annotation)
+    await db.commit()
+    await db.refresh(db_annotation)
+    
+    log_db_operation("CREATE", "user_annotations", db_annotation.id, str(created_by_id), {"image_id": str(annotation.image_id), "type": annotation.annotation_type})
+    
+    result = await db.execute(
+        select(models.UserAnnotation)
+        .where(models.UserAnnotation.id == db_annotation.id)
+    )
+    return result.scalars().first()
+
+async def get_user_annotation(db: AsyncSession, annotation_id: uuid.UUID) -> Optional[models.UserAnnotation]:
+    result = await db.execute(select(models.UserAnnotation).where(models.UserAnnotation.id == annotation_id))
+    return result.scalars().first()
+
+async def get_user_annotations_for_image(db: AsyncSession, image_id: uuid.UUID) -> List[models.UserAnnotation]:
+    result = await db.execute(
+        select(models.UserAnnotation)
+        .where(models.UserAnnotation.image_id == image_id)
+        .order_by(models.UserAnnotation.created_at.desc())
+    )
+    return list(result.scalars().all())
+
+async def update_user_annotation(db: AsyncSession, annotation_id: uuid.UUID, annotation_data: Dict[str, Any]) -> Optional[models.UserAnnotation]:
+    db_annotation = await get_user_annotation(db, annotation_id)
+    if not db_annotation:
+        return None
+    
+    await db.execute(
+        update(models.UserAnnotation)
+        .where(models.UserAnnotation.id == annotation_id)
+        .values(**annotation_data)
+    )
+    await db.commit()
+    
+    log_db_operation("UPDATE", "user_annotations", annotation_id, str(db_annotation.created_by_id), {"changes": annotation_data})
+    
+    return await get_user_annotation(db, annotation_id)
+
+async def delete_user_annotation(db: AsyncSession, annotation_id: uuid.UUID) -> bool:
+    db_annotation = await get_user_annotation(db, annotation_id)
+    if not db_annotation:
+        return False
+    
+    log_db_operation("DELETE", "user_annotations", annotation_id, str(db_annotation.created_by_id), {"type": db_annotation.annotation_type})
+    
+    await db.execute(delete(models.UserAnnotation).where(models.UserAnnotation.id == annotation_id))
+    await db.commit()
+    return True

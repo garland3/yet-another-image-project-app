@@ -341,3 +341,33 @@ class MLAnnotationList(BaseModel):
     total: int
 
 
+# ----------------- User Annotation Schemas -----------------
+class UserAnnotationBase(BaseModel):
+    annotation_type: str = Field(default="bounding_box", min_length=3, max_length=50)
+    label: Optional[str] = Field(None, max_length=255)
+    data: Dict[str, Any]
+
+class UserAnnotationCreate(UserAnnotationBase):
+    image_id: uuid.UUID
+
+class UserAnnotationUpdate(BaseModel):
+    label: Optional[str] = Field(None, max_length=255)
+    data: Optional[Dict[str, Any]] = None
+
+class UserAnnotation(UserAnnotationBase):
+    id: uuid.UUID
+    image_id: uuid.UUID
+    created_by_id: uuid.UUID
+    created_at: datetime
+    updated_at: Optional[datetime] = None
+
+    model_config = {
+        "from_attributes": True,
+        "populate_by_name": True
+    }
+
+class UserAnnotationList(BaseModel):
+    annotations: List[UserAnnotation]
+    total: int
+
+

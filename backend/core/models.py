@@ -209,3 +209,21 @@ class MLAnnotation(Base):
     analysis = relationship("MLAnalysis", back_populates="annotations")
 
 
+class UserAnnotation(Base):
+    """User-created annotation on an image (bounding box with label)."""
+    __tablename__ = "user_annotations"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    image_id = Column(UUID(as_uuid=True), ForeignKey("data_instances.id", ondelete="CASCADE"), nullable=False, index=True)
+    created_by_id = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False, index=True)
+    annotation_type = Column(String(50), nullable=False, default="bounding_box")  # bounding_box, point, polygon
+    label = Column(String(255), nullable=True)
+    data = Column(JSON, nullable=False)  # Bounding box coordinates: {x_min, y_min, x_max, y_max, image_width, image_height}
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), onupdate=func.now())
+
+    # Relationships
+    image = relationship("DataInstance")
+    created_by = relationship("User")
+
+
