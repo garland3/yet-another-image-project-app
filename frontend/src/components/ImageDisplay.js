@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef, useLayoutEffect, useCallback } from 'react';
 import BoundingBoxOverlay from './BoundingBoxOverlay';
 import HeatmapOverlay from './HeatmapOverlay';
+import UserAnnotationTool from './UserAnnotationTool';
 
 // Deleted image placeholder SVG for larger display
 const DELETED_IMAGE_DISPLAY_SVG = 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iODAwIiBoZWlnaHQ9IjYwMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iODAwIiBoZWlnaHQ9IjYwMCIgZmlsbD0iI2ZiZjVmNSIgc3Ryb2tlPSIjZjU5ZTBiIiBzdHJva2Utd2lkdGg9IjQiIHN0cm9rZS1kYXNoYXJyYXk9IjE1LDgiLz48dGV4dCB4PSI1MCUiIHk9IjM1JSIgZm9udC1mYW1pbHk9IkFyaWFsLCBzYW5zLXNlcmlmIiBmb250LXNpemU9IjM2IiBmb250LXdlaWdodD0iNjAwIiB0ZXh0LWFuY2hvcj0ibWlkZGxlIiBkeT0iLjNlbSIgZmlsbD0iI2M0MzAyYiI+SW1hZ2UgRGVsZXRlZDwvdGV4dD48dGV4dCB4PSI1MCUiIHk9IjUwJSIgZm9udC1mYW1pbHk9IkFyaWFsLCBzYW5zLXNlcmlmIiBmb250LXNpemU9IjY0IiB0ZXh0LWFuY2hvcj0ibWlkZGxlIiBkeT0iLjNlbSIgZmlsbD0iI2Y1OWUwYiI+8J+XkeKcgO+4jzwvdGV4dD48dGV4dCB4PSI1MCUiIHk9IjY1JSIgZm9udC1mYW1pbHk9IkFyaWFsLCBzYW5zLXNlcmlmIiBmb250LXNpemU9IjE4IiB0ZXh0LWFuY2hvcj0ibWlkZGxlIiBkeT0iLjNlbSIgZmlsbD0iIzk3OWNhMSI+VGhpcyBpbWFnZSBoYXMgYmVlbiBkZWxldGVkPC90ZXh0Pjx0ZXh0IHg9IjUwJSIgeT0iNzAlIiBmb250LWZhbWlseT0iQXJpYWwsIHNhbnMtc2VyaWYiIGZvbnQtc2l6ZT0iMTQiIHRleHQtYW5jaG9yPSJtaWRkbGUiIGR5PSIuM2VtIiBmaWxsPSIjOTc5Y2ExIj5DaGVjayB0aGUgZGVsZXRpb24gY29udHJvbHMgYmVsb3cgZm9yIG1vcmUgaW5mbzwvdGV4dD48L3N2Zz4=';
@@ -18,7 +19,10 @@ function ImageDisplay({
   projectImages,
   selectedAnalysis,
   annotations,
-  overlayOptions
+  overlayOptions,
+  userAnnotations = [],
+  annotationMode = false,
+  onAnnotationsChange
 }) {
   const [zoomLevel, setZoomLevel] = useState(1);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
@@ -307,6 +311,19 @@ function ImageDisplay({
             annotations={annotations}
             containerSize={displaySize}
             opacity={overlayOptions.opacity}
+          />
+        </div>
+      )}
+      {/* User Annotation Tool - always show if we have user annotations or annotation mode is enabled */}
+      {image && displaySize.width > 0 && (userAnnotations.length > 0 || annotationMode) && (
+        <div style={{ transform: `scale(${zoomLevel})`, transformOrigin: 'top left', position: 'absolute', top: 0, left: 0 }}>
+          <UserAnnotationTool
+            imageId={imageId}
+            naturalSize={{ width: image.width, height: image.height }}
+            displaySize={displaySize}
+            userAnnotations={userAnnotations}
+            onAnnotationsChange={onAnnotationsChange}
+            enabled={annotationMode}
           />
         </div>
       )}
