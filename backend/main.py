@@ -20,7 +20,7 @@ from middleware.cors_debug import add_cors_middleware, debug_exception_middlewar
 from middleware.auth import auth_middleware
 from middleware.security_headers import SecurityHeadersMiddleware
 from middleware.body_cache import BodyCacheMiddleware
-from routers import projects, images, users, image_classes, comments, project_metadata, api_keys, ml_analyses
+from routers import projects, images, users, image_classes, comments, project_metadata, api_keys, ml_analyses, user_annotations
 
 
 """
@@ -213,6 +213,7 @@ def create_app() -> FastAPI:
         {"router": project_metadata.router, "prefix": None},
         {"router": api_keys.router, "prefix": None},
         {"router": ml_analyses.router, "prefix": None},
+        {"router": user_annotations.router, "prefix": None},
     ]
 
     for cfg in routers_config:

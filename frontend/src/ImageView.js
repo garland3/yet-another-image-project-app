@@ -61,6 +61,14 @@ function ImageView() {
     return saved === 'true' || saved === null; // Default to true
   });
 
+  // User annotation state
+  const [userAnnotations, setUserAnnotations] = useState([]);
+  const [annotationMode, setAnnotationMode] = useState(false);
+  const [showUserAnnotations, setShowUserAnnotations] = useState(() => {
+    const saved = localStorage.getItem('showUserAnnotations');
+    return saved !== 'false'; // Default to true (show annotations)
+  });
+
   // ML analysis selection handler
   const handleMLAnalysisSelect = useCallback((data) => {
     if (data && data.analysis) {
@@ -179,6 +187,23 @@ function ImageView() {
     }
   }, [projectId]);
 
+  // Load user annotations
+  const loadUserAnnotations = useCallback(async () => {
+    try {
+      const response = await fetch(`/api/images/${imageId}/annotations`);
+      
+      if (!response.ok) {
+        throw new Error(`HTTP error! Status: ${response.status}`);
+      }
+      
+      const data = await response.json();
+      setUserAnnotations(data.annotations || []);
+      
+    } catch (error) {
+      console.error('Error loading user annotations:', error);
+    }
+  }, [imageId]);
+
   // Initialize data on component mount
   useEffect(() => {
     if (!imageId || !projectId) {
@@ -211,7 +236,8 @@ function ImageView() {
     loadImageData();
     loadProjectImages();
     loadClasses();
-  }, [imageId, projectId, loadImageData, loadProjectImages, loadClasses]);
+    loadUserAnnotations();
+  }, [imageId, projectId, loadImageData, loadProjectImages, loadClasses, loadUserAnnotations]);
 
   // Navigate to previous image with transition
   const navigateToPreviousImage = useCallback(() => {
@@ -275,6 +301,11 @@ function ImageView() {
   useEffect(() => {
     localStorage.setItem('mlAutoSelectLatest', autoSelectLatest.toString());
   }, [autoSelectLatest]);
+
+  // Save show user annotations preference to localStorage
+  useEffect(() => {
+    localStorage.setItem('showUserAnnotations', showUserAnnotations.toString());
+  }, [showUserAnnotations]);
 
   // Handle resize functionality
   const handleMouseDown = useCallback(() => {
@@ -395,6 +426,56 @@ function ImageView() {
                 setError={setError}
               />
 
+              {/* User Annotation Toggle */}
+              <div className="section-card" style={{ marginBottom: '1rem' }}>
+                <div className="section-header" style={{ marginBottom: '0.5rem' }}>
+                  <h3>User Annotations</h3>
+                </div>
+                
+                {/* Visibility toggle */}
+                <div style={{ marginBottom: '0.5rem' }}>
+                  <label style={{ display: 'flex', alignItems: 'center', cursor: 'pointer' }}>
+                    <input
+                      type="checkbox"
+                      checked={showUserAnnotations}
+                      onChange={(e) => setShowUserAnnotations(e.target.checked)}
+                      style={{ marginRight: '8px' }}
+                    />
+                    <span style={{ fontSize: '14px' }}>Show annotations</span>
+                  </label>
+                </div>
+                
+                {/* Draw mode button */}
+                <button
+                  onClick={() => setAnnotationMode(!annotationMode)}
+                  style={{
+                    width: '100%',
+                    padding: '8px 16px',
+                    background: annotationMode ? '#f44336' : '#00bcd4',
+                    color: 'white',
+                    border: 'none',
+                    borderRadius: '4px',
+                    cursor: 'pointer',
+                    fontSize: '14px',
+                    fontWeight: 'bold',
+                    marginBottom: '0.5rem'
+                  }}
+                >
+                  {annotationMode ? 'Exit Draw Mode' : 'Draw New Annotation'}
+                </button>
+                
+                {annotationMode && (
+                  <p style={{ marginTop: '0', marginBottom: '0.5rem', fontSize: '12px', color: '#666' }}>
+                    Click and drag on the image to draw bounding boxes. Select a label from available classes.
+                  </p>
+                )}
+                {userAnnotations.length > 0 && (
+                  <p style={{ marginTop: '0', fontSize: '12px', color: '#666' }}>
+                    {userAnnotations.length} annotation{userAnnotations.length !== 1 ? 's' : ''} on this image
+                  </p>
+                )}
+              </div>
+
               {/* ML Analysis Panel (read-only, only visible when analyses exist) */}
               {image && (
                 <MLAnalysisPanel
@@ -440,6 +521,11 @@ function ImageView() {
                 selectedAnalysis={selectedAnalysis}
                 annotations={selectedAnnotations}
                 overlayOptions={overlayOptions}
+                userAnnotations={userAnnotations}
+                annotationMode={annotationMode}
+                showUserAnnotations={showUserAnnotations}
+                availableClasses={classes}
+                onAnnotationsChange={setUserAnnotations}
               />
             </div>
           </div>
